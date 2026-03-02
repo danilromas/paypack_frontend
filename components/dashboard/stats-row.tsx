@@ -1,14 +1,32 @@
-"use client"
+"use client";
 
-import { Wallet, ArrowLeftRight, Search } from "lucide-react"
-import { useAppStore } from "@/store/app-store"
-import { useState } from "react"
+import { Wallet, ArrowLeftRight, Search } from "lucide-react";
+import { useAppStore } from "@/store/app-store";
+import { useState } from "react";
 
-const filters = ["All", "Active", "Disputed", "Completed"]
+const filters = ["All", "Active", "Disputed", "Completed"];
 
-export function StatsRow() {
-  const { walletBalance } = useAppStore()
-  const [activeFilter, setActiveFilter] = useState("All")
+interface StatsRowProps {
+  onFilterChange?: (filter: string) => void;
+  onSearchChange?: (search: string) => void;
+}
+
+export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
+  const { walletBalance } = useAppStore();
+  const [activeFilter, setActiveFilter] = useState("All");
+
+  const handleFilterClick = (filter: string) => {
+    setActiveFilter(filter);
+    if (onFilterChange) {
+      onFilterChange(filter);
+    }
+  };
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (onSearchChange) {
+      onSearchChange(e.target.value);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -35,6 +53,7 @@ export function StatsRow() {
           <input
             type="text"
             placeholder="Search deals..."
+            onChange={handleSearch}
             className="w-full rounded-xl border border-border bg-card py-3 pl-12 pr-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -42,7 +61,7 @@ export function StatsRow() {
           {filters.map((f) => (
             <button
               key={f}
-              onClick={() => setActiveFilter(f)}
+              onClick={() => handleFilterClick(f)}
               className={`rounded-lg border px-4 py-2 text-sm transition-all ${
                 activeFilter === f
                   ? "border-primary/30 bg-primary/10 font-medium text-primary"
@@ -55,5 +74,5 @@ export function StatsRow() {
         </div>
       </div>
     </div>
-  )
+  );
 }
