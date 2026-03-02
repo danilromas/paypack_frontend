@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { ShipmentsTable } from "@/components/dashboard/shipments-table"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
@@ -8,7 +8,7 @@ import { Search, Package } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useAppStore } from "@/store/app-store"
 
-export default function ShipmentsPage() {
+function ShipmentsPageContent() {
   const searchParams = useSearchParams()
   const { setMode } = useAppStore()
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -101,5 +101,13 @@ export default function ShipmentsPage() {
 
       {wizardOpen && <NewShipmentWizard onClose={() => setWizardOpen(false)} />}
     </>
+  )
+}
+
+export default function ShipmentsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ShipmentsPageContent />
+    </Suspense>
   )
 }
