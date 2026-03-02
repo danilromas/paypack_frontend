@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayPack.uno - Settings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0891b2 100%);
+            min-height: 100vh;
+            margin: 0;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s;
+        }
+        .glass-card:hover { background: rgba(255, 255, 255, 0.1); }
+        .glass-button {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(6, 182, 212, 0.8));
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .glass-button:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4); }
+        .gradient-text {
+            background: linear-gradient(135deg, #38bdf8, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .tab-active {
+            background: rgba(6, 182, 212, 0.2);
+            border-left: 3px solid #06b6d4;
+            color: white;
+        }
+        .kyc-verified { background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.3); }
+        .kyc-pending { background: rgba(234, 179, 8, 0.2); border: 1px solid rgba(234, 179, 8, 0.3); }
+        .scroll::-webkit-scrollbar { width: 4px; }
+        .scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+        .toggle {
+            width: 40px;
+            height: 22px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 11px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .toggle.active { background: linear-gradient(135deg, #38bdf8, #06b6d4); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        .toggle.active::after { transform: translateX(18px); }
+        .card-number { font-family: 'Courier New', monospace; letter-spacing: 2px; }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .nav-bottom { display: flex; }
+            .settings-tabs { width: 100%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); }
+            .settings-content { width: 100%; }
+        }
+        @media (min-width: 769px) {
+            .nav-bottom { display: none; }
+        }
+    </style>
+</head>
+<body class="text-white text-sm">
+
+    <div class="flex h-screen w-full overflow-hidden">
+        
+        <!-- Sidebar Desktop -->
+        <aside class="sidebar w-16 glass flex flex-col items-center py-4 border-r border-white/10">
+            <div class="mb-6"><i class="fas fa-cube text-xl text-cyan-400"></i></div>
+            <nav class="flex-1 flex flex-col gap-2 w-full">
+                <a href="#" class="p-3 text-gray-400 hover:text-white hover:bg-white/10 flex justify-center"><i class="fas fa-th-large"></i></a>
+                <a href="#" class="p-3 text-gray-400 hover:text-white hover:bg-white/10 flex justify-center"><i class="fas fa-comments"></i></a>
+                <a href="#" class="p-3 text-gray-400 hover:text-white hover:bg-white/10 flex justify-center"><i class="fas fa-question-circle"></i></a>
+                <a href="#" class="p-3 text-cyan-400 bg-white/10 border-l-2 border-cyan-400 flex justify-center"><i class="fas fa-cog"></i></a>
+            </nav>
+            <a href="#" class="p-3 text-gray-400 hover:text-red-400"><i class="fas fa-sign-out-alt"></i></a>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col glass overflow-hidden">
+            
+            <!-- Header -->
+            <div class="h-14 border-b border-white/10 flex items-center justify-between px-4">
+                <h2 class="font-bold text-base">Settings</h2>
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-xs">JD</div>
+                </div>
+            </div>
+
+            <!-- Settings Layout -->
+            <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+                
+                <!-- Tabs -->
+                <div class="settings-tabs w-full md:w-48 glass border-r border-white/10 overflow-y-auto scroll">
+                    <button onclick="showTab('profile')" id="tab-profile" class="tab-active w-full text-left p-3 flex items-center gap-2 text-xs transition-all">
+                        <i class="fas fa-user w-4"></i> Profile
+                    </button>
+                    <button onclick="showTab('kyc')" id="tab-kyc" class="w-full text-left p-3 flex items-center gap-2 text-gray-400 hover:bg-white/5 text-xs transition-all">
+                        <i class="fas fa-id-card w-4"></i> KYC Verification
+                    </button>
+                    <button onclick="showTab('payment')" id="tab-payment" class="w-full text-left p-3 flex items-center gap-2 text-gray-400 hover:bg-white/5 text-xs transition-all">
+                        <i class="fas fa-credit-card w-4"></i> Payment Methods
+                    </button>
+                    <button onclick="showTab('api')" id="tab-api" class="w-full text-left p-3 flex items-center gap-2 text-gray-400 hover:bg-white/5 text-xs transition-all">
+                        <i class="fas fa-code w-4"></i> API Keys
+                    </button>
+                    <button onclick="showTab('security')" id="tab-security" class="w-full text-left p-3 flex items-center gap-2 text-gray-400 hover:bg-white/5 text-xs transition-all">
+                        <i class="fas fa-shield-alt w-4"></i> Security
+                    </button>
+                    <button onclick="showTab('notifications')" id="tab-notifications" class="w-full text-left p-3 flex items-center gap-2 text-gray-400 hover:bg-white/5 text-xs transition-all">
+                        <i class="fas fa-bell w-4"></i> Notifications
+                    </button>
+                </div>
+
+                <!-- Content -->
+                <div class="settings-content flex-1 overflow-y-auto scroll p-4">
+
+                    <!-- Profile Tab -->
+                    <div id="content-profile" class="space-y-4 max-w-lg">
+                        <h3 class="font-semibold text-xs text-gray-400 uppercase mb-3">Personal Information</h3>
+                        
+                        <!-- Avatar -->
+                        <div class="glass-card rounded-xl p-4 flex items-center gap-4">
+                            <div class="relative">
+                                <div class="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-2xl font-bold">JD</div>
+                                <button class="absolute bottom-0 right-0 w-6 h-6 bg-cyan-500 rounded-full flex items-center justify-center text-xs">
+                                    <i class="fas fa-camera"></i>
+                                </button>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium text-sm">John Doe</p>
+                                <p class="text-xs text-gray-400">@johndoe</p>
+                                <p class="text-[10px] text-cyan-400 mt-1">Member since 2023</p>
+                            </div>
+                        </div>
+
+                        <!-- Form -->
+                        <div class="glass-card rounded-xl p-4 space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="text-[10px] text-gray-400 block mb-1">First Name</label>
+                                    <input type="text" value="John" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-cyan-400/50">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-gray-400 block mb-1">Last Name</label>
+                                    <input type="text" value="Doe" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-cyan-400/50">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 block mb-1">Display Name</label>
+                                <input type="text" value="John Doe" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-cyan-400/50">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 block mb-1">Email</label>
+                                <input type="email" value="john.doe@email.com" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-cyan-400/50">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 block mb-1">Phone</label>
+                                <input type="tel" value="+1 (555) 123-4567" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-cyan-400/50">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-gray-400 block mb-1">Bio</label>
+                                <textarea rows="2" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent resize-none focus:outline-none focus:ring-1 focus:ring-cyan-400/50">Trusted trader | Fast shipping</textarea>
+                            </div>
+                            <button class="w-full glass-button py-2 rounded-lg text-xs font-medium">Save Changes</button>
+                        </div>
+
+                        <!-- Danger Zone -->
+                        <div class="glass-card rounded-xl p-4 border border-red-500/30">
+                            <h4 class="text-red-400 font-medium text-xs mb-2">Danger Zone</h4>
+                            <div class="space-y-2">
+                                <button class="w-full glass-card py-2 rounded-lg text-xs text-left px-3 hover:bg-red-500/10 text-red-400">
+                                    <i class="fas fa-trash mr-2"></i>Delete Account
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KYC Tab -->
+                    <div id="content-kyc" class="space-y-4 max-w-lg hidden">
+                        <h3 class="font-semibold text-xs text-gray-400 uppercase mb-3">Identity Verification</h3>
+                        
+                        <!-- Status Card -->
+                        <div class="kyc-verified rounded-xl p-4 flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                                <i class="fas fa-check-circle text-green-400"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium text-sm text-green-400">Verified</p>
+                                <p class="text-[10px] text-gray-300">Your identity has been confirmed</p>
+                            </div>
+                            <i class="fas fa-shield-alt text-green-400 text-xl"></i>
+                        </div>
+
+                        <!-- Verification Levels -->
+                        <div class="glass-card rounded-xl p-4 space-y-3">
+                            <h4 class="font-medium text-xs">Verification Levels</h4>
+                            
+                            <div class="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                                <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                                    <i class="fas fa-check text-green-400 text-xs"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-xs font-medium">Level 1 - Basic</p>
+                                    <p class="text-[10px] text-gray-400">Email & Phone verified</p>
+                                </div>
+                                <span class="text-[10px] text-green-400">Done</span>
+                            </div>
+
+                            <div class="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                                <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                                    <i class="fas fa-check text-green-400 text-xs"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-xs font-medium">Level 2 - Identity</p>
+                                    <p class="text-[10px] text-gray-400">ID Document verified</p>
+                                </div>
+                                <span class="text-[10px] text-green-400">Done</span>
+                            </div>
+
+                            <div class="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                                <div class="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                                    <i class="fas fa-clock text-yellow-400 text-xs"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-xs font-medium">Level 3 - Address</p>
+                                    <p class="text-[10px] text-gray-400">Proof of address required</p>
+                                </div>
+                                <button class="text-[10px] text-cyan-400">Verify</button>
+                            </div>
+                        </div>
+
+                        <!-- Documents -->
+                        <div class="glass-card rounded-xl p-4">
+                            <h4 class="font-medium text-xs mb-3">Your Documents</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-passport text-cyan-400"></i>
+                                        <span class="text-xs">Passport.pdf</span>
+                                    </div>
+                                    <span class="text-[10px] text-green-400">Approved</span>
+                                </div>
+                                <div class="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-file-alt text-gray-400"></i>
+                                        <span class="text-xs text-gray-400">Utility_Bill.pdf</span>
+                                    </div>
+                                    <button class="text-[10px] text-cyan-400">Upload</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Limits -->
+                        <div class="glass-card rounded-xl p-4">
+                            <h4 class="font-medium text-xs mb-3">Your Limits</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-gray-400">Daily transactions</span>
+                                    <span>$10,000 / $50,000</span>
+                                </div>
+                                <div class="w-full bg-white/10 rounded-full h-1.5">
+                                    <div class="bg-cyan-400 h-1.5 rounded-full" style="width: 20%"></div>
+                                </div>
+                                <p class="text-[10px] text-gray-400 mt-1">Complete Level 3 to increase limits</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Methods Tab -->
+                    <div id="content-payment" class="space-y-4 max-w-lg hidden">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-semibold text-xs text-gray-400 uppercase">Payment Methods</h3>
+                            <button onclick="addCard()" class="glass-button px-3 py-1.5 rounded-lg text-xs">
+                                <i class="fas fa-plus mr-1"></i>Add New
+                            </button>
+                        </div>
+
+                        <!-- Cards -->
+                        <div class="space-y-3">
+                            <!-- Card 1 -->
+                            <div class="glass-card rounded-xl p-4 relative overflow-hidden">
+                                <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-cyan-400/20 to-transparent rounded-full -mr-8 -mt-8"></div>
+                                <div class="flex justify-between items-start mb-4 relative z-10">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fab fa-cc-visa text-2xl text-cyan-400"></i>
+                                        <span class="text-xs font-medium">Visa</span>
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <button class="text-gray-400 hover:text-white text-xs"><i class="fas fa-edit"></i></button>
+                                        <button class="text-gray-400 hover:text-red-400 text-xs"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </div>
+                                <p class="card-number text-lg mb-2 relative z-10">•••• •••• •••• 4242</p>
+                                <div class="flex justify-between items-center relative z-10">
+                                    <div>
+                                        <p class="text-[10px] text-gray-400">Card Holder</p>
+                                        <p class="text-xs">JOHN DOE</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] text-gray-400">Expires</p>
+                                        <p class="text-xs">12/25</p>
+                                    </div>
+                                </div>
+                                <div class="absolute top-2 right-2">
+                                    <span class="text-[10px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded">Default</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 2 -->
+                            <div class="glass-card rounded-xl p-4 relative overflow-hidden opacity-70">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fab fa-cc-mastercard text-2xl text-red-400"></i>
+                                        <span class="text-xs font-medium">Mastercard</span>
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <button class="text-gray-400 hover:text-white text-xs"><i class="fas fa-edit"></i></button>
+                                        <button class="text-gray-400 hover:text-red-400 text-xs"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </div>
+                                <p class="card-number text-lg mb-2">•••• •••• •••• 8888</p>
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="text-[10px] text-gray-400">Card Holder</p>
+                                        <p class="text-xs">JOHN DOE</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] text-gray-400">Expires</p>
+                                        <p class="text-xs">08/26</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bank Accounts -->
+                        <h4 class="font-medium text-xs text-gray-400 mt-4 mb-2">Bank Accounts</h4>
+                        <div class="glass-card rounded-xl p-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                                    <i class="fas fa-university text-green-400"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium">Chase Bank</p>
+                                    <p class="text-[10px] text-gray-400">•••• 4521</p>
+                                </div>
+                            </div>
+                            <span class="text-[10px] text-green-400">Verified</span>
+                        </div>
+
+                        <button class="w-full glass-card py-2 rounded-lg text-xs flex items-center justify-center gap-2 hover:bg-white/10">
+                            <i class="fas fa-plus text-cyan-400"></i>
+                            Link Bank Account
+                        </button>
+
+                        <!-- Crypto Wallets -->
+                        <h4 class="font-medium text-xs text-gray-400 mt-4 mb-2">Crypto Wallets</h4>
+                        <div class="glass-card rounded-xl p-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                                    <i class="fab fa-bitcoin text-orange-400"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium">Bitcoin</p>
+                                    <p class="text-[10px] text-gray-400 truncate max-w-[150px]">bc1q...xy2z</p>
+                                </div>
+                            </div>
+                            <button class="text-[10px] text-cyan-400">Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- API Keys Tab -->
+                    <div id="content-api" class="space-y-4 max-w-lg hidden">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-semibold text-xs text-gray-400 uppercase">API Keys</h3>
+                            <button onclick="generateKey()" class="glass-button px-3 py-1.5 rounded-lg text-xs">
+                                <i class="fas fa-plus mr-1"></i>Generate New
+                            </button>
+                        </div>
+
+                        <!-- API Key 1 -->
+                        <div class="glass-card rounded-xl p-4">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <p class="font-medium text-xs">Production Key</p>
+                                    <p class="text-[10px] text-gray-400">Created Jan 15, 2024</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Active</span>
+                                    <button onclick="toggleKey(this)" class="text-gray-400 hover:text-white"><i class="fas fa-eye"></i></button>
+                                </div>
+                            </div>
+                            <div class="glass-card rounded-lg p-2 mb-2 flex items-center justify-between">
+                                <code class="text-[10px] text-cyan-400 font-mono truncate max-w-[200px] key-hidden">pk_live_••••••••••••••••••••••••</code>
+                                <button onclick="copyKey(this)" class="text-gray-400 hover:text-cyan-400 text-xs"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div class="flex gap-2 text-[10px]">
+                                <span class="text-gray-400">Last used: 2h ago</span>
+                                <span class="text-gray-500">|</span>
+                                <span class="text-gray-400">1,234 requests</span>
+                            </div>
+                            <div class="flex gap-2 mt-3">
+                                <button class="flex-1 glass-card py-1.5 rounded text-[10px] hover:bg-white/10">Edit</button>
+                                <button class="flex-1 glass-card py-1.5 rounded text-[10px] text-red-400 hover:bg-red-500/10">Revoke</button>
+                            </div>
+                        </div>
+
+                        <!-- API Key 2 -->
+                        <div class="glass-card rounded-xl p-4">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <p class="font-medium text-xs">Test Key</p>
+                                    <p class="text-[10px] text-gray-400">Created Dec 01, 2023</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="text-[10px] bg-gray-500/20 text-gray-400 px-1.5 py-0.5 rounded">Inactive</span>
+                                    <button onclick="toggleKey(this)" class="text-gray-400 hover:text-white"><i class="fas fa-eye"></i></button>
+                                </div>
+                            </div>
+                            <div class="glass-card rounded-lg p-2 mb-2 flex items-center justify-between">
+                                <code class="text-[10px] text-cyan-400 font-mono truncate max-w-[200px] key-hidden">pk_test_••••••••••••••••••••••••</code>
+                                <button onclick="copyKey(this)" class="text-gray-400 hover:text-cyan-400 text-xs"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div class="flex gap-2 mt-3">
+                                <button class="flex-1 glass-card py-1.5 rounded text-[10px] hover:bg-white/10">Activate</button>
+                                <button class="flex-1 glass-card py-1.5 rounded text-[10px] text-red-400 hover:bg-red-500/10">Delete</button>
+                            </div>
+                        </div>
+
+                        <!-- Webhooks -->
+                        <h4 class="font-medium text-xs text-gray-400 mt-4 mb-2">Webhooks</h4>
+                        <div class="glass-card rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs">Endpoint URL</span>
+                                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                            </div>
+                            <input type="text" value="https://api.yoursite.com/webhooks/paypack" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent mb-3">
+                            <div class="flex gap-2">
+                                <label class="flex items-center gap-2 text-[10px] text-gray-400">
+                                    <input type="checkbox" checked class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                    deal.created
+                                </label>
+                                <label class="flex items-center gap-2 text-[10px] text-gray-400">
+                                    <input type="checkbox" checked class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                    deal.completed
+                                </label>
+                                <label class="flex items-center gap-2 text-[10px] text-gray-400">
+                                    <input type="checkbox" class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                    dispute.opened
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- API Docs -->
+                        <div class="glass-card rounded-xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                                    <i class="fas fa-book text-cyan-400"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium">API Documentation</p>
+                                    <p class="text-[10px] text-gray-400">Integrate with our API</p>
+                                </div>
+                            </div>
+                            <button class="text-cyan-400 text-xs"><i class="fas fa-external-link-alt"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Security Tab -->
+                    <div id="content-security" class="space-y-4 max-w-lg hidden">
+                        <h3 class="font-semibold text-xs text-gray-400 uppercase mb-3">Security Settings</h3>
+
+                        <!-- 2FA -->
+                        <div class="glass-card rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                                        <i class="fas fa-shield-alt text-green-400"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-medium">Two-Factor Authentication</p>
+                                        <p class="text-[10px] text-gray-400">Enabled via Authenticator</p>
+                                    </div>
+                                </div>
+                                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                            </div>
+                            <button class="text-[10px] text-cyan-400">Configure 2FA</button>
+                        </div>
+
+                        <!-- Password -->
+                        <div class="glass-card rounded-xl p-4">
+                            <h4 class="font-medium text-xs mb-3">Change Password</h4>
+                            <div class="space-y-2">
+                                <input type="password" placeholder="Current password" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                                <input type="password" placeholder="New password" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                                <input type="password" placeholder="Confirm new password" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                                <button class="w-full glass-button py-2 rounded-lg text-xs font-medium">Update Password</button>
+                            </div>
+                        </div>
+
+                        <!-- Sessions -->
+                        <div class="glass-card rounded-xl p-4">
+                            <h4 class="font-medium text-xs mb-3">Active Sessions</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-desktop text-cyan-400"></i>
+                                        <div>
+                                            <p class="text-xs">Chrome on Windows</p>
+                                            <p class="text-[10px] text-gray-400">Current session</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] text-green-400">Active</span>
+                                </div>
+                                <div class="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-mobile-alt text-gray-400"></i>
+                                        <div>
+                                            <p class="text-xs">iPhone 15</p>
+                                            <p class="text-[10px] text-gray-400">Last seen 2h ago</p>
+                                        </div>
+                                    </div>
+                                    <button class="text-[10px] text-red-400">Revoke</button>
+                                </div>
+                            </div>
+                            <button class="w-full glass-card mt-3 py-2 rounded-lg text-xs text-red-400 hover:bg-red-500/10">
+                                Log Out All Devices
+                            </button>
+                        </div>
+
+                        <!-- Login History -->
+                        <div class="glass-card rounded-xl p-4">
+                            <h4 class="font-medium text-xs mb-3">Recent Activity</h4>
+                            <div class="space-y-2 text-[10px]">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Login from 192.168.1.1</span>
+                                    <span>Today, 10:23 AM</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Password changed</span>
+                                    <span>Yesterday</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">New API key generated</span>
+                                    <span>Jan 15, 2024</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notifications Tab -->
+                    <div id="content-notifications" class="space-y-4 max-w-lg hidden">
+                        <h3 class="font-semibold text-xs text-gray-400 uppercase mb-3">Notification Preferences</h3>
+
+                        <div class="glass-card rounded-xl p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-medium">Email Notifications</p>
+                                    <p class="text-[10px] text-gray-400">Deal updates, security alerts</p>
+                                </div>
+                                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-medium">Push Notifications</p>
+                                    <p class="text-[10px] text-gray-400">Real-time deal alerts</p>
+                                </div>
+                                <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-medium">SMS Notifications</p>
+                                    <p class="text-[10px] text-gray-400">Security codes only</p>
+                                </div>
+                                <div class="toggle" onclick="this.classList.toggle('active')"></div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-medium">Marketing Emails</p>
+                                    <p class="text-[10px] text-gray-400">Promotions, newsletters</p>
+                                </div>
+                                <div class="toggle" onclick="this.classList.toggle('active')"></div>
+                            </div>
+                        </div>
+
+                        <!-- Deal Alerts -->
+                        <h4 class="font-medium text-xs text-gray-400 mt-4 mb-2">Deal Notifications</h4>
+                        <div class="glass-card rounded-xl p-4 space-y-2">
+                            <label class="flex items-center gap-2 text-xs">
+                                <input type="checkbox" checked class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                Deal created
+                            </label>
+                            <label class="flex items-center gap-2 text-xs">
+                                <input type="checkbox" checked class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                Funds locked
+                            </label>
+                            <label class="flex items-center gap-2 text-xs">
+                                <input type="checkbox" checked class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                Item shipped
+                            </label>
+                            <label class="flex items-center gap-2 text-xs">
+                                <input type="checkbox" checked class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                Deal completed
+                            </label>
+                            <label class="flex items-center gap-2 text-xs">
+                                <input type="checkbox" class="rounded bg-transparent border-gray-500 text-cyan-400 focus:ring-cyan-400/50">
+                                Dispute opened
+                            </label>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Bottom Nav Mobile -->
+            <nav class="nav-bottom h-14 glass border-t border-white/10 items-center justify-around px-4">
+                <a href="#" class="flex flex-col items-center gap-0.5 text-gray-400 text-[10px]">
+                    <i class="fas fa-th-large text-sm"></i>
+                    <span>Dash</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-0.5 text-gray-400 text-[10px]">
+                    <i class="fas fa-comments text-sm"></i>
+                    <span>Chats</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-0.5 text-gray-400 text-[10px]">
+                    <i class="fas fa-question-circle text-sm"></i>
+                    <span>Help</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-0.5 text-cyan-400 text-[10px]">
+                    <i class="fas fa-cog text-sm"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Add Card Modal -->
+        <div id="addCardModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="closeCardModal(event)">
+            <div class="glass rounded-xl w-full max-w-sm p-4" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-sm">Add Card</h3>
+                    <button onclick="closeCardModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="space-y-3">
+                    <input type="text" placeholder="Card Number" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent card-number">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="MM/YY" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                        <input type="text" placeholder="CVC" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                    </div>
+                    <input type="text" placeholder="Card Holder Name" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                    <button class="w-full glass-button py-2 rounded-lg text-xs font-medium" onclick="saveCard()">Add Card</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate API Key Modal -->
+        <div id="apiKeyModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="closeApiModal(event)">
+            <div class="glass rounded-xl w-full max-w-sm p-4" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-sm">New API Key</h3>
+                    <button onclick="closeApiModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="space-y-3">
+                    <input type="text" placeholder="Key Name (e.g., Production)" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                    <select class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent text-white">
+                        <option class="bg-slate-800">Full Access</option>
+                        <option class="bg-slate-800">Read Only</option>
+                        <option class="bg-slate-800">Deals Only</option>
+                    </select>
+                    <div class="glass-card rounded-lg p-3 bg-yellow-500/10 border border-yellow-500/30">
+                        <p class="text-[10px] text-yellow-400"><i class="fas fa-exclamation-triangle mr-1"></i> Copy this key now. You won't see it again!</p>
+                    </div>
+                    <button class="w-full glass-button py-2 rounded-lg text-xs font-medium" onclick="generateNewKey()">Generate</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 glass px-4 py-2 rounded-full text-xs z-50"></div>
+    </div>
+
+    <script>
+        function showTab(tab) {
+            // Hide all contents
+            ['profile', 'kyc', 'payment', 'api', 'security', 'notifications'].forEach(t => {
+                document.getElementById('content-' + t).classList.add('hidden');
+                document.getElementById('tab-' + t).classList.remove('tab-active');
+                document.getElementById('tab-' + t).classList.add('text-gray-400');
+            });
+            
+            // Show selected
+            document.getElementById('content-' + tab).classList.remove('hidden');
+            document.getElementById('tab-' + tab).classList.add('tab-active');
+            document.getElementById('tab-' + tab).classList.remove('text-gray-400');
+        }
+
+        function addCard() {
+            document.getElementById('addCardModal').classList.remove('hidden');
+        }
+
+        function closeCardModal(e) {
+            if (!e || e.target.id === 'addCardModal') {
+                document.getElementById('addCardModal').classList.add('hidden');
+            }
+        }
+
+        function saveCard() {
+            closeCardModal();
+            showToast('Card added successfully');
+        }
+
+        function generateKey() {
+            document.getElementById('apiKeyModal').classList.remove('hidden');
+        }
+
+        function closeApiModal(e) {
+            if (!e || e.target.id === 'apiKeyModal') {
+                document.getElementById('apiKeyModal').classList.add('hidden');
+            }
+        }
+
+        function generateNewKey() {
+            closeApiModal();
+            showToast('API key generated! Check your email.');
+        }
+
+        function toggleKey(btn) {
+            const code = btn.closest('.glass-card').querySelector('code');
+            const isHidden = code.classList.contains('key-hidden');
+            
+            if (isHidden) {
+                code.textContent = 'pk_live_51Hx9lmK8QJ4mP2vNn9xYzAbC123dEfGhIjKlMnOpQrStUvWxYz';
+                code.classList.remove('key-hidden');
+                btn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+            } else {
+                code.textContent = 'pk_live_••••••••••••••••••••••••';
+                code.classList.add('key-hidden');
+                btn.innerHTML = '<i class="fas fa-eye"></i>';
+            }
+        }
+
+        function copyKey(btn) {
+            const code = btn.closest('.glass-card').querySelector('code');
+            navigator.clipboard.writeText(code.textContent);
+            showToast('Copied to clipboard');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2000);
+        }
+    </script>
+</body>
+</html>

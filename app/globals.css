@@ -146,3 +146,104 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer base {
+  /* Scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 18%, transparent);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--foreground) 28%, transparent);
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: color-mix(in oklch, var(--card) 72%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 65%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .glass-hover {
+    transition: background-color 200ms ease, border-color 200ms ease, transform 200ms ease;
+  }
+  .glass-hover:hover {
+    background: color-mix(in oklch, var(--card) 82%, transparent);
+    border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+    transform: translateY(-1px);
+  }
+
+  @keyframes pp-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pp-scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes pp-confetti {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-110vh) rotate(720deg);
+      opacity: 0;
+    }
+  }
+
+  .pp-animate-slide-in {
+    animation: pp-slide-in 500ms ease-out both;
+  }
+
+  .pp-animate-scale-in {
+    animation: pp-scale-in 260ms ease-out both;
+  }
+
+  .pp-confetti-piece {
+    position: absolute;
+    left: var(--pp-left, 50%);
+    top: var(--pp-top, 100%);
+    width: var(--pp-size, 10px);
+    height: var(--pp-size, 10px);
+    background: var(--pp-color, rgb(34 211 238));
+    border-radius: 2px;
+    animation: pp-confetti var(--pp-duration, 3s) ease-out forwards;
+    animation-delay: var(--pp-delay, 0s);
+    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.18));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pp-animate-slide-in,
+    .pp-animate-scale-in {
+      animation: none !important;
+    }
+    .pp-confetti-piece {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+  }
+}

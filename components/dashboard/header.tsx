@@ -3,14 +3,22 @@
 import { Bell, Plus, Wallet, Package } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 export function DashboardHeader() {
+  const router = useRouter()
   const { mode, walletBalance, setNewDealModalOpen } = useAppStore()
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
       <Button
-        onClick={() => setNewDealModalOpen(true)}
+        onClick={() => {
+          if (mode === "ship") {
+            router.push("/dashboard/shipments?mode=ship&new=1")
+            return
+          }
+          setNewDealModalOpen(true)
+        }}
         className="gap-2 rounded-xl bg-primary px-8 py-3 font-semibold text-primary-foreground shadow-lg transition-all hover:shadow-xl"
       >
         <Plus className="h-4 w-4" />

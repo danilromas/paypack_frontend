@@ -1,6 +1,14 @@
+"use client"
+
 import Link from "next/link"
+import { useState } from "react"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { AuthPanel } from "@/components/auth/auth-panel"
 
 export function LandingHeader() {
+  const [open, setOpen] = useState(false)
+  const [defaultTab, setDefaultTab] = useState<"login" | "signup">("login")
+
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
@@ -15,6 +23,12 @@ export function LandingHeader() {
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
+          <a
+            href="#about"
+            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            About
+          </a>
           <a
             href="#how-it-works"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -36,20 +50,34 @@ export function LandingHeader() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard"
+          <button
+            type="button"
+            onClick={() => {
+              setDefaultTab("login")
+              setOpen(true)
+            }}
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Log in
-          </Link>
-          <Link
-            href="/dashboard"
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDefaultTab("signup")
+              setOpen(true)
+            }}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:opacity-90"
           >
             Sign up
-          </Link>
+          </button>
         </div>
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-6">
+          <AuthPanel defaultTab={defaultTab} onSuccess={() => setOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </header>
   )
 }

@@ -1,13 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { ShipmentsTable } from "@/components/dashboard/shipments-table"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
 import { Search, Package } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { useAppStore } from "@/store/app-store"
 
 export default function ShipmentsPage() {
+  const searchParams = useSearchParams()
+  const { setMode } = useAppStore()
   const [wizardOpen, setWizardOpen] = useState(false)
+
+  useEffect(() => {
+    const mode = searchParams.get("mode")
+    if (mode === "deal" || mode === "ship") setMode(mode)
+    else setMode("ship")
+
+    if (searchParams.get("new") === "1") {
+      setWizardOpen(true)
+    }
+  }, [searchParams, setMode])
 
   return (
     <>
