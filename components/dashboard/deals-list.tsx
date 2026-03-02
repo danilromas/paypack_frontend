@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   Check,
@@ -9,10 +9,10 @@ import {
   CheckCircle,
   Clock,
   MoreVertical,
-} from "lucide-react"
-import { useAppStore, mockDeals } from "@/store/app-store"
-import { cn } from "@/lib/utils"
-import type { DealStatus } from "@/types"
+} from "lucide-react";
+import { useAppStore, mockDeals } from "@/store/app-store";
+import { cn } from "@/lib/utils";
+import type { DealStatus } from "@/types";
 
 function getStatusConfig(status: DealStatus) {
   switch (status) {
@@ -20,69 +20,64 @@ function getStatusConfig(status: DealStatus) {
       return {
         icon: Play,
         label: "Pending",
-        className:
-          "bg-warning/10 text-warning border border-warning/20",
-      }
+        className: "bg-warning/10 text-warning border border-warning/20",
+      };
     case "escrow":
       return {
         icon: Shield,
         label: "In Escrow",
-        className:
-          "bg-warning/10 text-warning border border-warning/20",
-      }
+        className: "bg-warning/10 text-warning border border-warning/20",
+      };
     case "completed":
       return {
         icon: CheckCircle,
         label: "Completed",
-        className:
-          "bg-success/10 text-success border border-success/20",
-      }
+        className: "bg-success/10 text-success border border-success/20",
+      };
     case "shipped":
     case "in-transit":
       return {
         icon: Clock,
         label: "In Transit",
-        className:
-          "bg-primary/10 text-primary border border-primary/20",
-      }
+        className: "bg-primary/10 text-primary border border-primary/20",
+      };
     default:
       return {
         icon: Clock,
         label: status,
-        className:
-          "bg-muted text-muted-foreground border border-border",
-      }
+        className: "bg-muted text-muted-foreground border border-border",
+      };
   }
 }
 
 function getEventIcon(status: DealStatus) {
   switch (status) {
     case "pending":
-      return { icon: Check, bg: "bg-success/10 text-success" }
+      return { icon: Check, bg: "bg-success/10 text-success" };
     case "escrow":
-      return { icon: Lock, bg: "bg-warning/10 text-warning" }
+      return { icon: Lock, bg: "bg-warning/10 text-warning" };
     case "completed":
-      return { icon: CheckCheck, bg: "bg-primary/10 text-primary" }
+      return { icon: CheckCheck, bg: "bg-primary/10 text-primary" };
     default:
-      return { icon: Clock, bg: "bg-muted text-muted-foreground" }
+      return { icon: Clock, bg: "bg-muted text-muted-foreground" };
   }
 }
 
 function getEventLabel(status: DealStatus) {
   switch (status) {
     case "pending":
-      return "Deal Created"
+      return "Deal Created";
     case "escrow":
-      return "Funds Locked"
+      return "Funds Locked";
     case "completed":
-      return "Deal Released"
+      return "Deal Released";
     default:
-      return "Updated"
+      return "Updated";
   }
 }
 
 export function DealsList() {
-  const { selectedDealId, setSelectedDealId } = useAppStore()
+  const { selectedDealId, setSelectedDealId } = useAppStore();
 
   return (
     <div>
@@ -93,27 +88,27 @@ export function DealsList() {
 
       <div className="space-y-3">
         {mockDeals.map((deal) => {
-          const statusConfig = getStatusConfig(deal.status)
-          const eventConfig = getEventIcon(deal.status)
-          const StatusIcon = statusConfig.icon
-          const EventIcon = eventConfig.icon
+          const statusConfig = getStatusConfig(deal.status);
+          const eventConfig = getEventIcon(deal.status);
+          const StatusIcon = statusConfig.icon;
+          const EventIcon = eventConfig.icon;
 
           return (
-            <button
+            <div
               key={deal.id}
               onClick={() => setSelectedDealId(deal.id)}
               className={cn(
-                "flex w-full items-center justify-between rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md",
+                "flex w-full cursor-pointer items-center justify-between rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md",
                 selectedDealId === deal.id
                   ? "border-primary/30 shadow-md"
-                  : "border-border hover:border-primary/20"
+                  : "border-border hover:border-primary/20",
               )}
             >
               <div className="flex items-center gap-4">
                 <div
                   className={cn(
                     "flex h-12 w-12 items-center justify-center rounded-full",
-                    eventConfig.bg
+                    eventConfig.bg,
                   )}
                 >
                   <EventIcon className="h-5 w-5" />
@@ -131,7 +126,7 @@ export function DealsList() {
                 <span
                   className={cn(
                     "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",
-                    statusConfig.className
+                    statusConfig.className,
                   )}
                 >
                   <StatusIcon className="h-3 w-3" />
@@ -139,13 +134,16 @@ export function DealsList() {
                 </span>
                 <button
                   className="rounded p-1 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Добавьте здесь обработчик для меню
+                  }}
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>
               </div>
-            </button>
-          )
+            </div>
+          );
         })}
       </div>
 
@@ -153,5 +151,5 @@ export function DealsList() {
         All Deals...
       </button>
     </div>
-  )
+  );
 }
