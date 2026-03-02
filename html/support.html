@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayPack.uno - Support</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0891b2 100%);
+            min-height: 100vh;
+            margin: 0;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s;
+        }
+        .glass-card:hover { background: rgba(255, 255, 255, 0.1); }
+        .glass-button {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(6, 182, 212, 0.8));
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .glass-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.4);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #38bdf8, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .ticket-open { border-left: 3px solid #eab308; background: rgba(234, 179, 8, 0.1); }
+        .ticket-resolved { border-left: 3px solid #22c55e; background: rgba(34, 197, 94, 0.1); }
+        .ticket-pending { border-left: 3px solid #f97316; background: rgba(249, 115, 22, 0.1); }
+        .scroll::-webkit-scrollbar { width: 4px; }
+        .scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 2px; }
+        .faq-item.active .faq-answer { display: block; }
+        .faq-item.active .fa-chevron-down { transform: rotate(180deg); }
+        .chat-msg { max-width: 80%; }
+        .msg-agent { background: rgba(255, 255, 255, 0.1); }
+        .msg-user {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(6, 182, 212, 0.3));
+        }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .nav-bottom { display: flex; }
+        }
+        @media (min-width: 769px) {
+            .nav-bottom { display: none; }
+        }
+    </style>
+</head>
+<body class="text-white text-sm">
+
+    <div class="flex h-screen w-full overflow-hidden">
+        
+        <!-- Sidebar Desktop -->
+        <aside class="sidebar w-16 glass flex flex-col items-center py-4 border-r border-white/10">
+            <div class="mb-6"><i class="fas fa-cube text-xl text-cyan-400"></i></div>
+            <nav class="flex-1 flex flex-col gap-2 w-full">
+                <a href="#" class="p-3 text-gray-400 hover:text-white hover:bg-white/10 flex justify-center"><i class="fas fa-th-large"></i></a>
+                <a href="#" class="p-3 text-gray-400 hover:text-white hover:bg-white/10 flex justify-center"><i class="fas fa-comments"></i></a>
+                <a href="#" class="p-3 text-cyan-400 bg-white/10 border-l-2 border-cyan-400 flex justify-center"><i class="fas fa-question-circle"></i></a>
+                <a href="#" class="p-3 text-gray-400 hover:text-white hover:bg-white/10 flex justify-center"><i class="fas fa-cog"></i></a>
+            </nav>
+            <a href="#" class="p-3 text-gray-400 hover:text-red-400"><i class="fas fa-sign-out-alt"></i></a>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col glass overflow-hidden relative">
+            
+            <!-- Header -->
+            <div class="h-14 border-b border-white/10 flex items-center justify-between px-4">
+                <div class="flex items-center gap-2">
+                    <h2 class="font-bold text-base">Support Center</h2>
+                    <span class="glass-card px-2 py-0.5 rounded-full text-[10px] text-cyan-400">24/7</span>
+                </div>
+                <button onclick="openChat()" class="glass-button px-3 py-1.5 rounded-lg text-xs flex items-center gap-1">
+                    <i class="fas fa-headset"></i>
+                    <span class="hidden sm:inline">Live Chat</span>
+                </button>
+            </div>
+
+            <!-- Content Scroll -->
+            <div class="flex-1 overflow-y-auto scroll p-4">
+                
+                <!-- Quick Actions -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                    <button onclick="showSection('faq')" class="glass-card p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white/10">
+                        <i class="fas fa-book text-cyan-400 text-lg"></i>
+                        <span class="text-xs">FAQ</span>
+                    </button>
+                    <button onclick="showSection('tickets')" class="glass-card p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white/10">
+                        <i class="fas fa-ticket-alt text-yellow-400 text-lg"></i>
+                        <span class="text-xs">My Tickets</span>
+                    </button>
+                    <button onclick="showSection('dispute')" class="glass-card p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white/10">
+                        <i class="fas fa-gavel text-red-400 text-lg"></i>
+                        <span class="text-xs">Dispute</span>
+                    </button>
+                    <button onclick="showSection('contact')" class="glass-card p-3 rounded-xl flex flex-col items-center gap-1 hover:bg-white/10">
+                        <i class="fas fa-envelope text-green-400 text-lg"></i>
+                        <span class="text-xs">Contact</span>
+                    </button>
+                </div>
+
+                <!-- Search -->
+                <div class="relative mb-4">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    <input type="text" placeholder="Search help articles..." class="w-full glass-card rounded-xl pl-9 pr-4 py-2 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-cyan-400/50">
+                </div>
+
+                <!-- FAQ Section -->
+                <div id="faqSection" class="space-y-2 mb-4">
+                    <h3 class="font-semibold text-xs text-gray-400 uppercase mb-2">Popular Questions</h3>
+                    
+                    <div class="faq-item glass-card rounded-lg overflow-hidden">
+                        <button onclick="toggleFaq(this)" class="w-full p-3 flex items-center justify-between text-left">
+                            <span class="text-xs font-medium">How does escrow work?</span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform"></i>
+                        </button>
+                        <div class="faq-answer hidden px-3 pb-3 text-[11px] text-gray-300 leading-relaxed">
+                            Escrow holds funds until both parties confirm the transaction. Buyer deposits money → Seller ships item → Buyer confirms receipt → Funds released to seller.
+                        </div>
+                    </div>
+
+                    <div class="faq-item glass-card rounded-lg overflow-hidden">
+                        <button onclick="toggleFaq(this)" class="w-full p-3 flex items-center justify-between text-left">
+                            <span class="text-xs font-medium">What if I don't receive my item?</span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform"></i>
+                        </button>
+                        <div class="faq-answer hidden px-3 pb-3 text-[11px] text-gray-300 leading-relaxed">
+                            Open a dispute within 7 days of expected delivery. Our team will investigate and refund if the item wasn't delivered.
+                        </div>
+                    </div>
+
+                    <div class="faq-item glass-card rounded-lg overflow-hidden">
+                        <button onclick="toggleFaq(this)" class="w-full p-3 flex items-center justify-between text-left">
+                            <span class="text-xs font-medium">How to cancel a deal?</span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform"></i>
+                        </button>
+                        <div class="faq-answer hidden px-3 pb-3 text-[11px] text-gray-300 leading-relaxed">
+                            Both parties must agree to cancel. Go to Deal Details → Actions → Request Cancellation. Funds return to buyer within 24h.
+                        </div>
+                    </div>
+
+                    <div class="faq-item glass-card rounded-lg overflow-hidden">
+                        <button onclick="toggleFaq(this)" class="w-full p-3 flex items-center justify-between text-left">
+                            <span class="text-xs font-medium">Shipping tracking not updating?</span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform"></i>
+                        </button>
+                        <div class="faq-answer hidden px-3 pb-3 text-[11px] text-gray-300 leading-relaxed">
+                            Allow 24-48h for carrier updates. If still stuck, contact seller or open a support ticket with tracking number.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Tickets Section -->
+                <div id="ticketsSection" class="space-y-2 hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-xs text-gray-400 uppercase">My Tickets</h3>
+                        <button onclick="newTicket()" class="text-cyan-400 text-xs flex items-center gap-1">
+                            <i class="fas fa-plus"></i> New
+                        </button>
+                    </div>
+
+                    <div class="ticket-open glass-card rounded-lg p-3 cursor-pointer" onclick="openTicket(1)">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-xs font-medium">#SUP-2024-001</span>
+                            <span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">Open</span>
+                        </div>
+                        <p class="text-xs text-gray-300 mb-1">Item not as described</p>
+                        <div class="flex justify-between items-center text-[10px] text-gray-400">
+                            <span>2 hours ago</span>
+                            <span>2 messages</span>
+                        </div>
+                    </div>
+
+                    <div class="ticket-pending glass-card rounded-lg p-3 cursor-pointer" onclick="openTicket(2)">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-xs font-medium">#SUP-2024-002</span>
+                            <span class="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">Pending</span>
+                        </div>
+                        <p class="text-xs text-gray-300 mb-1">Refund request</p>
+                        <div class="flex justify-between items-center text-[10px] text-gray-400">
+                            <span>1 day ago</span>
+                            <span>5 messages</span>
+                        </div>
+                    </div>
+
+                    <div class="ticket-resolved glass-card rounded-lg p-3 cursor-pointer" onclick="openTicket(3)">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-xs font-medium">#SUP-2023-089</span>
+                            <span class="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Resolved</span>
+                        </div>
+                        <p class="text-xs text-gray-300 mb-1">Account verification</p>
+                        <div class="flex justify-between items-center text-[10px] text-gray-400">
+                            <span>2 weeks ago</span>
+                            <span>Closed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dispute Section -->
+                <div id="disputeSection" class="hidden">
+                    <h3 class="font-semibold text-xs text-gray-400 uppercase mb-2">Open Dispute</h3>
+                    <div class="glass-card rounded-lg p-3 space-y-3">
+                        <div>
+                            <label class="text-[10px] text-gray-400 block mb-1">Select Deal</label>
+                            <select class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                                <option>#25311497 - iPhone 15 Pro</option>
+                                <option>#25311498 - MacBook Air</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block mb-1">Reason</label>
+                            <select class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                                <option>Item not received</option>
+                                <option>Item not as described</option>
+                                <option>Fake/counterfeit item</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block mb-1">Description</label>
+                            <textarea rows="3" class="w-full glass-card rounded-lg px-3 py-2 text-xs bg-transparent resize-none" placeholder="Describe your issue..."></textarea>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-gray-400 block mb-1">Evidence (optional)</label>
+                            <div class="flex gap-2">
+                                <button class="glass-card px-3 py-2 rounded-lg text-xs flex items-center gap-1">
+                                    <i class="fas fa-image text-cyan-400"></i> Photo
+                                </button>
+                                <button class="glass-card px-3 py-2 rounded-lg text-xs flex items-center gap-1">
+                                    <i class="fas fa-file text-cyan-400"></i> File
+                                </button>
+                            </div>
+                        </div>
+                        <button class="w-full glass-button py-2 rounded-lg text-xs font-medium">
+                            Submit Dispute
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contact Section -->
+                <div id="contactSection" class="hidden space-y-3">
+                    <h3 class="font-semibold text-xs text-gray-400 uppercase mb-2">Contact Us</h3>
+                    
+                    <div class="glass-card rounded-lg p-3 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <i class="fas fa-phone text-green-400"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-xs font-medium">Phone Support</p>
+                            <p class="text-[10px] text-gray-400">+1 (888) 123-4567</p>
+                        </div>
+                        <button class="text-cyan-400 text-xs"><i class="fas fa-external-link-alt"></i></button>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-3 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                            <i class="fas fa-envelope text-cyan-400"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-xs font-medium">Email</p>
+                            <p class="text-[10px] text-gray-400">support@paypack.uno</p>
+                        </div>
+                        <button class="text-cyan-400 text-xs" onclick="copyEmail()"><i class="fas fa-copy"></i></button>
+                    </div>
+
+                    <div class="glass-card rounded-lg p-3 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                            <i class="fab fa-telegram text-purple-400"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-xs font-medium">Telegram</p>
+                            <p class="text-[10px] text-gray-400">@PayPackSupport</p>
+                        </div>
+                        <button class="text-cyan-400 text-xs"><i class="fas fa-external-link-alt"></i></button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Bottom Nav Mobile -->
+            <nav class="nav-bottom h-14 glass border-t border-white/10 items-center justify-around px-4">
+                <a href="#" class="flex flex-col items-center gap-0.5 text-gray-400 text-[10px]">
+                    <i class="fas fa-th-large text-sm"></i>
+                    <span>Dash</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-0.5 text-gray-400 text-[10px]">
+                    <i class="fas fa-comments text-sm"></i>
+                    <span>Chats</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-0.5 text-cyan-400 text-[10px]">
+                    <i class="fas fa-question-circle text-sm"></i>
+                    <span>Help</span>
+                </a>
+                <a href="#" class="flex flex-col items-center gap-0.5 text-gray-400 text-[10px]">
+                    <i class="fas fa-cog text-sm"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- Live Chat Panel -->
+        <div id="liveChat" class="hidden absolute right-0 top-0 h-full w-full md:w-80 glass border-l border-white/10 flex-col z-30">
+            <div class="h-14 border-b border-white/10 flex items-center justify-between px-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                        <i class="fas fa-headset text-xs"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-xs">Support Agent</h3>
+                        <p class="text-[10px] text-green-400">Online</p>
+                    </div>
+                </div>
+                <button onclick="closeChat()" class="text-gray-400 text-xs"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto scroll p-3 space-y-2" id="chatMessages">
+                <div class="flex justify-center"><span class="text-[10px] text-gray-500">Today, 10:23 AM</span></div>
+                
+                <div class="flex gap-2">
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex-shrink-0 flex items-center justify-center text-[10px]">
+                        <i class="fas fa-headset"></i>
+                    </div>
+                    <div class="chat-msg msg-agent rounded-lg rounded-tl-none px-3 py-2">
+                        <p class="text-xs">Hello! How can I help you today?</p>
+                        <span class="text-[9px] text-gray-500 mt-0.5 block">10:23 AM</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-3 border-t border-white/10">
+                <div class="flex gap-2">
+                    <input type="text" id="chatInput" placeholder="Type message..." class="flex-1 glass-card rounded-full px-3 py-2 text-xs bg-transparent focus:outline-none" onkeypress="handleChatKey(event)">
+                    <button onclick="sendChatMsg()" class="w-8 h-8 glass-button rounded-full flex items-center justify-center text-xs">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Detail Modal -->
+        <div id="ticketModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onclick="closeTicketModal(event)">
+            <div class="glass rounded-xl w-full max-w-md max-h-[80vh] flex flex-col" onclick="event.stopPropagation()">
+                <div class="p-3 border-b border-white/10 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-sm">Ticket #SUP-2024-001</h3>
+                        <span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">Open</span>
+                    </div>
+                    <button onclick="closeTicketModal()" class="text-gray-400"><i class="fas fa-times"></i></button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto scroll p-3 space-y-3">
+                    <div class="glass-card rounded-lg p-3">
+                        <p class="text-xs font-medium mb-1">Issue: Item not as described</p>
+                        <p class="text-[11px] text-gray-300">Received iPhone 14 instead of iPhone 15 Pro as listed. Box was sealed but wrong model inside.</p>
+                        <span class="text-[10px] text-gray-500 mt-2 block">Created 2 hours ago</span>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex gap-2">
+                            <div class="w-7 h-7 rounded-full bg-gray-600 flex items-center justify-center text-[10px]">JD</div>
+                            <div class="chat-msg msg-user rounded-lg rounded-tr-none px-3 py-2">
+                                <p class="text-xs">I received the wrong item. This is not what I ordered.</p>
+                                <span class="text-[9px] text-gray-300">2h ago</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-[10px]">
+                                <i class="fas fa-headset"></i>
+                            </div>
+                            <div class="chat-msg msg-agent rounded-lg rounded-tl-none px-3 py-2">
+                                <p class="text-xs">Sorry to hear that. Please upload photos of the received item and we'll investigate immediately.</p>
+                                <span class="text-[9px] text-gray-500">1h ago</span>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <div class="w-7 h-7 rounded-full bg-gray-600 flex items-center justify-center text-[10px]">JD</div>
+                            <div class="chat-msg msg-user rounded-lg rounded-tr-none px-3 py-2">
+                                <p class="text-xs">📎 Uploaded 3 photos</p>
+                                <span class="text-[9px] text-gray-300">30m ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 border-t border-white/10">
+                    <div class="flex gap-2">
+                        <input type="text" placeholder="Reply..." class="flex-1 glass-card rounded-lg px-3 py-2 text-xs bg-transparent">
+                        <button class="glass-button px-4 py-2 rounded-lg text-xs">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 glass px-4 py-2 rounded-full text-xs z-50"></div>
+    </div>
+
+    <script>
+        function showSection(section) {
+            ['faq', 'tickets', 'dispute', 'contact'].forEach(s => {
+                document.getElementById(s + 'Section').classList.add('hidden');
+            });
+            document.getElementById(section + 'Section').classList.remove('hidden');
+        }
+
+        function toggleFaq(btn) {
+            const item = btn.parentElement;
+            item.classList.toggle('active');
+        }
+
+        function openChat() {
+            document.getElementById('liveChat').classList.remove('hidden');
+            document.getElementById('liveChat').classList.add('flex');
+        }
+
+        function closeChat() {
+            document.getElementById('liveChat').classList.add('hidden');
+            document.getElementById('liveChat').classList.remove('flex');
+        }
+
+        function sendChatMsg() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const div = document.createElement('div');
+            div.className = 'flex justify-end';
+            div.innerHTML = `
+                <div class="chat-msg msg-user rounded-lg rounded-tr-none px-3 py-2">
+                    <p class="text-xs">${text}</p>
+                    <span class="text-[9px] text-gray-300">Just now</span>
+                </div>
+            `;
+            document.getElementById('chatMessages').appendChild(div);
+            input.value = '';
+            
+            setTimeout(() => {
+                const reply = document.createElement('div');
+                reply.className = 'flex gap-2';
+                reply.innerHTML = `
+                    <div class="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex-shrink-0 flex items-center justify-center text-[10px]">
+                        <i class="fas fa-headset"></i>
+                    </div>
+                    <div class="chat-msg msg-agent rounded-lg rounded-tl-none px-3 py-2">
+                        <p class="text-xs">Thank you for your message. An agent will respond shortly.</p>
+                        <span class="text-[9px] text-gray-500">Just now</span>
+                    </div>
+                `;
+                document.getElementById('chatMessages').appendChild(reply);
+                document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+            }, 1000);
+        }
+
+        function handleChatKey(e) {
+            if (e.key === 'Enter') sendChatMsg();
+        }
+
+        function openTicket(id) {
+            document.getElementById('ticketModal').classList.remove('hidden');
+        }
+
+        function closeTicketModal(e) {
+            if (!e || e.target.id === 'ticketModal' || e.target.closest('button')) {
+                document.getElementById('ticketModal').classList.add('hidden');
+            }
+        }
+
+        function newTicket() {
+            showToast('New ticket form opened');
+        }
+
+        function copyEmail() {
+            navigator.clipboard.writeText('support@paypack.uno');
+            showToast('Email copied!');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2000);
+        }
+    </script>
+</body>
+</html>

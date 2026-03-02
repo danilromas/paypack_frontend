@@ -1,5 +1,5 @@
-import { LandingHero } from "@/components/landing/hero"
 import { LandingHeader } from "@/components/landing/header"
+import { LandingSplitHero } from "@/components/landing/split-hero"
 import { HowItWorks } from "@/components/landing/how-it-works"
 import { BuyerSeller } from "@/components/landing/buyer-seller"
 import { SecuritySection } from "@/components/landing/security"
@@ -10,7 +10,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
       <LandingHeader />
-      <LandingHero />
+      <LandingSplitHero />
       <HowItWorks />
       <BuyerSeller />
       <SecuritySection />

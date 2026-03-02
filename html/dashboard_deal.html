@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayPack.uno - Secure Transactions & Delivery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0891b2 100%);
+            min-height: 100vh;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .glass-button {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.8), rgba(6, 182, 212, 0.8));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.4);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 1), rgba(6, 182, 212, 1));
+        }
+        
+        .sidebar-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .sidebar-item:hover, .sidebar-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            border-left-color: #06b6d4;
+        }
+        
+        .status-pending { background: rgba(234, 179, 8, 0.2); color: #fbbf24; border: 1px solid rgba(234, 179, 8, 0.3); }
+        .status-escrow { background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .status-completed { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #38bdf8, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .floating-shape {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: float 20s infinite ease-in-out;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        
+        .progress-step {
+            position: relative;
+        }
+        
+        .progress-step::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-50%);
+        }
+        
+        .progress-step:last-child::after {
+            display: none;
+        }
+        
+        .progress-step.completed::after {
+            background: linear-gradient(90deg, #22c55e, #22c55e);
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .page-transition {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background: linear-gradient(135deg, #38bdf8, #06b6d4);
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(28px);
+        }
+    </style>
+<base target="_blank">
+</head>
+<body class="text-white overflow-hidden">
+
+    <!-- Background Effects -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="floating-shape w-96 h-96 bg-cyan-500 top-0 left-0"></div>
+        <div class="floating-shape w-80 h-80 bg-blue-600 bottom-0 right-0 animation-delay-2000"></div>
+        <div class="floating-shape w-64 h-64 bg-teal-500 top-1/2 left-1/2 animation-delay-4000"></div>
+    </div>
+
+    <!-- Landing Page -->
+    <div id="landingPage" class="relative z-10 min-h-screen flex flex-col items-center justify-center p-6 page-transition">
+        <div class="glass-panel rounded-3xl p-12 max-w-4xl w-full text-center mb-8">
+            <div class="mb-6">
+                <i class="fas fa-cube text-6xl gradient-text mb-4"></i>
+                <h1 class="text-5xl font-bold mb-2">PayPack<span class="text-cyan-400">.uno</span></h1>
+                <p class="text-xl text-gray-300">Secure Transactions & Delivery Platform</p>
+            </div>
+            
+            <div class="flex items-center justify-center gap-4 mb-8">
+                <span class="text-sm font-medium text-gray-400">DEAL</span>
+                <div class="toggle-switch active" id="modeToggle" onclick="toggleMode()">
+                    <div class="toggle-slider"></div>
+                </div>
+                <span class="text-sm font-medium text-cyan-400">SHIP</span>
+            </div>
+            
+            <p class="text-gray-400 mb-8 max-w-lg mx-auto">Choose your mode to continue. Switch between Deal mode for transactions or Ship mode for logistics management.</p>
+            
+            <button onclick="enterDashboard()" class="glass-button px-12 py-4 rounded-full text-lg font-semibold text-white flex items-center gap-3 mx-auto group">
+                <span>Enter Dashboard</span>
+                <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+            </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
+            <div class="glass-card rounded-2xl p-6 text-center">
+                <i class="fas fa-shield-alt text-3xl text-cyan-400 mb-3"></i>
+                <h3 class="font-semibold mb-1">Secure Escrow</h3>
+                <p class="text-sm text-gray-400">Funds locked until delivery</p>
+            </div>
+            <div class="glass-card rounded-2xl p-6 text-center">
+                <i class="fas fa-shipping-fast text-3xl text-cyan-400 mb-3"></i>
+                <h3 class="font-semibold mb-1">Fast Shipping</h3>
+                <p class="text-sm text-gray-400">Worldwide delivery network</p>
+            </div>
+            <div class="glass-card rounded-2xl p-6 text-center">
+                <i class="fas fa-headset text-3xl text-cyan-400 mb-3"></i>
+                <h3 class="font-semibold mb-1">24/7 Support</h3>
+                <p class="text-sm text-gray-400">Always here to help</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden relative z-10 min-h-screen flex page-transition">
+        <!-- Sidebar -->
+        <aside class="w-64 glass-panel border-r border-white/10 flex flex-col">
+            <div class="p-6 border-b border-white/10">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-cube text-2xl text-cyan-400"></i>
+                    <span class="text-xl font-bold">PayPack<span class="text-cyan-400">.uno</span></span>
+                </div>
+            </div>
+            
+            <nav class="flex-1 py-6">
+                <a href="#" class="sidebar-item active flex items-center gap-4 px-6 py-3 text-white">
+                    <i class="fas fa-th-large w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center gap-4 px-6 py-3 text-gray-400 hover:text-white">
+                    <i class="fas fa-comments w-5"></i>
+                    <span>Chats</span>
+                    <span class="ml-auto bg-red-500 text-xs px-2 py-0.5 rounded-full">3</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center gap-4 px-6 py-3 text-gray-400 hover:text-white">
+                    <i class="fas fa-question-circle w-5"></i>
+                    <span>Support</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center gap-4 px-6 py-3 text-gray-400 hover:text-white">
+                    <i class="fas fa-cog w-5"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+            
+            <div class="p-6 border-t border-white/10">
+                <a href="#" onclick="logout()" class="flex items-center gap-4 text-gray-400 hover:text-red-400 transition-colors">
+                    <i class="fas fa-sign-out-alt w-5"></i>
+                    <span>Log Out</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Bar -->
+            <header class="glass-panel border-b border-white/10 px-8 py-4 flex items-center justify-between">
+                <button onclick="showNewDealModal()" class="glass-button px-8 py-3 rounded-xl font-semibold flex items-center gap-2">
+                    <i class="fas fa-plus"></i>
+                    <span>NEW DEAL</span>
+                    <i class="fas fa-box ml-2"></i>
+                </button>
+                
+                <div class="flex items-center gap-6">
+                    <button class="relative text-gray-300 hover:text-white transition-colors">
+                        <i class="fas fa-bell text-xl"></i>
+                        <span class="absolute -top-1 -right-1 bg-red-500 text-xs w-5 h-5 flex items-center justify-center rounded-full">1</span>
+                    </button>
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold">
+                            JD
+                        </div>
+                        <button class="glass-card px-3 py-1.5 rounded-lg text-sm">
+                            <i class="fas fa-wallet mr-2"></i>500$
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Content -->
+            <div class="flex-1 overflow-auto p-8 hide-scrollbar">
+                <!-- Stats Row -->
+                <div class="flex items-center gap-6 mb-8">
+                    <div class="glass-card rounded-2xl px-6 py-3 flex items-center gap-3">
+                        <i class="fas fa-wallet text-cyan-400"></i>
+                        <span class="text-gray-400">Wallet Balance:</span>
+                        <span class="text-xl font-bold text-white">500$</span>
+                    </div>
+                    <div class="glass-card rounded-2xl px-6 py-3 flex items-center gap-3">
+                        <i class="fas fa-exchange-alt text-cyan-400"></i>
+                        <span class="text-gray-400">Active Deals:</span>
+                        <span class="text-xl font-bold text-white">3</span>
+                    </div>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="relative flex-1 max-w-md">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" placeholder="Search deals..." class="w-full glass-card rounded-xl pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition-colors bg-white/10">All</button>
+                        <button class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition-colors text-gray-400">Active</button>
+                        <button class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition-colors text-gray-400">Disputed</button>
+                        <button class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition-colors text-gray-400">Completed</button>
+                    </div>
+                </div>
+
+                <!-- Main Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Recent Activity -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <i class="fas fa-clock-rotate-left text-cyan-400"></i>
+                            Recent Activity
+                        </h2>
+                        
+                        <div class="space-y-3" id="activityList">
+                            <!-- Activity Item 1 -->
+                            <div class="glass-card rounded-xl p-4 flex items-center justify-between group cursor-pointer" onclick="selectDeal(1)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold">Deal Created</h4>
+                                        <p class="text-sm text-gray-400">In hour ago • #44317542</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="status-pending px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-play text-xs"></i> Pending
+                                    </span>
+                                    <button class="text-gray-400 hover:text-white p-2">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Activity Item 2 -->
+                            <div class="glass-card rounded-xl p-4 flex items-center justify-between group cursor-pointer" onclick="selectDeal(2)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400">
+                                        <i class="fas fa-lock"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold">Funds Locked</h4>
+                                        <p class="text-sm text-gray-400">2 days ago • #25311497</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="status-escrow px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-shield-alt text-xs"></i> In Escrow
+                                    </span>
+                                    <button class="text-gray-400 hover:text-white p-2">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Activity Item 3 -->
+                            <div class="glass-card rounded-xl p-4 flex items-center justify-between group cursor-pointer" onclick="selectDeal(3)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                        <i class="fas fa-check-double"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold">Deal Released</h4>
+                                        <p class="text-sm text-gray-400">Week ago • #69854123</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="status-completed px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-check-circle text-xs"></i> Completed
+                                    </span>
+                                    <button class="text-gray-400 hover:text-white p-2">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Activity Item 4 -->
+                            <div class="glass-card rounded-xl p-4 flex items-center justify-between group cursor-pointer" onclick="selectDeal(4)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                                        <i class="fas fa-check-double"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold">Deal Released</h4>
+                                        <p class="text-sm text-gray-400">Week ago • #62346345</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="status-completed px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-check-circle text-xs"></i> Completed
+                                    </span>
+                                    <button class="text-gray-400 hover:text-white p-2">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Activity Item 5 -->
+                            <div class="glass-card rounded-xl p-4 flex items-center justify-between group cursor-pointer" onclick="selectDeal(5)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400">
+                                        <i class="fas fa-lock"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold">Funds Locked</h4>
+                                        <p class="text-sm text-gray-400">2 weeks ago • #12515457</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="status-escrow px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-shield-alt text-xs"></i> In Escrow
+                                    </span>
+                                    <button class="text-gray-400 hover:text-white p-2">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Activity Item 6 -->
+                            <div class="glass-card rounded-xl p-4 flex items-center justify-between group cursor-pointer" onclick="selectDeal(6)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                                        <i class="fas fa-check"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold">Deal Created</h4>
+                                        <p class="text-sm text-gray-400">2 weeks ago • #8853125</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="status-pending px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                                        <i class="fas fa-play text-xs"></i> Pending
+                                    </span>
+                                    <button class="text-gray-400 hover:text-white p-2">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="w-full glass-card rounded-xl py-3 text-center text-cyan-400 hover:text-cyan-300 transition-colors font-medium mt-4">
+                            All Deals...
+                        </button>
+                    </div>
+
+                    <!-- Deal Detail -->
+                    <div class="lg:col-span-1">
+                        <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <i class="fas fa-file-contract text-cyan-400"></i>
+                            Deal Detail
+                        </h2>
+                        
+                        <div class="glass-panel rounded-2xl p-6 sticky top-0">
+                            <div class="flex items-start justify-between mb-6">
+                                <div>
+                                    <h3 class="text-lg font-bold text-cyan-400 mb-1">iPhone 16 Pro Max 256gb</h3>
+                                    <div class="flex items-center gap-2 text-sm text-gray-400">
+                                        <span class="bg-white/10 px-2 py-0.5 rounded">#25311497</span>
+                                        <span>Funds have locked in escrow.</span>
+                                    </div>
+                                </div>
+                                <div class="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center">
+                                    <i class="fas fa-user text-gray-400"></i>
+                                </div>
+                            </div>
+
+                            <!-- Progress Bar -->
+                            <div class="flex justify-between mb-8 relative">
+                                <div class="progress-step completed flex flex-col items-center gap-2 flex-1">
+                                    <div class="w-4 h-4 rounded-full bg-green-500 border-4 border-green-500/30"></div>
+                                    <span class="text-xs text-gray-400">Created</span>
+                                </div>
+                                <div class="progress-step completed flex flex-col items-center gap-2 flex-1">
+                                    <div class="w-4 h-4 rounded-full bg-green-500 border-4 border-green-500/30"></div>
+                                    <span class="text-xs text-gray-400">Funds Locked</span>
+                                </div>
+                                <div class="progress-step completed flex flex-col items-center gap-2 flex-1">
+                                    <div class="w-4 h-4 rounded-full bg-green-500 border-4 border-green-500/30"></div>
+                                    <span class="text-xs text-gray-400">Shipped</span>
+                                </div>
+                                <div class="progress-step flex flex-col items-center gap-2 flex-1">
+                                    <div class="w-4 h-4 rounded-full bg-yellow-500 border-4 border-yellow-500/30"></div>
+                                    <span class="text-xs text-gray-400">In Transit</span>
+                                </div>
+                                <div class="progress-step flex flex-col items-center gap-2 flex-1">
+                                    <div class="w-4 h-4 rounded-full bg-gray-600 border-4 border-gray-600/30"></div>
+                                    <span class="text-xs text-gray-400">Received</span>
+                                </div>
+                            </div>
+
+                            <!-- Chat Preview -->
+                            <div class="space-y-4 mb-6 max-h-48 overflow-y-auto hide-scrollbar">
+                                <div class="flex gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0 flex items-center justify-center text-xs">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <div class="glass-card rounded-2xl rounded-tl-none px-4 py-2 flex-1">
+                                        <p class="text-sm text-gray-300">Me: Please ship the phone soon.</p>
+                                    </div>
+                                </div>
+                                <div class="flex gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-cyan-600 flex-shrink-0 flex items-center justify-center text-xs font-bold">
+                                        M
+                                    </div>
+                                    <div class="glass-card rounded-2xl rounded-tl-none px-4 py-2 flex-1 bg-cyan-500/10 border-cyan-500/30">
+                                        <p class="text-sm text-cyan-100">Michael: Ok.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Chat Input -->
+                            <div class="flex gap-2 mb-6">
+                                <input type="text" placeholder="Enter your message here..." class="flex-1 glass-card rounded-xl px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                                <button class="glass-button px-4 py-2 rounded-xl text-sm">
+                                    Open Chat
+                                </button>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="grid grid-cols-3 gap-2">
+                                <button class="glass-card hover:bg-green-500/20 hover:border-green-500/50 py-2 rounded-lg text-xs font-medium transition-all text-gray-300 hover:text-green-400">
+                                    Confirm Receipt
+                                </button>
+                                <button class="glass-card hover:bg-red-500/20 hover:border-red-500/50 py-2 rounded-lg text-xs font-medium transition-all text-gray-300 hover:text-red-400">
+                                    Open Dispute
+                                </button>
+                                <button class="glass-card hover:bg-blue-500/20 hover:border-blue-500/50 py-2 rounded-lg text-xs font-medium transition-all text-gray-300 hover:text-blue-400">
+                                    Release Funds
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- New Deal Modal - Multi Step -->
+    <div id="newDealModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="glass-panel rounded-3xl p-8 max-w-4xl w-full transform transition-all scale-100 max-h-[90vh] overflow-y-auto">
+
+            <!-- Header with Navigation -->
+            <div class="flex items-center justify-between mb-8">
+                <button onclick="prevStep()" id="backBtn" class="hidden text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-chevron-left text-2xl"></i>
+                </button>
+
+                <div class="flex-1 flex justify-center items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                        <i class="fas fa-gift text-white text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold gradient-text">NEW DEAL</h2>
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+                        <i class="fas fa-gift text-white text-xl"></i>
+                    </div>
+                </div>
+
+                <button onclick="closeNewDealModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <!-- Step 1: Role Selection -->
+            <div id="step1" class="step-content">
+                <h3 class="text-xl font-semibold text-center mb-8">Your Role</h3>
+
+                <div class="space-y-4 max-w-md mx-auto">
+                    <label class="flex items-center gap-4 p-4 glass-card rounded-2xl cursor-pointer hover:bg-white/10 transition-all border-2 border-transparent hover:border-cyan-400/50 role-option" onclick="selectRole('buyer')">
+                        <input type="radio" name="role" value="buyer" class="hidden">
+                        <div class="w-6 h-6 rounded-full border-2 border-cyan-400 flex items-center justify-center radio-circle">
+                            <div class="w-3 h-3 rounded-full bg-cyan-400 hidden radio-dot"></div>
+                        </div>
+                        <span class="text-lg font-medium">Buyer</span>
+                    </label>
+
+                    <label class="flex items-center gap-4 p-4 glass-card rounded-2xl cursor-pointer hover:bg-white/10 transition-all border-2 border-transparent hover:border-cyan-400/50 role-option" onclick="selectRole('seller')">
+                        <input type="radio" name="role" value="seller" class="hidden">
+                        <div class="w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center radio-circle">
+                            <div class="w-3 h-3 rounded-full bg-cyan-400 hidden radio-dot"></div>
+                        </div>
+                        <span class="text-lg font-medium text-gray-400">Seller</span>
+                    </label>
+                </div>
+
+                <div class="flex justify-end mt-8">
+                    <button onclick="nextStep()" class="glass-button w-14 h-14 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Product Link -->
+            <div id="step2" class="step-content hidden">
+                <h3 class="text-xl font-semibold text-center mb-2">Paste Product Link</h3>
+                <p class="text-sm text-gray-400 text-center mb-8">Product name will appear here if exist</p>
+
+                <div class="max-w-lg mx-auto">
+                    <div class="relative">
+                        <input type="text" id="productLink" placeholder="Paste product link here:" 
+                            class="w-full glass-card rounded-2xl px-6 py-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 text-lg">
+                        <button onclick="fetchProductInfo()" class="absolute right-2 top-1/2 -translate-y-1/2 glass-button w-12 h-12 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI Assistant Badge -->
+                <div class="fixed bottom-8 right-8">
+                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 cursor-pointer hover:scale-110 transition-transform">
+                        <span class="text-xl font-bold text-white">A</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Check Item Details (Buyer View) -->
+            <div id="step3" class="step-content hidden">
+                <h3 class="text-xl font-semibold text-center mb-2">Check item details</h3>
+                <p class="text-sm text-gray-400 text-center mb-6">We've fetched the information from the link. Please verify everything is correct before creating the deal.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Product Images -->
+                    <div class="space-y-4">
+                        <div class="glass-card rounded-2xl p-4 aspect-square flex items-center justify-center bg-white/5">
+                            <img id="mainProductImage" src="https://via.placeholder.com/400x400/f0f0f0/666?text=iPhone+15" alt="Product" class="max-w-full max-h-full object-contain rounded-xl">
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="glass-card rounded-xl p-2 aspect-square cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all product-thumb" onclick="changeMainImage(0)">
+                                <img src="https://via.placeholder.com/150x150/f0f0f0/666?text=Front" class="w-full h-full object-cover rounded-lg">
+                            </div>
+                            <div class="glass-card rounded-xl p-2 aspect-square cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all product-thumb" onclick="changeMainImage(1)">
+                                <img src="https://via.placeholder.com/150x150/f0f0f0/666?text=Back" class="w-full h-full object-cover rounded-lg">
+                            </div>
+                            <div class="glass-card rounded-xl p-2 aspect-square cursor-pointer hover:ring-2 hover:ring-cyan-400 transition-all product-thumb" onclick="changeMainImage(2)">
+                                <img src="https://via.placeholder.com/150x150/f0f0f0/666?text=Side" class="w-full h-full object-cover rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Details Form -->
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm text-gray-400 mb-1">
+                                <label>Title</label>
+                                <span id="titleCount">26/100</span>
+                            </div>
+                            <input type="text" id="productTitle" value="iPhone 15 (256 GB, Pink)" 
+                                class="w-full glass-card rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-sm text-gray-400 mb-1">
+                                <label>Description</label>
+                                <span id="descCount">139/200</span>
+                            </div>
+                            <textarea id="productDesc" rows="3" 
+                                class="w-full glass-card rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 resize-none">Lightly used, minor screen scratches. Fully functional. Comes with original box and charger.</textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Box size (cm): <span class="text-cyan-400">small</span> | <span class="text-cyan-400">medium</span> | <span class="text-gray-500">large</span></label>
+                            <div class="flex gap-2">
+                                <input type="number" value="20" class="w-20 glass-card rounded-lg px-3 py-2 text-center text-white">
+                                <span class="self-center text-gray-400">×</span>
+                                <input type="number" value="15" class="w-20 glass-card rounded-lg px-3 py-2 text-center text-white">
+                                <span class="self-center text-gray-400">×</span>
+                                <input type="number" value="10" class="w-20 glass-card rounded-lg px-3 py-2 text-center text-white">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">Price</label>
+                                <div class="glass-card rounded-xl px-4 py-3 flex items-center gap-2">
+                                    <input type="number" value="500" class="bg-transparent w-full text-white focus:outline-none">
+                                    <span class="text-gray-400">€</span>
+                                    <span class="text-xs text-gray-500">+ 3% tax</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">Shipment Price</label>
+                                <div class="glass-card rounded-xl px-4 py-3 flex items-center gap-2">
+                                    <input type="number" value="5" class="bg-transparent w-full text-white focus:outline-none">
+                                    <span class="text-gray-400">€</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" class="w-5 h-5 rounded border-gray-500 text-cyan-400 focus:ring-cyan-400/50 bg-transparent">
+                            <span class="text-sm text-gray-400">I agree to the <span class="text-cyan-400 underline cursor-pointer">Terms of Service</span> and <span class="text-cyan-400 underline cursor-pointer">Privacy Policy</span></span>
+                        </label>
+
+                        <button onclick="createDeal()" class="w-full glass-button py-4 rounded-xl font-semibold text-white mt-4">
+                            CREATE DEAL
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI Assistant Badge -->
+                <div class="fixed bottom-8 right-8">
+                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 cursor-pointer hover:scale-110 transition-transform">
+                        <span class="text-xl font-bold text-white">A</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Share QR Code -->
+            <div id="step4" class="step-content hidden">
+                <h3 class="text-xl font-semibold text-center mb-8">Share Your QR</h3>
+
+                <div class="max-w-md mx-auto text-center">
+                    <div class="glass-card rounded-3xl p-8 mb-6 inline-block">
+                        <div class="bg-white p-4 rounded-2xl">
+                            <!-- QR Code Placeholder -->
+                            <div id="qrCode" class="w-48 h-48 bg-gray-900 rounded-xl flex items-center justify-center relative overflow-hidden">
+                                <!-- Simulated QR Code Pattern -->
+                                <div class="absolute inset-0 grid grid-cols-7 grid-rows-7 gap-0.5 p-2">
+                                    <div class="col-span-2 row-span-2 bg-black rounded-sm"></div>
+                                    <div class="col-span-1 row-span-1 bg-black col-start-4"></div>
+                                    <div class="col-span-2 row-span-2 bg-black col-start-6 row-start-1 rounded-sm"></div>
+                                    <div class="col-span-1 row-span-2 bg-black row-start-3"></div>
+                                    <div class="col-span-1 row-span-1 bg-black col-start-3 row-start-3"></div>
+                                    <div class="col-span-1 row-span-2 bg-black col-start-5 row-start-3"></div>
+                                    <div class="col-span-1 row-span-1 bg-black col-start-7 row-start-3"></div>
+                                    <div class="col-span-2 row-span-2 bg-black row-start-6 rounded-sm"></div>
+                                    <div class="col-span-1 row-span-1 bg-black col-start-3 row-start-5"></div>
+                                    <div class="col-span-1 row-span-2 bg-black col-start-4 row-start-6"></div>
+                                    <div class="col-span-2 row-span-2 bg-black col-start-6 row-start-6 rounded-sm"></div>
+                                    <div class="col-span-1 row-span-1 bg-black col-start-2 row-start-4"></div>
+                                    <div class="col-span-1 row-span-1 bg-black col-start-6 row-start-4"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 mb-6 glass-card rounded-xl p-2">
+                        <input type="text" id="dealLink" value="www.paypack.it/deal/22235/678647" readonly 
+                            class="flex-1 bg-transparent px-4 py-2 text-gray-300 text-sm focus:outline-none">
+                        <button onclick="copyLink()" class="bg-cyan-500 hover:bg-cyan-400 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                            Copy
+                        </button>
+                    </div>
+
+                    <button onclick="shareDeal()" class="w-full glass-button py-4 rounded-xl font-semibold text-white mb-4">
+                        SHARE
+                    </button>
+
+                    <p class="text-sm text-gray-400">Transaction Status: "<span class="text-yellow-400">Awaiting Seller Confirmation</span>"</p>
+                </div>
+            </div>
+
+            <!-- Step 5: Check Offered Deal (Seller/Receiver View) -->
+            <div id="step5" class="step-content hidden">
+                <h3 class="text-xl font-semibold text-center mb-2">Check offered deal details</h3>
+                <p class="text-sm text-gray-400 text-center mb-6">We've fetched the information from the link. Please verify everything is correct before creating the deal.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Product Images -->
+                    <div class="space-y-4">
+                        <div class="glass-card rounded-2xl p-4 aspect-square flex items-center justify-center bg-white/5">
+                            <img src="https://via.placeholder.com/400x400/f0f0f0/666?text=iPhone+15" alt="Product" class="max-w-full max-h-full object-contain rounded-xl">
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="glass-card rounded-xl p-2 aspect-square">
+                                <img src="https://via.placeholder.com/150x150/f0f0f0/666?text=Front" class="w-full h-full object-cover rounded-lg">
+                            </div>
+                            <div class="glass-card rounded-xl p-2 aspect-square">
+                                <img src="https://via.placeholder.com/150x150/f0f0f0/666?text=Back" class="w-full h-full object-cover rounded-lg">
+                            </div>
+                            <div class="glass-card rounded-xl p-2 aspect-square">
+                                <img src="https://via.placeholder.com/150x150/f0f0f0/666?text=Side" class="w-full h-full object-cover rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Details (Read Only) -->
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm text-gray-400 mb-1">
+                                <label>Title</label>
+                                <span>26/100</span>
+                            </div>
+                            <input type="text" value="iPhone 15 (256 GB, Pink)" readonly 
+                                class="w-full glass-card rounded-xl px-4 py-3 text-white bg-white/5 cursor-not-allowed">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-sm text-gray-400 mb-1">
+                                <label>Description</label>
+                                <span>139/200</span>
+                            </div>
+                            <textarea readonly rows="3" 
+                                class="w-full glass-card rounded-xl px-4 py-3 text-white bg-white/5 cursor-not-allowed resize-none">Lightly used, minor screen scratches. Fully functional. Comes with original box and charger.</textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">Box size (cm): <span class="text-cyan-400">small</span> | <span class="text-cyan-400">medium</span> | <span class="text-gray-500">large</span></label>
+                            <div class="flex gap-2">
+                                <input type="number" value="20" readonly class="w-20 glass-card rounded-lg px-3 py-2 text-center text-white bg-white/5 cursor-not-allowed">
+                                <span class="self-center text-gray-400">×</span>
+                                <input type="number" value="15" readonly class="w-20 glass-card rounded-lg px-3 py-2 text-center text-white bg-white/5 cursor-not-allowed">
+                                <span class="self-center text-gray-400">×</span>
+                                <input type="number" value="10" readonly class="w-20 glass-card rounded-lg px-3 py-2 text-center text-white bg-white/5 cursor-not-allowed">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">Price</label>
+                                <div class="glass-card rounded-xl px-4 py-3 flex items-center gap-2 bg-white/5">
+                                    <span class="text-white">500</span>
+                                    <span class="text-gray-400">€</span>
+                                    <span class="text-xs text-gray-500">+ 3% tax</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">Shipment Price</label>
+                                <div class="glass-card rounded-xl px-4 py-3 flex items-center gap-2 bg-white/5">
+                                    <span class="text-white">5</span>
+                                    <span class="text-gray-400">€</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="agreeTerms" class="w-5 h-5 rounded border-gray-500 text-cyan-400 focus:ring-cyan-400/50 bg-transparent">
+                            <span class="text-sm text-gray-400">I agree to the <span class="text-cyan-400 underline cursor-pointer">Terms of Service</span> and <span class="text-cyan-400 underline cursor-pointer">Privacy Policy</span></span>
+                        </label>
+
+                        <div class="grid grid-cols-2 gap-4 mt-4">
+                            <button onclick="confirmDeal()" class="bg-cyan-500 hover:bg-cyan-400 text-white py-4 rounded-xl font-semibold transition-colors">
+                                CONFIRM DEAL
+                            </button>
+                            <button onclick="declineDeal()" class="bg-red-500 hover:bg-red-400 text-white py-4 rounded-xl font-semibold transition-colors">
+                                DECLINE DEAL
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Indicator -->
+            <div class="flex justify-center gap-2 mt-8">
+                <div class="step-dot w-2 h-2 rounded-full bg-cyan-400 transition-all" data-step="1"></div>
+                <div class="step-dot w-2 h-2 rounded-full bg-white/20 transition-all" data-step="2"></div>
+                <div class="step-dot w-2 h-2 rounded-full bg-white/20 transition-all" data-step="3"></div>
+                <div class="step-dot w-2 h-2 rounded-full bg-white/20 transition-all" data-step="4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-8 left-1/2 -translate-x-1/2 glass-panel px-6 py-3 rounded-xl z-50">
+        <span id="toastMessage" class="text-white"></span>
+    </div>
+    <script>
+        let currentMode = 'SHIP';
+        let currentStep = 1;
+        let selectedRole = null;
+        const totalSteps = 4;
+
+        function toggleMode() {
+            const toggle = document.getElementById('modeToggle');
+            toggle.classList.toggle('active');
+            currentMode = currentMode === 'DEAL' ? 'SHIP' : 'DEAL';
+        }
+
+        function enterDashboard() {
+            document.getElementById('landingPage').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        function logout() {
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('landingPage').classList.remove('hidden');
+        }
+
+        // New Deal Modal Functions
+        function showNewDealModal() {
+            document.getElementById('newDealModal').classList.remove('hidden');
+            resetDealFlow();
+        }
+
+        function closeNewDealModal() {
+            document.getElementById('newDealModal').classList.add('hidden');
+        }
+
+        function resetDealFlow() {
+            currentStep = 1;
+            selectedRole = null;
+            showStep(1);
+            updateProgressDots();
+
+            // Reset role selection
+            document.querySelectorAll('.role-option').forEach(opt => {
+                opt.classList.remove('border-cyan-400');
+                opt.querySelector('.radio-circle').classList.remove('border-cyan-400');
+                opt.querySelector('.radio-circle').classList.add('border-gray-500');
+                opt.querySelector('.radio-dot').classList.add('hidden');
+            });
+
+            // Reset product link
+            document.getElementById('productLink').value = '';
+        }
+
+        function showStep(step) {
+            // Hide all steps
+            document.querySelectorAll('.step-content').forEach(el => {
+                el.classList.add('hidden');
+            });
+
+            // Show current step
+            document.getElementById(`step${step}`).classList.remove('hidden');
+
+            // Update back button visibility
+            const backBtn = document.getElementById('backBtn');
+            if (step === 1) {
+                backBtn.classList.add('hidden');
+            } else {
+                backBtn.classList.remove('hidden');
+            }
+
+            currentStep = step;
+            updateProgressDots();
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                showStep(currentStep + 1);
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                showStep(currentStep - 1);
+            }
+        }
+
+        function updateProgressDots() {
+            document.querySelectorAll('.step-dot').forEach((dot, index) => {
+                if (index < currentStep) {
+                    dot.classList.remove('bg-white/20');
+                    dot.classList.add('bg-cyan-400');
+                } else {
+                    dot.classList.remove('bg-cyan-400');
+                    dot.classList.add('bg-white/20');
+                }
+            });
+        }
+
+        function selectRole(role) {
+            selectedRole = role;
+
+            // Reset all roles
+            document.querySelectorAll('.role-option').forEach(opt => {
+                opt.classList.remove('border-cyan-400');
+                opt.querySelector('.radio-circle').classList.remove('border-cyan-400');
+                opt.querySelector('.radio-circle').classList.add('border-gray-500');
+                opt.querySelector('.radio-dot').classList.add('hidden');
+                opt.querySelector('span').classList.add('text-gray-400');
+            });
+
+            // Select clicked role
+            const selected = document.querySelector(`input[value="${role}"]`).closest('.role-option');
+            selected.classList.add('border-cyan-400');
+            selected.querySelector('.radio-circle').classList.remove('border-gray-500');
+            selected.querySelector('.radio-circle').classList.add('border-cyan-400');
+            selected.querySelector('.radio-dot').classList.remove('hidden');
+            selected.querySelector('span').classList.remove('text-gray-400');
+        }
+
+        function fetchProductInfo() {
+            const link = document.getElementById('productLink').value;
+            if (!link) {
+                showToast('Please paste a product link');
+                return;
+            }
+            // Simulate fetching product info
+            showToast('Fetching product information...');
+            setTimeout(() => {
+                nextStep();
+            }, 1000);
+        }
+
+        function changeMainImage(index) {
+            const images = [
+                'https://via.placeholder.com/400x400/f0f0f0/666?text=iPhone+15',
+                'https://via.placeholder.com/400x400/f0f0f0/666?text=Back+View',
+                'https://via.placeholder.com/400x400/f0f0f0/666?text=Side+View'
+            ];
+            document.getElementById('mainProductImage').src = images[index];
+
+            // Update active thumbnail
+            document.querySelectorAll('.product-thumb').forEach((thumb, i) => {
+                if (i === index) {
+                    thumb.classList.add('ring-2', 'ring-cyan-400');
+                } else {
+                    thumb.classList.remove('ring-2', 'ring-cyan-400');
+                }
+            });
+        }
+
+        function createDeal() {
+            const title = document.getElementById('productTitle').value;
+            if (!title) {
+                showToast('Please enter product title');
+                return;
+            }
+
+            showToast('Creating deal...');
+            setTimeout(() => {
+                nextStep(); // Go to QR code step
+            }, 1000);
+        }
+
+        function copyLink() {
+            const linkInput = document.getElementById('dealLink');
+            linkInput.select();
+            document.execCommand('copy');
+            showToast('Link copied to clipboard!');
+        }
+
+        function shareDeal() {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'PayPack Deal',
+                    text: 'Check out this deal on PayPack',
+                    url: document.getElementById('dealLink').value
+                });
+            } else {
+                showToast('Share dialog would open here');
+            }
+        }
+
+        function confirmDeal() {
+            const agreed = document.getElementById('agreeTerms').checked;
+            if (!agreed) {
+                showToast('Please agree to Terms of Service');
+                return;
+            }
+            showToast('Deal confirmed! Funds locked in escrow.');
+            setTimeout(() => {
+                closeNewDealModal();
+            }, 1500);
+        }
+
+        function declineDeal() {
+            showToast('Deal declined');
+            setTimeout(() => {
+                closeNewDealModal();
+            }, 1000);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        function selectDeal(id) {
+            // Visual feedback for selection
+            const items = document.querySelectorAll('#activityList > div');
+            items.forEach(item => item.classList.remove('ring-2', 'ring-cyan-400'));
+            event.currentTarget.classList.add('ring-2', 'ring-cyan-400');
+        }
+
+        // Close modal on outside click
+        document.getElementById('newDealModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeNewDealModal();
+            }
+        });
+
+        // Filter buttons interaction
+        document.querySelectorAll('.glass-card.rounded-lg').forEach(btn => {
+            if (btn.textContent.match(/All|Active|Disputed|Completed/)) {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.glass-card.rounded-lg').forEach(b => {
+                        b.classList.remove('bg-white/10', 'text-white');
+                        b.classList.add('text-gray-400');
+                    });
+                    this.classList.add('bg-white/10', 'text-white');
+                    this.classList.remove('text-gray-400');
+                });
+            }
+        });
+
+        // Character counters
+        document.getElementById('productTitle')?.addEventListener('input', function() {
+            document.getElementById('titleCount').textContent = `${this.value.length}/100`;
+        });
+
+        document.getElementById('productDesc')?.addEventListener('input', function() {
+            document.getElementById('descCount').textContent = `${this.value.length}/200`;
+        });
+    </script>
+</body>
+</html>

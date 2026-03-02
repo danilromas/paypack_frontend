@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayPack.uno - Shipments</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f0f4f8 0%, #e8f0f8 50%, #f5f9fc 100%);
+            min-height: 100vh;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .glass-dark {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        /* Animations */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes checkmark {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes confetti {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+
+        .animate-slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .animate-scale-in {
+            animation: scaleIn 0.3s ease-out;
+        }
+
+        .animate-checkmark {
+            animation: checkmark 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Hover Effects */
+        .hover-lift {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .hover-lift:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 20px 40px -10px rgba(0, 191, 255, 0.2);
+        }
+
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: scale(1.01);
+            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Progress Bar */
+        .progress-line {
+            background: linear-gradient(90deg, #00BFFF var(--progress, 0%), #e2e8f0 var(--progress, 0%));
+        }
+
+        /* Status Badges */
+        .status-arrived {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+        }
+        .status-pending {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
+        }
+        .status-transit {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Gradient Text */
+        .gradient-text {
+            background: linear-gradient(135deg, #00BFFF 0%, #0080ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Confetti */
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #00BFFF;
+            animation: confetti 3s ease-out forwards;
+        }
+
+        /* Input Focus */
+        .input-focus:focus {
+            outline: none;
+            border-color: #00BFFF;
+            box-shadow: 0 0 0 3px rgba(0, 191, 255, 0.1);
+        }
+
+        /* Sidebar Active State */
+        .nav-item {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 0;
+            background: #00BFFF;
+            transition: height 0.3s ease;
+            border-radius: 0 3px 3px 0;
+        }
+        .nav-item:hover::before,
+        .nav-item.active::before {
+            height: 60%;
+        }
+        .nav-item.active {
+            background: rgba(0, 191, 255, 0.1);
+            color: #00BFFF;
+        }
+
+        /* Service Card Selected */
+        .service-card.selected {
+            border-color: #00BFFF;
+            background: rgba(0, 191, 255, 0.05);
+            box-shadow: 0 0 0 2px #00BFFF, 0 10px 40px -10px rgba(0, 191, 255, 0.3);
+        }
+
+        /* Payment Method Selected */
+        .payment-method.selected {
+            border-color: #00BFFF;
+            background: rgba(0, 191, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="text-slate-700 overflow-x-hidden">
+
+    <!-- Main Layout -->
+    <div class="flex min-h-screen">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 glass-dark text-white fixed h-full z-40 flex flex-col">
+            <!-- Logo -->
+            <div class="p-6 border-b border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-cyan-500/30">
+                        P
+                    </div>
+                    <div>
+                        <div class="font-bold text-lg tracking-tight">PayPack<span class="font-light text-cyan-400">.uno</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEAL/SHIP Toggle -->
+            <div class="px-4 py-4">
+                <div class="bg-slate-800/50 rounded-xl p-1 flex gap-1">
+                    <button onclick="switchMode('deal')" id="btn-deal" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white">
+                        DEAL
+                    </button>
+                    <button onclick="switchMode('ship')" id="btn-ship" class="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-cyan-500 text-white shadow-lg shadow-cyan-500/25">
+                        SHIP
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 px-4 space-y-1">
+                <a href="#" class="nav-item active flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    Dashboard
+                </a>
+                <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    Support
+                </a>
+                <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Settings
+                </a>
+            </nav>
+
+            <!-- Logout -->
+            <div class="p-4 border-t border-slate-700/50">
+                <button class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 w-full transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    Log Out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 ml-64">
+            
+            <!-- Top Bar -->
+            <div class="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 text-white px-8 py-6 relative overflow-hidden">
+                <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23ffffff\" fill-opacity=\"0.05\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-50"></div>
+                <div class="relative z-10 flex items-center justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold mb-1">Shipments Dashboard</h1>
+                        <p class="text-blue-100 text-sm">Manage and track all your deliveries</p>
+                    </div>
+                    <button onclick="openWizard()" class="bg-white text-blue-600 px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        NEW SHIPMENT
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="px-8 py-6">
+                <div class="glass rounded-2xl p-4 mb-6 flex flex-wrap items-center gap-4">
+                    <div class="flex items-center gap-2 bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-200">
+                        <span class="text-slate-400 text-sm">Sender</span>
+                        <select class="bg-transparent text-sm font-medium text-slate-700 outline-none">
+                            <option>All</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-200">
+                        <span class="text-slate-400 text-sm">Receiver</span>
+                        <select class="bg-transparent text-sm font-medium text-slate-700 outline-none">
+                            <option>All</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-200">
+                        <span class="text-slate-400 text-sm">Service</span>
+                        <select class="bg-transparent text-sm font-medium text-slate-700 outline-none">
+                            <option>All</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-200">
+                        <span class="text-slate-400 text-sm">Status</span>
+                        <select class="bg-transparent text-sm font-medium text-slate-700 outline-none">
+                            <option>All</option>
+                        </select>
+                    </div>
+                    <div class="flex-1"></div>
+                    <div class="relative">
+                        <svg class="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" placeholder="Search shipments..." class="pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 w-64 transition-all">
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="glass rounded-2xl overflow-hidden shadow-sm">
+                    <table class="w-full">
+                        <thead class="bg-slate-50/50 border-b border-slate-200">
+                            <tr>
+                                <th class="text-left py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sender</th>
+                                <th class="text-left py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Receiver</th>
+                                <th class="text-left py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Service</th>
+                                <th class="text-left py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Dimensions/Weight</th>
+                                <th class="text-left py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th class="text-left py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="hover:bg-white/50 transition-colors card-hover">
+                                <td class="py-5 px-6">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">II</div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">Ivanov Ivan</div>
+                                            <div class="text-xs text-slate-500">Moscow, Russia</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <div class="font-semibold text-slate-800">Petrov Sergey</div>
+                                    <div class="text-xs text-slate-500">Saint Petersburg</div>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                        Express 24h
+                                    </span>
+                                </td>
+                                <td class="py-5 px-6 text-sm text-slate-600">
+                                    30×20×15 cm<br>
+                                    <span class="text-slate-400">2.5 kg</span>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <span class="status-arrived text-white text-xs font-semibold px-3 py-1.5 rounded-full">ARRIVED</span>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <div class="flex items-center gap-2">
+                                        <button class="text-cyan-500 hover:text-cyan-600 text-sm font-medium hover:underline">Tracking</button>
+                                        <span class="text-slate-300">|</span>
+                                        <button class="text-slate-500 hover:text-slate-700 text-sm">Details</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-white/50 transition-colors card-hover">
+                                <td class="py-5 px-6">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-semibold text-sm">AS</div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">Anna Smith</div>
+                                            <div class="text-xs text-slate-500">London, UK</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <div class="font-semibold text-slate-800">John Doe</div>
+                                    <div class="text-xs text-slate-500">Manchester, UK</div>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                                        Standard
+                                    </span>
+                                </td>
+                                <td class="py-5 px-6 text-sm text-slate-600">
+                                    40×30×25 cm<br>
+                                    <span class="text-slate-400">5.0 kg</span>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <span class="status-transit text-white text-xs font-semibold px-3 py-1.5 rounded-full">IN TRANSIT</span>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <div class="flex items-center gap-2">
+                                        <button class="text-cyan-500 hover:text-cyan-600 text-sm font-medium hover:underline">Tracking</button>
+                                        <span class="text-slate-300">|</span>
+                                        <button class="text-slate-500 hover:text-slate-700 text-sm">Details</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-white/50 transition-colors card-hover">
+                                <td class="py-5 px-6">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">MK</div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">Maria Kuznetsova</div>
+                                            <div class="text-xs text-slate-500">Berlin, Germany</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <div class="font-semibold text-slate-800">Hans Mueller</div>
+                                    <div class="text-xs text-slate-500">Munich, Germany</div>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-cyan-50 text-cyan-700 border border-cyan-100">
+                                        Same Day
+                                    </span>
+                                </td>
+                                <td class="py-5 px-6 text-sm text-slate-600">
+                                    25×15×10 cm<br>
+                                    <span class="text-slate-400">1.2 kg</span>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <span class="status-pending text-white text-xs font-semibold px-3 py-1.5 rounded-full">PENDING</span>
+                                </td>
+                                <td class="py-5 px-6">
+                                    <div class="flex items-center gap-2">
+                                        <button class="text-cyan-500 hover:text-cyan-600 text-sm font-medium hover:underline">See details</button>
+                                        <span class="text-slate-300">|</span>
+                                        <button class="text-slate-500 hover:text-slate-700 text-sm">Cancel</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="flex items-center justify-between mt-6">
+                    <div class="text-sm text-slate-500">Showing 1-3 of 24 shipments</div>
+                    <div class="flex gap-2">
+                        <button class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white transition-colors text-sm">Previous</button>
+                        <button class="px-4 py-2 rounded-lg bg-cyan-500 text-white shadow-lg shadow-cyan-500/25 text-sm">1</button>
+                        <button class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white transition-colors text-sm">2</button>
+                        <button class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white transition-colors text-sm">3</button>
+                        <button class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white transition-colors text-sm">Next</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Wizard Modal -->
+    <div id="wizardModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeWizard()"></div>
+        <div class="absolute inset-4 md:inset-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-in">
+            
+            <!-- Wizard Header -->
+            <div class="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Create New Shipment</h2>
+                    <button onclick="closeWizard()" class="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
+                        <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="flex items-center justify-center">
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center">
+                            <div id="step1-circle" class="w-10 h-10 rounded-full bg-cyan-500 text-white flex items-center justify-center font-semibold shadow-lg shadow-cyan-500/30">1</div>
+                            <span id="step1-text" class="ml-3 text-sm font-medium text-cyan-600">Shipping Details</span>
+                        </div>
+                        <div class="w-16 h-0.5 bg-slate-200 relative">
+                            <div id="line1" class="absolute inset-y-0 left-0 bg-cyan-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <div class="flex items-center">
+                            <div id="step2-circle" class="w-10 h-10 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-semibold transition-all">2</div>
+                            <span id="step2-text" class="ml-3 text-sm font-medium text-slate-400">Select Service</span>
+                        </div>
+                        <div class="w-16 h-0.5 bg-slate-200 relative">
+                            <div id="line2" class="absolute inset-y-0 left-0 bg-cyan-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <div class="flex items-center">
+                            <div id="step3-circle" class="w-10 h-10 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-semibold transition-all">3</div>
+                            <span id="step3-text" class="ml-3 text-sm font-medium text-slate-400">Address Data</span>
+                        </div>
+                        <div class="w-16 h-0.5 bg-slate-200 relative">
+                            <div id="line3" class="absolute inset-y-0 left-0 bg-cyan-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <div class="flex items-center">
+                            <div id="step4-circle" class="w-10 h-10 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-semibold transition-all">4</div>
+                            <span id="step4-text" class="ml-3 text-sm font-medium text-slate-400">Payment</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wizard Content -->
+            <div class="flex-1 overflow-auto p-8">
+                
+                <!-- Step 1: Shipping Details -->
+                <div id="step1" class="step-content max-w-4xl mx-auto">
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                            <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                <span class="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center text-sm">📦</span>
+                                From
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Full Name</label>
+                                    <input type="text" value="Ivanov Ivan" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus transition-all bg-slate-50">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Country</label>
+                                    <select class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus transition-all bg-slate-50">
+                                        <option>Italy</option>
+                                        <option>Russia</option>
+                                        <option>Germany</option>
+                                        <option>United Kingdom</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Address</label>
+                                    <textarea class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus transition-all bg-slate-50 h-24">Via Roma 123, Milano</textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-6">
+                            <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                                <span class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-sm">⚖️</span>
+                                Package Details
+                            </h3>
+                            <div class="glass rounded-2xl p-6 border border-slate-200">
+                                <div class="flex items-center justify-between mb-4">
+                                    <span class="font-medium text-slate-700">Default Package</span>
+                                    <button class="text-cyan-500 text-sm hover:underline">+ Add package</button>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-500 mb-1">Weight (kg)</label>
+                                        <input type="number" value="2.5" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-cyan-400 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-500 mb-1">Length (cm)</label>
+                                        <input type="number" value="30" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-cyan-400 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-500 mb-1">Width (cm)</label>
+                                        <input type="number" value="20" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-cyan-400 focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-500 mb-1">Height (cm)</label>
+                                        <input type="number" value="15" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-cyan-400 focus:outline-none">
+                                    </div>
+                                </div>
+                                <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                    <div class="flex items-center gap-2 text-sm text-blue-700">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        Volumetric weight: 1.8 kg
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Select Service -->
+                <div id="step2" class="step-content hidden max-w-5xl mx-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-semibold text-slate-800">Available Services</h3>
+                        <div class="flex gap-3">
+                            <select class="px-4 py-2 rounded-xl border border-slate-200 text-sm bg-white">
+                                <option>Sort by: Default</option>
+                                <option>Price: Low to High</option>
+                                <option>Price: High to Low</option>
+                                <option>Fastest Delivery</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <!-- Service Card 1 -->
+                        <div class="service-card rounded-2xl border-2 border-slate-200 p-6 cursor-pointer hover-lift bg-white" onclick="selectService(this)">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="px-3 py-1 rounded-full bg-red-100 text-red-600 text-xs font-semibold">24 hours</span>
+                                <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-2xl">🚚</div>
+                            </div>
+                            <h4 class="font-bold text-slate-800 mb-1">Express Delivery</h4>
+                            <p class="text-sm text-slate-500 mb-4">DHL Express Worldwide</p>
+                            <div class="space-y-2 mb-4">
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Door to door
+                                </div>
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Real-time tracking
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                <div>
+                                    <span class="text-2xl font-bold text-slate-800">€99.9</span>
+                                    <span class="text-sm text-slate-400">/estimated</span>
+                                </div>
+                                <button class="px-4 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium hover:bg-cyan-600 transition-colors">Book now</button>
+                            </div>
+                        </div>
+
+                        <!-- Service Card 2 -->
+                        <div class="service-card selected rounded-2xl border-2 border-slate-200 p-6 cursor-pointer hover-lift bg-white" onclick="selectService(this)">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="px-3 py-1 rounded-full bg-blue-100 text-blue-600 text-xs font-semibold">3-5 days</span>
+                                <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-2xl">✈️</div>
+                            </div>
+                            <h4 class="font-bold text-slate-800 mb-1">Standard Air</h4>
+                            <p class="text-sm text-slate-500 mb-4">FedEx International</p>
+                            <div class="space-y-2 mb-4">
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Pickup Point
+                                </div>
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Insurance included
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                <div>
+                                    <span class="text-2xl font-bold text-slate-800">€45.5</span>
+                                    <span class="text-sm text-slate-400">/estimated</span>
+                                </div>
+                                <button class="px-4 py-2 rounded-xl bg-cyan-500 text-white text-sm font-medium hover:bg-cyan-600 transition-colors">Selected</button>
+                            </div>
+                        </div>
+
+                        <!-- Service Card 3 -->
+                        <div class="service-card rounded-2xl border-2 border-slate-200 p-6 cursor-pointer hover-lift bg-white" onclick="selectService(this)">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-600 text-xs font-semibold">7-10 days</span>
+                                <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-2xl">🚢</div>
+                            </div>
+                            <h4 class="font-bold text-slate-800 mb-1">Economy Sea</h4>
+                            <p class="text-sm text-slate-500 mb-4">Maersk Line</p>
+                            <div class="space-y-2 mb-4">
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Deposit Point
+                                </div>
+                                <div class="flex items-center gap-2 text-sm text-slate-600">
+                                    <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Eco-friendly
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                <div>
+                                    <span class="text-2xl font-bold text-slate-800">€29.9</span>
+                                    <span class="text-sm text-slate-400">/estimated</span>
+                                </div>
+                                <button class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-colors">Details</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 p-4 rounded-xl bg-blue-50 border border-blue-100 flex items-center gap-3">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <span class="text-sm text-blue-700">Nearest pickup point: <strong>Milano Centrale Station</strong> (2.3 km)</span>
+                        <button class="ml-auto text-sm text-cyan-600 hover:underline">See map</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Address Data -->
+                <div id="step3" class="step-content hidden max-w-4xl mx-auto">
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Sender -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-4">
+                                <span class="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center text-sm">📤</span>
+                                Sender Details
+                            </h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Name</label>
+                                    <input type="text" value="Ivan" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Surname</label>
+                                    <input type="text" value="Ivanov" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Email</label>
+                                <input type="email" value="ivanov@email.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Phone</label>
+                                <input type="tel" value="+39 333 123 4567" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Address</label>
+                                <input type="text" value="Via Roma 123" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Country</label>
+                                    <select class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                        <option>Italy</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Postcode</label>
+                                    <input type="text" value="20121" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Destination -->
+                        <div class="space-y-4">
+                            <h3 class="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-4">
+                                <span class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-sm">📥</span>
+                                Destination
+                            </h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Name</label>
+                                    <input type="text" value="Maria" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Surname</label>
+                                    <input type="text" value="Rossi" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Email</label>
+                                <input type="email" value="maria.rossi@email.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Phone</label>
+                                <input type="tel" value="+39 333 987 6543" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Address</label>
+                                <input type="text" value="Via Dante 45" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Country</label>
+                                    <select class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                        <option>Italy</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-2">Postcode</label>
+                                    <input type="text" value="20123" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pickup Time -->
+                    <div class="mt-8 p-6 rounded-2xl bg-slate-50 border border-slate-200">
+                        <h4 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Pickup Date & Time
+                        </h4>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Select Date</label>
+                                <input type="date" class="w-full px-4 py-3 rounded-xl border border-slate-200 input-focus bg-white">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-600 mb-2">Time Slot</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button class="py-2 px-3 rounded-lg border border-slate-200 text-sm hover:border-cyan-400 hover:text-cyan-600 transition-colors">09:00-11:00</button>
+                                    <button class="py-2 px-3 rounded-lg border border-cyan-500 bg-cyan-50 text-cyan-700 text-sm font-medium">11:00-13:00</button>
+                                    <button class="py-2 px-3 rounded-lg border border-slate-200 text-sm hover:border-cyan-400 hover:text-cyan-600 transition-colors">13:00-15:00</button>
+                                    <button class="py-2 px-3 rounded-lg border border-slate-200 text-sm hover:border-cyan-400 hover:text-cyan-600 transition-colors">15:00-17:00</button>
+                                    <button class="py-2 px-3 rounded-lg border border-slate-200 text-sm hover:border-cyan-400 hover:text-cyan-600 transition-colors">17:00-18:30</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Payment -->
+                <div id="step4" class="step-content hidden max-w-2xl mx-auto">
+                    <div class="space-y-6">
+                        <!-- Promo Code -->
+                        <div class="glass rounded-2xl p-6 border border-slate-200">
+                            <label class="block text-sm font-medium text-slate-600 mb-3">Promo Code</label>
+                            <div class="flex gap-3">
+                                <input type="text" placeholder="Enter promo code" class="flex-1 px-4 py-3 rounded-xl border border-slate-200 input-focus bg-slate-50">
+                                <button class="px-6 py-3 rounded-xl bg-slate-800 text-white font-medium hover:bg-slate-700 transition-colors">ADD</button>
+                            </div>
+                        </div>
+
+                        <!-- Payment Method -->
+                        <div class="space-y-3">
+                            <label class="block text-sm font-medium text-slate-600">Payment Method</label>
+                            
+                            <div class="payment-method selected rounded-2xl border-2 border-slate-200 p-5 cursor-pointer hover:border-cyan-400 transition-all bg-white" onclick="selectPayment(this)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+                                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="font-semibold text-slate-800">Pay by Credit Card</div>
+                                        <div class="text-sm text-slate-500">Visa, Mastercard, Amex</div>
+                                    </div>
+                                    <div class="w-6 h-6 rounded-full border-2 border-cyan-500 bg-cyan-500 flex items-center justify-center">
+                                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="payment-method rounded-2xl border-2 border-slate-200 p-5 cursor-pointer hover:border-cyan-400 transition-all bg-white" onclick="selectPayment(this)">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-lg">P</div>
+                                    <div class="flex-1">
+                                        <div class="font-semibold text-slate-800">Pay with PayPal</div>
+                                        <div class="text-sm text-slate-500">Fast and secure</div>
+                                    </div>
+                                    <div class="w-6 h-6 rounded-full border-2 border-slate-300 flex items-center justify-center"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Order Summary -->
+                        <div class="rounded-2xl bg-slate-50 border border-slate-200 p-6">
+                            <h4 class="font-semibold text-slate-800 mb-4">Order Summary</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between text-slate-600">
+                                    <span>Standard Air shipping</span>
+                                    <span>€45.50</span>
+                                </div>
+                                <div class="flex justify-between text-slate-600">
+                                    <span>Insurance</span>
+                                    <span>€2.00</span>
+                                </div>
+                                <div class="flex justify-between text-slate-600">
+                                    <span>Tax (22%)</span>
+                                    <span>€10.45</span>
+                                </div>
+                                <div class="border-t border-slate-200 pt-2 mt-2 flex justify-between font-bold text-lg text-slate-800">
+                                    <span>Total</span>
+                                    <span class="text-cyan-600">€57.95</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pay Button -->
+                        <button onclick="processPayment()" class="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold text-lg shadow-lg shadow-cyan-500/25 hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            Proceed to Payment
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wizard Footer -->
+            <div class="border-t border-slate-100 p-6 bg-slate-50/50 flex items-center justify-between">
+                <button onclick="prevStep()" id="btnBack" class="px-6 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    ← Back
+                </button>
+                <div class="flex gap-3">
+                    <button onclick="closeWizard()" class="px-6 py-3 rounded-xl text-slate-500 hover:text-slate-700 font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="nextStep()" id="btnNext" class="px-8 py-3 rounded-xl bg-cyan-500 text-white font-medium hover:bg-cyan-600 transition-all shadow-lg shadow-cyan-500/25 flex items-center gap-2">
+                        Next →
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="fixed inset-0 z-[60] hidden">
+        <div class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm"></div>
+        
+        <!-- Confetti Container -->
+        <div id="confettiContainer" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+        
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center animate-scale-in relative overflow-hidden">
+                <!-- Glow Effect -->
+                <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-green-400/20 rounded-full blur-3xl"></div>
+                
+                <div class="relative z-10">
+                    <!-- Success Icon -->
+                    <div class="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30 animate-checkmark">
+                        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">Payment Succeeded!</h2>
+                    <p class="text-slate-500 mb-6">Your shipment has been successfully created and paid. Thank you!</p>
+                    
+                    <!-- Details -->
+                    <div class="bg-slate-50 rounded-2xl p-4 mb-6 text-left space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">Reference</span>
+                            <span class="font-mono font-medium text-slate-800">#SHP-2025-78432</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">Total Paid</span>
+                            <span class="font-bold text-green-600">€57.95</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-500">Est. Delivery</span>
+                            <span class="font-medium text-slate-800">Jan 20-22, 2025</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="closeSuccess()" class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors">
+                            Close
+                        </button>
+                        <button onclick="viewTracking()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium hover:shadow-lg transition-all">
+                            View Tracking
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        const totalSteps = 4;
+
+        function openWizard() {
+            document.getElementById('wizardModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeWizard() {
+            document.getElementById('wizardModal').classList.add('hidden');
+            document.body.style.overflow = '';
+            resetWizard();
+        }
+
+        function resetWizard() {
+            currentStep = 1;
+            updateStep();
+        }
+
+        function updateStep() {
+            // Hide all steps
+            document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`step${currentStep}`).classList.remove('hidden');
+            
+            // Update progress
+            for (let i = 1; i <= totalSteps; i++) {
+                const circle = document.getElementById(`step${i}-circle`);
+                const text = document.getElementById(`step${i}-text`);
+                const line = document.getElementById(`line${i}`);
+                
+                if (i < currentStep) {
+                    // Completed
+                    circle.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-semibold shadow-lg shadow-green-500/30';
+                    circle.innerHTML = '✓';
+                    text.className = 'ml-3 text-sm font-medium text-green-600';
+                    if (line) line.style.width = '100%';
+                } else if (i === currentStep) {
+                    // Current
+                    circle.className = 'w-10 h-10 rounded-full bg-cyan-500 text-white flex items-center justify-center font-semibold shadow-lg shadow-cyan-500/30';
+                    circle.innerHTML = i;
+                    text.className = 'ml-3 text-sm font-medium text-cyan-600';
+                    if (line) line.style.width = '0%';
+                } else {
+                    // Future
+                    circle.className = 'w-10 h-10 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-semibold transition-all';
+                    circle.innerHTML = i;
+                    text.className = 'ml-3 text-sm font-medium text-slate-400';
+                    if (line) line.style.width = '0%';
+                }
+            }
+            
+            // Update buttons
+            document.getElementById('btnBack').disabled = currentStep === 1;
+            
+            const nextBtn = document.getElementById('btnNext');
+            if (currentStep === totalSteps) {
+                nextBtn.style.display = 'none';
+            } else {
+                nextBtn.style.display = 'flex';
+                nextBtn.innerHTML = currentStep === totalSteps - 1 ? 'Proceed to Payment →' : 'Next →';
+            }
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                currentStep++;
+                updateStep();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStep();
+            }
+        }
+
+        function selectService(card) {
+            document.querySelectorAll('.service-card').forEach(c => {
+                c.classList.remove('selected');
+                c.querySelector('button').textContent = 'Book now';
+                c.querySelector('button').classList.remove('bg-cyan-500', 'text-white');
+                c.querySelector('button').classList.add('bg-slate-100', 'text-slate-600');
+            });
+            card.classList.add('selected');
+            const btn = card.querySelector('button');
+            btn.textContent = 'Selected';
+            btn.classList.remove('bg-slate-100', 'text-slate-600');
+            btn.classList.add('bg-cyan-500', 'text-white');
+        }
+
+        function selectPayment(card) {
+            document.querySelectorAll('.payment-method').forEach(c => {
+                c.classList.remove('selected');
+                const indicator = c.querySelector('.rounded-full:last-child');
+                indicator.className = 'w-6 h-6 rounded-full border-2 border-slate-300 flex items-center justify-center';
+                indicator.innerHTML = '';
+            });
+            card.classList.add('selected');
+            const indicator = card.querySelector('.rounded-full:last-child');
+            indicator.className = 'w-6 h-6 rounded-full border-2 border-cyan-500 bg-cyan-500 flex items-center justify-center';
+            indicator.innerHTML = '<svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+        }
+
+        function processPayment() {
+            closeWizard();
+            setTimeout(() => {
+                showSuccess();
+            }, 300);
+        }
+
+        function showSuccess() {
+            document.getElementById('successModal').classList.remove('hidden');
+            createConfetti();
+        }
+
+        function closeSuccess() {
+            document.getElementById('successModal').classList.add('hidden');
+            document.getElementById('confettiContainer').innerHTML = '';
+        }
+
+        function viewTracking() {
+            closeSuccess();
+            // Navigate to tracking
+        }
+
+        function createConfetti() {
+            const container = document.getElementById('confettiContainer');
+            const colors = ['#00BFFF', '#10b981', '#3b82f6', '#f59e0b', '#ec4899'];
+            
+            for (let i = 0; i < 50; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                piece.style.left = Math.random() * 100 + '%';
+                piece.style.top = '100%';
+                piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+                piece.style.animationDelay = Math.random() * 2 + 's';
+                piece.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                container.appendChild(piece);
+            }
+        }
+
+        function switchMode(mode) {
+            const dealBtn = document.getElementById('btn-deal');
+            const shipBtn = document.getElementById('btn-ship');
+            
+            if (mode === 'deal') {
+                dealBtn.className = 'flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-cyan-500 text-white shadow-lg shadow-cyan-500/25';
+                shipBtn.className = 'flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white';
+            } else {
+                shipBtn.className = 'flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-cyan-500 text-white shadow-lg shadow-cyan-500/25';
+                dealBtn.className = 'flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-white';
+            }
+        }
+
+        // Initialize
+        updateStep();
+    </script>
+</body>
+</html>

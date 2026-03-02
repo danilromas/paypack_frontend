@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { X, Check } from "lucide-react"
+import { useMemo, useState, type CSSProperties } from "react"
+import { X, Check, Sparkles, PackageCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const wizardSteps = ["Shipping Details", "Select Service", "Address Data", "Payment"]
@@ -15,6 +15,26 @@ const services = [
 export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState(1)
   const [selectedService, setSelectedService] = useState(1)
+  const [successOpen, setSuccessOpen] = useState(false)
+
+  const confetti = useMemo(() => {
+    if (!successOpen) return []
+    const colors = [
+      "rgb(34 211 238)", // cyan
+      "rgb(59 130 246)", // blue
+      "rgb(16 185 129)", // emerald
+      "rgb(245 158 11)", // amber
+      "rgb(236 72 153)", // pink
+    ]
+    return Array.from({ length: 54 }, (_, i) => {
+      const size = 8 + Math.round(Math.random() * 10)
+      const left = Math.random() * 100
+      const delay = Math.random() * 1.8
+      const duration = 2.2 + Math.random() * 2.0
+      const color = colors[i % colors.length]
+      return { i, size, left, delay, duration, color }
+    })
+  }, [successOpen])
 
   return (
     <div className="fixed inset-0 z-50">
@@ -58,7 +78,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-auto p-8">
           {/* Step 1 */}
           {step === 1 && (
-            <div className="mx-auto max-w-4xl">
+            <div className="pp-animate-slide-in mx-auto max-w-4xl">
               <div className="grid gap-8 md:grid-cols-2">
                 <div className="space-y-6">
                   <h3 className="text-lg font-semibold text-foreground">From</h3>
@@ -108,7 +128,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
 
           {/* Step 2 */}
           {step === 2 && (
-            <div className="mx-auto max-w-5xl">
+            <div className="pp-animate-slide-in mx-auto max-w-5xl">
               <div className="mb-6 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-foreground">Available Services</h3>
                 <select className="rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground">
@@ -157,7 +177,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
 
           {/* Step 3 */}
           {step === 3 && (
-            <div className="mx-auto max-w-2xl space-y-6">
+            <div className="pp-animate-slide-in mx-auto max-w-2xl space-y-6">
               <h3 className="text-lg font-semibold text-foreground">Receiver Address</h3>
               {[{ label: "Full Name", value: "Petrov Sergey" }, { label: "Phone", value: "+7 (999) 123-4567" }, { label: "Email", value: "petrov@email.com" }, { label: "Country", value: "" }, { label: "City", value: "Saint Petersburg" }, { label: "Address", value: "Nevsky Prospect 28" }, { label: "ZIP Code", value: "190000" }].map((field) => (
                 <div key={field.label}>
@@ -176,7 +196,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
 
           {/* Step 4 */}
           {step === 4 && (
-            <div className="mx-auto max-w-md text-center">
+            <div className="pp-animate-slide-in mx-auto max-w-md text-center">
               <h3 className="mb-4 text-lg font-semibold text-foreground">Payment Summary</h3>
               <div className="mb-8 rounded-2xl border border-border bg-secondary/50 p-6 text-left">
                 <div className="space-y-3 text-sm">
@@ -185,7 +205,10 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                   <div className="flex justify-between border-t border-border pt-3 font-semibold"><span className="text-foreground">Total:</span><span className="text-primary">EUR{services[selectedService].price}</span></div>
                 </div>
               </div>
-              <button onClick={onClose} className="w-full rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-all hover:opacity-90">
+              <button
+                onClick={() => setSuccessOpen(true)}
+                className="w-full rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-all hover:opacity-90"
+              >
                 Confirm & Pay
               </button>
             </div>
@@ -204,6 +227,87 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {successOpen && (
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-foreground/80 backdrop-blur-sm" />
+
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            {confetti.map((p) => (
+              <div
+                key={p.i}
+                className="pp-confetti-piece"
+                style={
+                  {
+                    ["--pp-left" as any]: `${p.left}%`,
+                    ["--pp-top" as any]: "100%",
+                    ["--pp-size" as any]: `${p.size}px`,
+                    ["--pp-delay" as any]: `${p.delay}s`,
+                    ["--pp-duration" as any]: `${p.duration}s`,
+                    ["--pp-color" as any]: p.color,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </div>
+
+          <div className="absolute inset-0 grid place-items-center p-4">
+            <div className="pp-animate-scale-in relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-2xl">
+              <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-success/20 blur-3xl" />
+
+              <div className="relative z-10">
+                <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-success to-success/70 text-success-foreground shadow-lg">
+                  <PackageCheck className="h-9 w-9" />
+                </div>
+
+                <h2 className="text-2xl font-bold text-foreground">Payment Succeeded!</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Your shipment has been created and paid successfully.
+                </p>
+
+                <div className="mt-6 rounded-2xl border border-border bg-secondary/40 p-4 text-left text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Reference</span>
+                    <span className="font-mono text-foreground">#SHP-2026-78432</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted-foreground">Total paid</span>
+                    <span className="font-semibold text-success">EUR{services[selectedService].price}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted-foreground">Next</span>
+                    <span className="inline-flex items-center gap-1 text-primary">
+                      <Sparkles className="h-4 w-4" />
+                      Track your shipment
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setSuccessOpen(false)
+                      onClose()
+                    }}
+                    className="rounded-xl border border-border py-3 text-sm font-medium text-foreground transition-all hover:bg-secondary"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSuccessOpen(false)
+                      onClose()
+                    }}
+                    className="rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
+                  >
+                    View tracking
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

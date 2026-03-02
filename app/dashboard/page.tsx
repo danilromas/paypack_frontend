@@ -1,14 +1,26 @@
 "use client"
 
+import { useEffect } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { DealsList } from "@/components/dashboard/deals-list"
 import { DealDetail } from "@/components/dashboard/deal-detail"
 import { StatsRow } from "@/components/dashboard/stats-row"
 import { NewDealModal } from "@/components/dashboard/new-deal-modal"
 import { useAppStore } from "@/store/app-store"
+import { useSearchParams } from "next/navigation"
 
 export default function DashboardPage() {
-  const { newDealModalOpen } = useAppStore()
+  const searchParams = useSearchParams()
+  const { newDealModalOpen, setNewDealModalOpen, setMode } = useAppStore()
+
+  useEffect(() => {
+    const mode = searchParams.get("mode")
+    if (mode === "deal" || mode === "ship") setMode(mode)
+
+    if (searchParams.get("new") === "1") {
+      setNewDealModalOpen(true)
+    }
+  }, [searchParams, setMode, setNewDealModalOpen])
 
   return (
     <>
