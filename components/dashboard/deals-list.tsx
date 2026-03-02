@@ -76,76 +76,124 @@ function getEventLabel(status: DealStatus) {
   }
 }
 
-export function DealsList() {
+interface DealsListProps {
+  activeFilter?: string;
+  searchQuery?: string;
+}
+
+export function DealsList({
+  activeFilter = "All",
+  searchQuery = "",
+}: DealsListProps) {
   const { selectedDealId, setSelectedDealId } = useAppStore();
+
+  // Функция для фильтрации сделок
+  const getFilteredDeals = () => {
+    let filtered = [...mockDeals];
+
+    // Фильтр по статусу
+    if (activeFilter !== "All") {
+      const statusMap: Record<string, DealStatus[]> = {
+        Active: ["pending", "escrow", "shipped", "in-transit"],
+        Disputed: ["disputed"],
+        Completed: ["completed"],
+      };
+
+      const statuses = statusMap[activeFilter];
+      if (statuses) {
+        filtered = filtered.filter((deal) => statuses.includes(deal.status));
+      }
+    }
+
+    // Поиск по ID или другим полям
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (deal) =>
+          deal.id.toLowerCase().includes(query) ||
+          deal.status.toLowerCase().includes(query),
+      );
+    }
+
+    return filtered;
+  };
+
+  const filteredDeals = getFilteredDeals();
 
   return (
     <div>
       <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
         <Clock className="h-5 w-5 text-primary" />
-        Recent Activity
+        Recent Activity {activeFilter !== "All" && `(${activeFilter})`}
+        {searchQuery && ` - Search: "${searchQuery}"`}
       </h2>
 
-      <div className="space-y-3">
-        {mockDeals.map((deal) => {
-          const statusConfig = getStatusConfig(deal.status);
-          const eventConfig = getEventIcon(deal.status);
-          const StatusIcon = statusConfig.icon;
-          const EventIcon = eventConfig.icon;
+      {filteredDeals.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <p className="text-muted-foreground">No deals found</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredDeals.map((deal) => {
+            const statusConfig = getStatusConfig(deal.status);
+            const eventConfig = getEventIcon(deal.status);
+            const StatusIcon = statusConfig.icon;
+            const EventIcon = eventConfig.icon;
 
-          return (
-            <div
-              key={deal.id}
-              onClick={() => setSelectedDealId(deal.id)}
-              className={cn(
-                "flex w-full cursor-pointer items-center justify-between rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md",
-                selectedDealId === deal.id
-                  ? "border-primary/30 shadow-md"
-                  : "border-border hover:border-primary/20",
-              )}
-            >
-              <div className="flex items-center gap-4">
-                <div
-                  className={cn(
-                    "flex h-12 w-12 items-center justify-center rounded-full",
-                    eventConfig.bg,
-                  )}
-                >
-                  <EventIcon className="h-5 w-5" />
+            return (
+              <div
+                key={deal.id}
+                onClick={() => setSelectedDealId(deal.id)}
+                className={cn(
+                  "flex w-full cursor-pointer items-center justify-between rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md",
+                  selectedDealId === deal.id
+                    ? "border-primary/30 shadow-md"
+                    : "border-border hover:border-primary/20",
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className={cn(
+                      "flex h-12 w-12 items-center justify-center rounded-full",
+                      eventConfig.bg,
+                    )}
+                  >
+                    <EventIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-card-foreground">
+                      {getEventLabel(deal.status)}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {deal.createdAt} &bull; #{deal.id.padStart(8, "4431754")}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-card-foreground">
-                    {getEventLabel(deal.status)}
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    {deal.createdAt} &bull; #{deal.id.padStart(8, "4431754")}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",
+                      statusConfig.className,
+                    )}
+                  >
+                    <StatusIcon className="h-3 w-3" />
+                    {statusConfig.label}
+                  </span>
+                  <button
+                    className="rounded p-1 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Добавьте здесь обработчик для меню
+                    }}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={cn(
-                    "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",
-                    statusConfig.className,
-                  )}
-                >
-                  <StatusIcon className="h-3 w-3" />
-                  {statusConfig.label}
-                </span>
-                <button
-                  className="rounded p-1 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Добавьте здесь обработчик для меню
-                  }}
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       <button className="mt-4 w-full rounded-xl border border-border bg-card py-3 text-center text-sm font-medium text-primary transition-all hover:bg-secondary">
         All Deals...
