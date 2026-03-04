@@ -7,26 +7,28 @@ import { useRouter } from "next/navigation"
 
 export function DashboardHeader() {
   const router = useRouter()
-  const { mode, walletBalance, setNewDealModalOpen } = useAppStore()
+  const { mode, walletBalance } = useAppStore()
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
-      <Button
-        onClick={() => {
-          if (mode === "ship") {
-            router.push("/dashboard/shipments?mode=ship&new=1")
-            return
-          }
-          setNewDealModalOpen(true)
-        }}
-        className="gap-2 rounded-xl bg-primary px-8 py-3 font-semibold text-primary-foreground shadow-lg transition-all hover:shadow-xl"
-      >
-        <Plus className="h-4 w-4" />
-        {mode === "deal" ? "NEW DEAL" : "NEW SHIPMENT"}
+      <div className="flex items-center gap-3">
         {mode === "ship" ? (
-          <Package className="ml-1 h-4 w-4" />
-        ) : null}
-      </Button>
+          <Button
+            onClick={() => {
+              router.push("/dashboard/shipments?mode=ship&new=1")
+            }}
+            className="gap-2 rounded-xl bg-primary px-8 py-3 font-semibold text-primary-foreground shadow-lg transition-all hover:shadow-xl"
+          >
+            <Plus className="h-4 w-4" />
+            NEW SHIPMENT
+            <Package className="ml-1 h-4 w-4" />
+          </Button>
+        ) : (
+          <span className="text-lg font-semibold text-foreground">
+            Dashboard
+          </span>
+        )}
+      </div>
 
       <div className="flex items-center gap-6">
         <button className="relative text-muted-foreground transition-colors hover:text-foreground">

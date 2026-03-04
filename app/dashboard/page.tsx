@@ -7,9 +7,10 @@ import { StatsRow } from "@/components/dashboard/stats-row";
 import { NewDealModal } from "@/components/dashboard/new-deal-modal";
 import { useAppStore } from "@/store/app-store";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const { newDealModalOpen } = useAppStore();
+  const { newDealModalOpen, setNewDealModalOpen } = useAppStore();
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -17,6 +18,14 @@ export default function DashboardPage() {
     <>
       <DashboardHeader />
       <div className="flex-1 overflow-auto p-8">
+        <div className="mb-8 flex justify-center">
+          <Button
+            onClick={() => setNewDealModalOpen(true)}
+            className="h-14 px-10 rounded-2xl bg-primary text-lg font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl"
+          >
+            NEW DEAL
+          </Button>
+        </div>
         <StatsRow
           onFilterChange={setActiveFilter}
           onSearchChange={setSearchQuery}

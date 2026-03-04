@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation"; // Добавляем useRouter
+import { usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   LayoutDashboard,
   MessageCircle,
@@ -23,59 +24,55 @@ const navItems = [
 
 export function DashboardSidebar() {
   const pathname = usePathname();
-  const router = useRouter(); // Инициализируем роутер
-  const { mode, setMode } = useAppStore();
+  const { mode } = useAppStore();
 
-  const handleModeChange = (newMode: "deal" | "ship") => {
-    setMode(newMode);
-    // Перенаправляем на соответствующий маршрут
-    if (newMode === "deal") {
-      router.push("/dashboard"); // или /dashboard/deals, если у вас отдельная страница сделок
-    } else {
-      router.push("/dashboard/shipments");
-    }
-  };
+  // Определяем активный сервис по URL, чтобы всегда корректно подсвечивать
+  const isShipRoute = pathname.startsWith("/dashboard/shipments");
+  const currentService: "deal" | "ship" = isShipRoute ? "ship" : "deal";
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
-      <div className="flex items-center gap-3 border-b border-sidebar-border px-6 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 font-bold text-primary-foreground shadow-lg">
-          P
-        </div>
-        <div>
-          <span className="text-lg font-bold tracking-tight">PayPack</span>
-          <span className="text-lg font-light text-primary">.uno</span>
-        </div>
-      </div>
-
-      {/* Mode Toggle */}
-      <div className="px-4 py-4">
-        <div className="flex gap-1 rounded-xl bg-sidebar-accent/50 p-1">
-          <button
-            onClick={() => handleModeChange("deal")}
+      <div className="border-b border-sidebar-border px-6 py-5">
+        <Link href="/" className="flex items-center gap-3">
+          <Image
+            src="/logo.png"
+            alt="PayPack logo"
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-xl"
+            priority
+          />
+          <div className="flex flex-col">
+            <div>
+              <span className="text-lg font-bold tracking-tight">PayPack</span>
+              <span className="text-lg font-light text-primary">.uno</span>
+            </div>
+          </div>
+        </Link>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-sidebar-accent/80 px-3 py-1.5 text-[12px] font-semibold uppercase tracking-wide">
+          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          <span
             className={cn(
-              "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all",
-              mode === "deal"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "text-sidebar-muted hover:text-sidebar-foreground",
+              "transition-all",
+              currentService === "deal"
+                ? "text-primary"
+                : "text-sidebar-muted/70",
             )}
           >
-            <Handshake className="h-4 w-4" />
-            DEAL
-          </button>
-          <button
-            onClick={() => handleModeChange("ship")}
+            Deals
+          </span>
+          <span className="text-sidebar-muted/60">·</span>
+          <span
             className={cn(
-              "flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all",
-              mode === "ship"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "text-sidebar-muted hover:text-sidebar-foreground",
+              "transition-all",
+              currentService === "ship"
+                ? "text-primary"
+                : "text-sidebar-muted/70",
             )}
           >
-            <Package className="h-4 w-4" />
-            SHIP
-          </button>
+            Ship
+          </span>
         </div>
       </div>
 

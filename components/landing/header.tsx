@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { AuthPanel } from "@/components/auth/auth-panel"
+import Image from "next/image"
 
 export function LandingHeader() {
   const [open, setOpen] = useState(false)
@@ -13,9 +14,14 @@ export function LandingHeader() {
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-sm font-bold text-primary-foreground">
-            P
-          </div>
+          <Image
+            src="/logo.png"
+            alt="PayPack logo"
+            width={32}
+            height={32}
+            className="h-8 w-8"
+            priority
+          />
           <span className="text-lg font-semibold tracking-tight text-foreground">
             PayPack
             <span className="font-light text-primary">.uno</span>
