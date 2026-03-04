@@ -4,7 +4,7 @@ import { Wallet, ArrowLeftRight, Search } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { useState } from "react";
 
-const filters = ["All", "Active", "Disputed", "Completed"];
+const filters = ["All", "Active", "Pending", "In Escrow", "Disputed", "Completed"];
 
 interface StatsRowProps {
   onFilterChange?: (filter: string) => void;

@@ -29,13 +29,13 @@ function getStatusConfig(status: DealStatus) {
       return {
         icon: Play,
         label: "Pending",
-        className: "bg-warning/10 text-warning border border-warning/20",
+        className: "bg-warning/20 text-warning-foreground border border-warning/20 ",
       };
     case "escrow":
       return {
         icon: Shield,
         label: "In Escrow",
-        className: "bg-warning/10 text-warning border border-warning/20",
+        className: "bg-warning/40 text-warning-foreground border border-warning/20",
       };
     case "completed":
       return {
@@ -104,6 +104,8 @@ export function DealsList({
     if (activeFilter !== "All") {
       const statusMap: Record<string, DealStatus[]> = {
         Active: ["pending", "escrow", "shipped", "in-transit"],
+        Pending: ["pending"],
+        "In Escrow": ["escrow"],
         Disputed: ["disputed"],
         Completed: ["completed"],
       };

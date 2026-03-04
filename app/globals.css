@@ -4,41 +4,41 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* PayPack Uno Design Tokens - Light */
-  --background: oklch(0.975 0.003 250);
-  --foreground: oklch(0.195 0.02 250);
-  --card: oklch(0.995 0.001 250);
-  --card-foreground: oklch(0.195 0.02 250);
-  --popover: oklch(0.995 0.001 250);
-  --popover-foreground: oklch(0.195 0.02 250);
-  --primary: oklch(0.55 0.15 230);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.006 250);
-  --secondary-foreground: oklch(0.25 0.02 250);
-  --muted: oklch(0.955 0.006 250);
-  --muted-foreground: oklch(0.50 0.02 250);
-  --accent: oklch(0.55 0.15 230);
-  --accent-foreground: oklch(0.99 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.55 0.16 155);
-  --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.75 0.16 75);
-  --warning-foreground: oklch(0.25 0.04 75);
-  --border: oklch(0.91 0.006 250);
-  --input: oklch(0.91 0.006 250);
-  --ring: oklch(0.55 0.15 230);
+  /* PayPack Uno Design Tokens - Light (Warm, low-contrast) */
+  --background: #f2ebe3;
+  --foreground: #191b1f;
+  --card: #f9f3eb;
+  --card-foreground: #171a1f;
+  --popover: #ffffff;
+  --popover-foreground: #191b1f;
+  --primary: #0f7680;
+  --primary-foreground: #fdfaf6;
+  --secondary: #e7ded2;
+  --secondary-foreground: #2b3037;
+  --muted: #e2d8cb;
+  --muted-foreground: #6c6256;
+  --accent: #0f7680;
+  --accent-foreground: #fdfaf6;
+  --destructive: #e4584b;
+  --destructive-foreground: #fdfaf6;
+  --success: #3c9a6b;
+  --success-foreground: #fdfaf6;
+  --warning: #e9b850;
+  --warning-foreground: #3c2e16;
+  --border: #d9cfc2;
+  --input: #d9cfc2;
+  --ring: #0f7680;
   --radius: 0.625rem;
 
-  --sidebar: oklch(0.14 0.025 250);
-  --sidebar-foreground: oklch(0.92 0.006 250);
-  --sidebar-primary: oklch(0.65 0.15 200);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.22 0.025 250);
-  --sidebar-accent-foreground: oklch(0.92 0.006 250);
-  --sidebar-border: oklch(0.25 0.02 250);
-  --sidebar-ring: oklch(0.55 0.15 230);
-  --sidebar-muted: oklch(0.55 0.01 250);
+  --sidebar: #ebe2d6;
+  --sidebar-foreground: #15171c;
+  --sidebar-primary: #0f7680;
+  --sidebar-primary-foreground: #fdfaf6;
+  --sidebar-accent: #dfd3c4;
+  --sidebar-accent-foreground: #15171c;
+  --sidebar-border: #d2c7b8;
+  --sidebar-ring: #0f7680;
+  --sidebar-muted: #7b6c59;
 
   --chart-1: oklch(0.55 0.15 230);
   --chart-2: oklch(0.55 0.16 155);
