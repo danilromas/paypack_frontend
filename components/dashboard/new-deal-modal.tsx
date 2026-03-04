@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { X, ChevronLeft, ChevronRight, Gift } from "lucide-react"
-import { useAppStore } from "@/store/app-store"
-import { cn } from "@/lib/utils"
+import { useState } from "react";
+import { X, ChevronLeft, ChevronRight, Gift } from "lucide-react";
+import { useAppStore } from "@/store/app-store";
+import { cn } from "@/lib/utils";
 
-const stepLabels = ["Role", "Product Link", "Item Details", "Summary"]
+const stepLabels = ["Role", "Product Link", "Item Details", "Summary"];
 
 export function NewDealModal() {
   const { setNewDealModalOpen } = useAppStore()
@@ -18,66 +18,67 @@ export function NewDealModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border border-border bg-card p-8">
-        {/* Header */}
+        {/* Header with integrated progress */}
         <div className="mb-8 flex items-center justify-between">
-          {step > 1 ? (
-            <button
-              onClick={() => setStep(step - 1)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-          ) : (
-            <div className="w-6" />
-          )}
-          <div className="flex flex-1 items-center justify-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70">
-              <Gift className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <h2 className="text-2xl font-bold text-primary">NEW DEAL</h2>
+          {/* Left side - Back button or placeholder */}
+          <div className="flex items-center">
+            {step > 1 ? (
+              <button
+                onClick={() => setStep(step - 1)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+            ) : (
+              <div className="w-6" />
+            )}
           </div>
-          <button
-            onClick={() => setNewDealModalOpen(false)}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
 
-        {/* Step Indicators */}
-        <div className="mb-8 flex justify-center gap-2">
-          {stepLabels.map((label, i) => (
-            <div key={label} className="flex items-center gap-2">
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold",
-                  i + 1 <= step
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground"
-                )}
-              >
-                {i + 1}
-              </div>
-              <span
-                className={cn(
-                  "hidden text-sm sm:block",
-                  i + 1 <= step
-                    ? "font-medium text-foreground"
-                    : "text-muted-foreground"
-                )}
-              >
-                {label}
-              </span>
-              {i < stepLabels.length - 1 && (
+          {/* Center - Progress Steps */}
+          <div className="flex items-center gap-2">
+            {stepLabels.map((label, i) => (
+              <div key={label} className="flex items-center gap-2">
                 <div
                   className={cn(
-                    "mx-2 h-0.5 w-8",
-                    i + 1 < step ? "bg-primary" : "bg-border"
+                    "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold",
+                    i + 1 <= step
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-muted-foreground",
                   )}
-                />
-              )}
-            </div>
-          ))}
+                >
+                  {i + 1}
+                </div>
+                <span
+                  className={cn(
+                    "hidden text-sm sm:block",
+                    i + 1 <= step
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {label}
+                </span>
+                {i < stepLabels.length - 1 && (
+                  <div
+                    className={cn(
+                      "mx-2 h-0.5 w-8",
+                      i + 1 < step ? "bg-primary" : "bg-border",
+                    )}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Right side - Close button */}
+          <div className="flex items-center">
+            <button
+              onClick={() => setNewDealModalOpen(false)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
         </div>
 
         {/* Step 1: Role */}
@@ -95,13 +96,13 @@ export function NewDealModal() {
                     "flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition-all",
                     role === r
                       ? "border-primary bg-primary/5"
-                      : "border-border bg-card hover:border-primary/30"
+                      : "border-border bg-card hover:border-primary/30",
                   )}
                 >
                   <div
                     className={cn(
                       "flex h-6 w-6 items-center justify-center rounded-full border-2",
-                      role === r ? "border-primary" : "border-muted-foreground"
+                      role === r ? "border-primary" : "border-muted-foreground",
                     )}
                   >
                     {role === r && (
@@ -111,9 +112,7 @@ export function NewDealModal() {
                   <span
                     className={cn(
                       "text-lg font-medium capitalize",
-                      role === r
-                        ? "text-foreground"
-                        : "text-muted-foreground"
+                      role === r ? "text-foreground" : "text-muted-foreground",
                     )}
                   >
                     {r}
@@ -382,5 +381,5 @@ export function NewDealModal() {
         )}
       </div>
     </div>
-  )
+  );
 }
