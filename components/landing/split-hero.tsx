@@ -17,13 +17,13 @@ const ACTIONS: Record<
   }
 > = {
   deal: {
-    title: "New Deal",
+    title: "Deal",
     hint: "Create secure escrow transaction",
     href: "/dashboard?mode=deal&new=1",
     icon: Handshake,
   },
   ship: {
-    title: "New Shipment",
+    title: "Shipment",
     hint: "Track & manage delivery",
     href: "/dashboard/shipments?mode=ship&new=1",
     icon: Package,
@@ -47,16 +47,11 @@ export function LandingSplitHero() {
 
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-4 py-1.5 text-sm text-foreground backdrop-blur-xl">
-            <Shield className="h-4 w-4 text-primary" />
-            Secure internet deals & shipments in one place
-          </div>
-
           <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
             PayPack<span className="font-light text-primary">.uno</span>
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground">
-            Choose what you want to create today. Smooth UX, modern design, and escrow-grade safety.
+            Secure internet deals & shipments in one place.
           </p>
         </div>
 
@@ -96,7 +91,7 @@ export function LandingSplitHero() {
                     </div>
 
                     <div>
-                      <h2 className="text-sm font-semibold tracking-[0.32em] text-foreground uppercase transition-all duration-500 group-hover:-translate-y-1">
+                      <h2 className="text-lg font-semibold text-foreground transition-all duration-500 group-hover:-translate-y-1">
                         {action.title}
                       </h2>
                       <p className="mt-2 text-sm text-muted-foreground opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">

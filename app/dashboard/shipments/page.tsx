@@ -4,13 +4,13 @@ import { Suspense, useEffect, useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { ShipmentsTable } from "@/components/dashboard/shipments-table"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
-import { Search, Package } from "lucide-react"
+import { Search, Package, Wallet } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useAppStore } from "@/store/app-store"
 
 function ShipmentsPageContent() {
   const searchParams = useSearchParams()
-  const { setMode } = useAppStore()
+  const { setMode, walletBalance } = useAppStore()
   const [wizardOpen, setWizardOpen] = useState(false)
 
   useEffect(() => {
@@ -47,9 +47,19 @@ function ShipmentsPageContent() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="px-8 py-6">
-        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-4">
+      {/* Wallet + Filters */}
+      <div className="px-8 py-6 space-y-6">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-3">
+            <Wallet className="h-5 w-5 text-primary" />
+            <span className="text-muted-foreground">Wallet Balance:</span>
+            <span className="text-xl font-bold text-foreground">
+              {walletBalance}$
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card p-4">
           {["Sender", "Receiver", "Service", "Status"].map((label) => (
             <div
               key={label}
@@ -75,7 +85,7 @@ function ShipmentsPageContent() {
         <ShipmentsTable />
 
         {/* Pagination */}
-        <div className="mt-6 flex items-center justify-between">
+        <div className="mt-2 flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
             Showing 1-3 of 24 shipments
           </span>

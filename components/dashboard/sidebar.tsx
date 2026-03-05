@@ -9,11 +9,8 @@ import {
   HelpCircle,
   Settings,
   LogOut,
-  Package,
-  Handshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAppStore } from "@/store/app-store";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -24,11 +21,6 @@ const navItems = [
 
 export function DashboardSidebar() {
   const pathname = usePathname();
-  const { mode } = useAppStore();
-
-  // Определяем активный сервис по URL, чтобы всегда корректно подсвечивать
-  const isShipRoute = pathname.startsWith("/dashboard/shipments");
-  const currentService: "deal" | "ship" = isShipRoute ? "ship" : "deal";
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground">
@@ -50,30 +42,6 @@ export function DashboardSidebar() {
             </div>
           </div>
         </Link>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-sidebar-accent/80 px-3 py-1.5 text-[12px] font-semibold uppercase tracking-wide">
-          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-          <span
-            className={cn(
-              "transition-all",
-              currentService === "deal"
-                ? "text-primary"
-                : "text-sidebar-muted/70",
-            )}
-          >
-            Deals
-          </span>
-          <span className="text-sidebar-muted/60">·</span>
-          <span
-            className={cn(
-              "transition-all",
-              currentService === "ship"
-                ? "text-primary"
-                : "text-sidebar-muted/70",
-            )}
-          >
-            Ship
-          </span>
-        </div>
       </div>
 
       {/* Navigation */}
