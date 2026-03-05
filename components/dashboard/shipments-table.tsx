@@ -88,7 +88,13 @@ function formatDate(dateString: string) {
   }).format(date);
 }
 
-export function ShipmentsTable() {
+export type Shipment = (typeof shipments)[number];
+
+interface ShipmentsTableProps {
+  onSelectShipment?: (shipment: Shipment) => void;
+}
+
+export function ShipmentsTable({ onSelectShipment }: ShipmentsTableProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const handleSort = () => {
@@ -145,7 +151,8 @@ export function ShipmentsTable() {
             return (
               <tr
                 key={s.id}
-                className="transition-colors hover:bg-secondary/30"
+                className="cursor-pointer transition-colors hover:bg-secondary/30"
+                onClick={() => onSelectShipment?.(s)}
               >
                 <td className="px-6 py-5">
                   <div className="font-semibold text-foreground">
@@ -202,11 +209,23 @@ export function ShipmentsTable() {
                 </td>
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-2">
-                    <button className="text-sm font-medium text-primary hover:underline">
+                    <button
+                      className="text-sm font-medium text-primary hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectShipment?.(s);
+                      }}
+                    >
                       Tracking
                     </button>
                     <span className="text-border">|</span>
-                    <button className="text-sm text-muted-foreground hover:text-foreground">
+                    <button
+                      className="text-sm text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectShipment?.(s);
+                      }}
+                    >
                       Details
                     </button>
                   </div>

@@ -13,6 +13,12 @@ import {
 import { useAppStore, mockDeals } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import type { DealStatus } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 const statusSortOrder: DealStatus[] = [
   "pending",
@@ -201,15 +207,27 @@ export function DealsList({
                     <StatusIcon className="h-3 w-3" />
                     {statusConfig.label}
                   </span>
-                  <button
-                    className="rounded p-1 text-muted-foreground hover:text-foreground"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Добавьте здесь обработчик для меню
-                    }}
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      asChild
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button className="rounded p-1 text-muted-foreground hover:text-foreground">
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => setSelectedDealId(deal.id)}
+                      >
+                        View details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>Open chat</DropdownMenuItem>
+                      <DropdownMenuItem disabled>
+                        Cancel deal (soon)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             );
@@ -217,7 +235,14 @@ export function DealsList({
         </div>
       )}
 
-      <button className="mt-4 w-full rounded-xl border border-border bg-card py-3 text-center text-sm font-medium text-primary transition-all hover:bg-secondary">
+      <button
+        className="mt-4 w-full rounded-xl border border-border bg-card py-3 text-center text-sm font-medium text-primary transition-all hover:bg-secondary"
+        onClick={() => {
+          if (filteredDeals[0]) {
+            setSelectedDealId(filteredDeals[0].id);
+          }
+        }}
+      >
         All Deals...
       </button>
     </div>

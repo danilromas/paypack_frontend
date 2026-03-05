@@ -1,18 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DealsList } from "@/components/dashboard/deals-list";
 import { DealDetail } from "@/components/dashboard/deal-detail";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { NewDealModal } from "@/components/dashboard/new-deal-modal";
 import { useAppStore } from "@/store/app-store";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const { newDealModalOpen, setNewDealModalOpen } = useAppStore();
+  const { newDealModalOpen, setNewDealModalOpen, setMode } = useAppStore();
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setMode("deal");
+  }, [setMode]);
 
   return (
     <>
