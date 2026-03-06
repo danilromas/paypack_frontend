@@ -3,6 +3,17 @@
 import { FileText, User } from "lucide-react"
 import { useAppStore, mockDeals } from "@/store/app-store"
 import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 
 const progressSteps = ["Created", "Funds Locked", "Shipped", "In Transit", "Received"]
 
@@ -35,9 +46,18 @@ export function DealDetail() {
             <h3 className="mb-1 text-lg font-bold text-primary">
               {deal.title}
             </h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="rounded bg-secondary px-2 py-0.5 text-xs">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="secondary" className="text-[10px]">
                 #{deal.id.padStart(8, "2531149")}
+              </Badge>
+              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-foreground">
+                {deal.status === "escrow"
+                  ? "In Escrow"
+                  : deal.status === "pending"
+                    ? "Pending Payment"
+                    : deal.status === "completed"
+                      ? "Completed"
+                      : "Active"}
               </span>
               <span>
                 {deal.status === "escrow"
@@ -48,9 +68,48 @@ export function DealDetail() {
               </span>
             </div>
           </div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
-            <User className="h-5 w-5 text-muted-foreground" />
-          </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <button className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary transition-colors hover:bg-secondary/80">
+                <User className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-sm">
+              <DialogHeader className="space-y-1">
+                <DialogTitle className="text-base">
+                  Counterparty details
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Quick overview of who you are trading with.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-3 space-y-4 text-sm">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {deal.counterparty}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Verified PayPack Uno user
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span>Completed deals</span>
+                    <span className="font-medium text-foreground">24</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Disputes</span>
+                    <span className="font-medium text-success">0</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Trust score</span>
+                    <span className="font-medium text-primary">4.9 / 5</span>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Progress Steps */}
@@ -121,17 +180,85 @@ export function DealDetail() {
           </button>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons + deal details modal */}
         <div className="grid grid-cols-3 gap-2">
-          <button className="rounded-lg border border-border bg-card py-2 text-xs font-medium text-muted-foreground transition-all hover:border-success/30 hover:bg-success/10 hover:text-success">
+          <Button
+            variant="outline"
+            className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-success/30 hover:bg-success/10 hover:text-success"
+          >
             Confirm Receipt
-          </button>
-          <button className="rounded-lg border border-border bg-card py-2 text-xs font-medium text-muted-foreground transition-all hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive">
+          </Button>
+          <Button
+            variant="outline"
+            className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+          >
             Open Dispute
-          </button>
-          <button className="rounded-lg border border-border bg-card py-2 text-xs font-medium text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary/10 hover:text-primary">
-            Release Funds
-          </button>
+          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+              >
+                Deal details
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader className="space-y-1">
+                <DialogTitle className="flex items-center justify-between text-base">
+                  <span>Deal #{deal.id}</span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {deal.currency} escrow
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Full breakdown of this escrow transaction.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4 space-y-4 text-sm">
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">
+                    Item
+                  </div>
+                  <div className="font-semibold text-foreground">
+                    {deal.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {deal.description}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">
+                    <div className="text-muted-foreground">Price</div>
+                    <div className="text-sm font-semibold text-foreground">
+                      {deal.price} {deal.currency}
+                    </div>
+                  </div>
+                  <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">
+                    <div className="text-muted-foreground">Shipping</div>
+                    <div className="text-sm font-semibold text-foreground">
+                      {deal.shippingPrice} {deal.currency}
+                    </div>
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  <div>
+                    Created:{" "}
+                    <span className="font-medium text-foreground">
+                      {deal.createdAt}
+                    </span>
+                  </div>
+                  <div>
+                    Updated:{" "}
+                    <span className="font-medium text-foreground">
+                      {deal.updatedAt}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

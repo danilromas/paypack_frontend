@@ -2,7 +2,18 @@
 
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, PackageSearch } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 const shipments = [
   {
@@ -88,13 +99,7 @@ function formatDate(dateString: string) {
   }).format(date);
 }
 
-export type Shipment = (typeof shipments)[number];
-
-interface ShipmentsTableProps {
-  onSelectShipment?: (shipment: Shipment) => void;
-}
-
-export function ShipmentsTable({ onSelectShipment }: ShipmentsTableProps) {
+export function ShipmentsTable() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const handleSort = () => {
@@ -151,8 +156,7 @@ export function ShipmentsTable({ onSelectShipment }: ShipmentsTableProps) {
             return (
               <tr
                 key={s.id}
-                className="cursor-pointer transition-colors hover:bg-secondary/30"
-                onClick={() => onSelectShipment?.(s)}
+                className="transition-colors hover:bg-secondary/30"
               >
                 <td className="px-6 py-5">
                   <div className="font-semibold text-foreground">
@@ -209,25 +213,111 @@ export function ShipmentsTable({ onSelectShipment }: ShipmentsTableProps) {
                 </td>
                 <td className="px-6 py-5">
                   <div className="flex items-center gap-2">
-                    <button
-                      className="text-sm font-medium text-primary hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectShipment?.(s);
-                      }}
-                    >
-                      Tracking
-                    </button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button className="text-sm font-medium text-primary hover:underline">
+                          Tracking
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader className="space-y-1">
+                          <DialogTitle className="flex items-center justify-between text-base">
+                            <span>Shipment tracking</span>
+                            <Badge variant="secondary" className="text-[10px]">
+                              #{s.id}
+                            </Badge>
+                          </DialogTitle>
+                          <DialogDescription className="text-xs">
+                            Current status and history for this shipment.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-4 space-y-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <PackageSearch className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-foreground">
+                              {s.service}
+                            </span>
+                          </div>
+                          <Separator />
+                          <ul className="space-y-1 text-xs text-muted-foreground">
+                            <li>Package created • {formatDate(s.createdAt)}</li>
+                            <li>Picked up by courier • +2h</li>
+                            <li>In transit to destination hub • +8h</li>
+                          </ul>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     <span className="text-border">|</span>
-                    <button
-                      className="text-sm text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectShipment?.(s);
-                      }}
-                    >
-                      Details
-                    </button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button className="text-sm text-muted-foreground hover:text-foreground">
+                          Details
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader className="space-y-1">
+                          <DialogTitle className="flex items-center justify-between text-base">
+                            <span>Shipment details</span>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {s.status.toUpperCase()}
+                            </Badge>
+                          </DialogTitle>
+                          <DialogDescription className="text-xs">
+                            Receiver, sender and package information.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-4 space-y-3 text-sm">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground">
+                                Receiver
+                              </div>
+                              <div className="font-semibold text-foreground">
+                                {s.receiver.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {s.receiver.location}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground">
+                                Sender
+                              </div>
+                              <div className="font-semibold text-foreground">
+                                {s.sender.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {s.sender.location}
+                              </div>
+                            </div>
+                          </div>
+                          <Separator />
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">
+                              <div className="text-muted-foreground">
+                                Dimensions
+                              </div>
+                              <div className="font-medium text-foreground">
+                                {s.dimensions}
+                              </div>
+                            </div>
+                            <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">
+                              <div className="text-muted-foreground">
+                                Weight
+                              </div>
+                              <div className="font-medium text-foreground">
+                                {s.weight}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="pt-2">
+                            <Button className="w-full" size="sm">
+                              Open full shipment page
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </td>
               </tr>

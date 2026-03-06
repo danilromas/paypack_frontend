@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DealsList } from "@/components/dashboard/deals-list";
 import { DealDetail } from "@/components/dashboard/deal-detail";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { NewDealModal } from "@/components/dashboard/new-deal-modal";
 import { useAppStore } from "@/store/app-store";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
