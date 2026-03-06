@@ -21,11 +21,11 @@ export default function DashboardPage() {
   return (
     <>
       <DashboardHeader />
-      <div className="flex-1 overflow-auto p-8">
-        <div className="mb-8 flex justify-center">
+      <div className="flex-1 overflow-auto px-4 py-6 sm:px-6 md:p-8">
+        <div className="mb-6 flex justify-center md:mb-8">
           <Button
             onClick={() => setNewDealModalOpen(true)}
-            className="h-14 px-10 rounded-2xl bg-primary text-lg font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl"
+            className="h-12 rounded-2xl bg-primary px-8 text-base font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl md:h-14 md:px-10 md:text-lg"
           >
             NEW DEAL
           </Button>
@@ -34,7 +34,7 @@ export default function DashboardPage() {
           onFilterChange={setActiveFilter}
           onSearchChange={setSearchQuery}
         />
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:mt-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <DealsList activeFilter={activeFilter} searchQuery={searchQuery} />
           </div>

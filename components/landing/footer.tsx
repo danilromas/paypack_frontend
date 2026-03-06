@@ -4,9 +4,9 @@ import Image from "next/image"
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-border bg-card py-12">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+    <footer className="border-t border-border bg-card py-8 sm:py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col items-center justify-between gap-6 text-center md:flex-row md:text-left">
           <div className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-sm font-bold text-primary-foreground">
               <Image
@@ -23,7 +23,7 @@ export function LandingFooter() {
             </span>
           </div>
 
-          <nav className="flex gap-8">
+          <nav className="flex flex-wrap justify-center gap-6 sm:gap-8">
             <Link
               href="#"
               className="text-sm text-muted-foreground hover:text-foreground"

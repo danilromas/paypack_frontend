@@ -68,11 +68,11 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
         className="absolute inset-0 bg-foreground/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="absolute inset-4 flex flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl md:inset-10">
+      <div className="absolute inset-0 flex flex-col overflow-hidden rounded-none border-0 bg-card shadow-2xl sm:inset-4 sm:rounded-3xl sm:border sm:border-border md:inset-10">
         {/* Header */}
-        <div className="border-b border-border bg-secondary/30 p-6">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-foreground">
+        <div className="border-b border-border bg-secondary/30 p-4 sm:p-6">
+          <div className="mb-4 flex items-center justify-between sm:mb-6">
+            <h2 className="text-xl font-bold text-foreground sm:text-2xl">
               Create New Shipment
             </h2>
             <button
@@ -84,7 +84,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Progress */}
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
             {wizardSteps.map((label, i) => (
               <div key={label} className="flex items-center">
                 <div

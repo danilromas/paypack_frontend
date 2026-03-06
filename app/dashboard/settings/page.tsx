@@ -38,28 +38,28 @@ export default function SettingsPage() {
   return (
     <>
       <DashboardHeader />
-      <div className="flex flex-1 overflow-hidden">
-        {/* Tabs Sidebar */}
-        <div className="w-52 border-r border-border bg-card">
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+        {/* Tabs: horizontal scroll on mobile, sidebar on desktop */}
+        <div className="flex shrink-0 flex-row overflow-x-auto border-b border-border bg-card md:w-52 md:flex-col md:overflow-x-visible md:border-b-0 md:border-r">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "flex w-full items-center gap-3 border-l-3 px-4 py-3 text-left text-sm transition-all",
+                "flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-left text-sm transition-all md:w-full md:border-b-0 md:border-l-4",
                 activeTab === tab.id
-                  ? "border-l-primary bg-primary/5 font-medium text-primary"
-                  : "border-l-transparent text-muted-foreground hover:bg-secondary/50"
+                  ? "border-primary bg-primary/5 font-medium text-primary md:border-l-primary"
+                  : "border-transparent text-muted-foreground hover:bg-secondary/50 md:border-l-transparent"
               )}
             >
               <tab.icon className="h-4 w-4" />
-              {tab.label}
+              <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-8">
+        <div className="flex-1 overflow-auto px-4 py-6 sm:px-6 md:p-8">
           <div className="mx-auto max-w-lg">
             {activeTab === "profile" && <ProfileTab />}
             {activeTab === "kyc" && <KYCTab />}

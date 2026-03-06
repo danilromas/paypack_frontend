@@ -38,16 +38,16 @@ export function LandingSplitHero() {
   return (
     <section
       id="about"
-      className="relative overflow-hidden pt-28 pb-14 lg:pt-36 lg:pb-20"
+      className="relative overflow-hidden pt-24 pb-10 sm:pt-28 sm:pb-14 lg:pt-36 lg:pb-20"
     >
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute left-1/2 top-0 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
         <div className="absolute left-1/2 top-24 h-[320px] w-[520px] -translate-x-1/2 rounded-full bg-[#5E90B4]/15 blur-3xl" />
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+          <h1 className="text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-6xl">
             PayPack<span className="font-light text-primary">.uno</span>
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground">
@@ -55,9 +55,9 @@ export function LandingSplitHero() {
           </p>
         </div>
 
-        <div className="mx-auto mt-12 max-w-5xl">
+        <div className="mx-auto mt-8 max-w-5xl sm:mt-12">
           <div
-            className="relative flex flex-col overflow-hidden rounded-3xl border border-border bg-card/40 backdrop-blur-xl md:flex-row"
+            className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card/40 backdrop-blur-xl sm:rounded-3xl md:flex-row"
             onMouseLeave={() => setHovered(null)}
           >
             {/* Left / Right cards */}
@@ -73,7 +73,7 @@ export function LandingSplitHero() {
                   href={action.href}
                   onMouseEnter={() => setHovered(key)}
                   className={cn(
-                    "group relative flex min-h-[240px] flex-1 items-center justify-center overflow-hidden px-8 py-12 transition-all duration-700",
+                    "group relative flex min-h-[200px] flex-1 items-center justify-center overflow-hidden px-6 py-10 transition-all duration-700 sm:min-h-[240px] sm:px-8 sm:py-12",
                     idx === 0 && "md:border-r md:border-border/60",
                     isHovered && "md:flex-[1.35] bg-primary/[0.04]",
                     key === "ship" && isHovered && "bg-success/[0.04]",
@@ -94,12 +94,12 @@ export function LandingSplitHero() {
                       <h2 className="text-lg font-semibold text-foreground transition-all duration-500 group-hover:-translate-y-1">
                         {action.title}
                       </h2>
-                      <p className="mt-2 text-sm text-muted-foreground opacity-0 transition-all duration-500 group-hover:translate-y-0 group-hover:opacity-100">
+                      <p className="mt-2 text-sm text-muted-foreground opacity-100 transition-all duration-500 md:opacity-0 md:group-hover:opacity-100">
                         {action.hint}
                       </p>
                     </div>
 
-                    <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground opacity-0 backdrop-blur transition-all duration-500 group-hover:opacity-100">
+                    <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground opacity-100 backdrop-blur transition-all duration-500 md:opacity-0 md:group-hover:opacity-100">
                       Open
                       <ArrowRight className="h-4 w-4 text-primary" />
                     </div>

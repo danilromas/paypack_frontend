@@ -2,8 +2,8 @@ import { ShieldCheck, Eye, Undo2, Banknote, Clock, Star } from "lucide-react"
 
 export function BuyerSeller() {
   return (
-    <section className="py-24">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+    <section className="py-16 sm:py-20 lg:py-24">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Built for Both Sides
@@ -13,9 +13,9 @@ export function BuyerSeller() {
           </p>
         </div>
 
-        <div className="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-8 lg:grid-cols-2">
+        <div className="mx-auto mt-12 grid max-w-5xl grid-cols-1 gap-8 lg:mt-16 lg:grid-cols-2">
           {/* Buyers */}
-          <div className="rounded-2xl border border-border bg-card p-8">
+          <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
             <h3 className="mb-6 text-xl font-bold text-foreground">
               For Buyers
             </h3>
@@ -53,7 +53,7 @@ export function BuyerSeller() {
           </div>
 
           {/* Sellers */}
-          <div className="rounded-2xl border border-border bg-card p-8">
+          <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
             <h3 className="mb-6 text-xl font-bold text-foreground">
               For Sellers
             </h3>

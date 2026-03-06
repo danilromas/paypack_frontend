@@ -40,8 +40,8 @@ export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
@@ -50,12 +50,12 @@ export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
             className="w-full rounded-xl border border-border bg-card py-3 pl-12 pr-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
           {filters.map((f) => (
             <button
               key={f}
               onClick={() => handleFilterClick(f)}
-              className={`rounded-lg border px-4 py-2 text-sm transition-all ${
+              className={`shrink-0 rounded-lg border px-4 py-2 text-sm transition-all ${
                 activeFilter === f
                   ? "border-primary/30 bg-primary/10 font-medium text-primary"
                   : "border-border bg-card text-muted-foreground hover:bg-secondary"

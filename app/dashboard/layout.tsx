@@ -13,12 +13,19 @@ export default function DashboardLayout({
   const isShipments = pathname.startsWith("/dashboard/shipments")
 
   return (
-    <div className={cn("flex min-h-screen", isShipments ? "bg-[#f0e5d8]" : "bg-[#f5ede4]")}>
-      <DashboardSidebar />
+    <div
+      className={cn(
+        "flex min-h-screen flex-col md:flex-row",
+        isShipments ? "bg-[#f0e5d8]" : "bg-[#f5ede4]",
+      )}
+    >
+      <div className="hidden md:block">
+        <DashboardSidebar />
+      </div>
       <main
         className={cn(
-          "ml-64 flex flex-1 flex-col overflow-hidden border-l border-border",
-          isShipments ? "bg-[#fff7ec]" : "bg-[#fffdf8]"
+          "flex flex-1 flex-col overflow-hidden border-border md:ml-64 md:border-l",
+          isShipments ? "bg-[#fff7ec]" : "bg-[#fffdf8]",
         )}
       >
         {children}

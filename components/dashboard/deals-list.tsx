@@ -167,31 +167,31 @@ export function DealsList({
                 key={deal.id}
                 onClick={() => setSelectedDealId(deal.id)}
                 className={cn(
-                  "flex w-full cursor-pointer items-center justify-between rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md",
+                  "flex w-full cursor-pointer flex-col gap-3 rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:gap-0",
                   selectedDealId === deal.id
                     ? "border-primary/30 shadow-md"
                     : "border-border hover:border-primary/20",
                 )}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                   <div
                     className={cn(
-                      "flex h-12 w-12 items-center justify-center rounded-full",
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12",
                       eventConfig.bg,
                     )}
                   >
-                    <EventIcon className="h-5 w-5" />
+                    <EventIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-card-foreground">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate font-semibold text-card-foreground">
                       {getEventLabel(deal.status)}
                     </h4>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="truncate text-sm text-muted-foreground">
                       {deal.createdAt} &bull; #{deal.id.padStart(8, "4431754")}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
                   <span
                     className={cn(
                       "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",

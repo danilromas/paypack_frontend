@@ -33,15 +33,15 @@ export default function SupportPage() {
   return (
     <>
       <DashboardHeader />
-      <div className="flex-1 overflow-auto p-8">
+      <div className="flex-1 overflow-auto px-4 py-6 sm:px-6 md:p-8">
         <div className="mx-auto max-w-4xl">
-          <h1 className="mb-2 text-2xl font-bold text-foreground">Support Center</h1>
-          <p className="mb-8 text-muted-foreground">
+          <h1 className="mb-2 text-xl font-bold text-foreground sm:text-2xl">Support Center</h1>
+          <p className="mb-6 text-sm text-muted-foreground sm:mb-8 sm:text-base">
             {"How can we help you today?"}
           </p>
 
           {/* Search */}
-          <div className="relative mb-8">
+          <div className="relative mb-6 sm:mb-8">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
@@ -113,7 +113,7 @@ export default function SupportPage() {
               {tickets.map((ticket) => (
                 <div
                   key={ticket.id}
-                  className="flex items-center justify-between rounded-xl border border-border bg-card p-5"
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
                 >
                   <div className="flex items-center gap-4">
                     <div className={cn("flex h-10 w-10 items-center justify-center rounded-full", ticket.status === "open" ? "bg-warning/10 text-warning" : "bg-success/10 text-success")}>
@@ -121,7 +121,7 @@ export default function SupportPage() {
                     </div>
                     <div>
                       <h4 className="font-medium text-foreground">{ticket.subject}</h4>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:gap-3">
                         <span>{ticket.id}</span>
                         <span>{ticket.date}</span>
                         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", ticket.priority === "high" ? "bg-destructive/10 text-destructive" : ticket.priority === "medium" ? "bg-warning/10 text-warning" : "bg-secondary text-muted-foreground")}>
@@ -130,7 +130,7 @@ export default function SupportPage() {
                       </div>
                     </div>
                   </div>
-                  <span className={cn("rounded-full px-3 py-1 text-xs font-medium capitalize", ticket.status === "open" ? "bg-warning/10 text-warning" : "bg-success/10 text-success")}>
+                  <span className={cn("shrink-0 self-start rounded-full px-3 py-1 text-xs font-medium capitalize sm:self-center", ticket.status === "open" ? "bg-warning/10 text-warning" : "bg-success/10 text-success")}>
                     {ticket.status}
                   </span>
                 </div>

@@ -23,7 +23,7 @@ export function DashboardSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-sidebar text-sidebar-foreground md:flex">
       {/* Logo */}
       <div className="border-b border-sidebar-border px-6 py-5">
         <Link href="/" className="flex items-center gap-3">

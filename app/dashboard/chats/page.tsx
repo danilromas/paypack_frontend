@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Search, Send, Paperclip, MoreVertical, Phone, Video, User, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { DashboardHeader } from "@/components/dashboard/header"
 
 const conversations = [
   {
@@ -51,10 +52,12 @@ export default function ChatsPage() {
   const activeConv = conversations.find((c) => c.id === selected) || conversations[0]
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    <>
+      <DashboardHeader />
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
       {/* Sidebar */}
-      <div className="flex w-80 flex-col border-r border-border bg-card">
-        <div className="border-b border-border p-4">
+      <div className="flex w-full flex-col border-b border-border bg-card md:w-80 md:border-b-0 md:border-r">
+        <div className="border-b border-border p-3 sm:p-4">
           <h2 className="mb-4 text-lg font-semibold text-foreground">Messages</h2>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -99,7 +102,7 @@ export default function ChatsPage() {
       {/* Chat Area */}
       <div className="flex flex-1 flex-col">
         {/* Chat Header */}
-        <div className="flex items-center justify-between border-b border-border bg-card px-6 py-4">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-card px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <div className={cn("flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br text-sm font-semibold text-primary-foreground", activeConv.color)}>
               {activeConv.initials}
@@ -123,7 +126,7 @@ export default function ChatsPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 space-y-4 overflow-auto p-6">
+        <div className="flex-1 space-y-4 overflow-auto p-4 sm:p-6">
           {messages.map((msg) => {
             if (msg.sender === "system") {
               return (
@@ -151,7 +154,7 @@ export default function ChatsPage() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-border bg-card p-4">
+        <div className="border-t border-border bg-card p-3 sm:p-4">
           <div className="flex items-center gap-3">
             <button className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
               <Paperclip className="h-5 w-5" />
@@ -168,5 +171,6 @@ export default function ChatsPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

@@ -39,7 +39,7 @@ export function DealDetail() {
         Deal Detail
       </h2>
 
-      <div className="sticky top-0 rounded-2xl border border-border bg-card p-6">
+      <div className="rounded-2xl border border-border bg-card p-6 lg:sticky lg:top-0">
         {/* Header */}
         <div className="mb-6 flex items-start justify-between">
           <div>
@@ -113,7 +113,7 @@ export function DealDetail() {
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8 flex justify-between">
+        <div className="mb-6 flex justify-between gap-1 md:mb-8">
           {progressSteps.map((step, i) => (
             <div key={step} className="flex flex-1 flex-col items-center gap-2">
               <div className="relative flex items-center">
@@ -137,7 +137,7 @@ export function DealDetail() {
                   )}
                 />
               </div>
-              <span className="text-center text-[10px] text-muted-foreground">
+              <span className="text-center text-[9px] text-muted-foreground sm:text-[10px]">
                 {step}
               </span>
             </div>
@@ -181,7 +181,7 @@ export function DealDetail() {
         </div>
 
         {/* Action Buttons + deal details modal */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Button
             variant="outline"
             className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-success/30 hover:bg-success/10 hover:text-success"

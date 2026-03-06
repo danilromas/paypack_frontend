@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Plus, Wallet, Package, User } from "lucide-react"
+import { Bell, Menu, Wallet, User } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -17,6 +17,15 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import Link from "next/link"
 
 export function DashboardHeader() {
   const router = useRouter()
@@ -25,30 +34,66 @@ export function DashboardHeader() {
   return (
     <header
       className={cn(
-        "flex items-center justify-between border-b px-8 py-4 transition-colors",
+        "flex items-center justify-between border-b px-4 py-3 transition-colors sm:px-6 md:px-8",
         mode === "ship"
           ? "border-[#4C7A99] bg-[#5E90B4] text-primary-foreground"
           : "border-border bg-card text-foreground",
       )}
     >
       <div className="flex items-center gap-3">
-        <span className="text-lg font-semibold">
+        <Sheet>
+          <SheetTrigger asChild>
+            <button className="flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-inherit transition-colors hover:border-border hover:bg-background/10 md:hidden">
+              <Menu className="h-5 w-5" />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-72 p-0">
+            <SheetHeader className="border-b border-border bg-sidebar px-6 py-4 text-left">
+              <SheetTitle className="text-sm font-semibold text-sidebar-foreground">
+                PayPack<span className="font-light text-primary">.uno</span>
+              </SheetTitle>
+            </SheetHeader>
+            <nav className="space-y-1 px-3 py-4 text-sm">
+              {[
+                { href: "/dashboard", label: "Dashboard" },
+                { href: "/dashboard/shipments", label: "Shipments" },
+                { href: "/dashboard/chats", label: "Chats" },
+                { href: "/dashboard/support", label: "Support" },
+                { href: "/dashboard/settings", label: "Settings" },
+              ].map((item) => (
+                <SheetClose key={item.href} asChild>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "block rounded-xl px-4 py-3 font-medium transition-colors",
+                      "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                </SheetClose>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
+
+        <span className="text-base font-semibold sm:text-lg">
           {mode === "ship" ? "Shipments" : "Dashboard"}
         </span>
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4 sm:gap-6">
         {/* Notifications */}
         <Dialog>
           <DialogTrigger asChild>
-            <button className="relative text-muted-foreground transition-colors hover:text-foreground">
+            <button className="relative text-inherit opacity-80 transition-opacity hover:opacity-100">
               <Bell className="h-5 w-5" />
               <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
                 3
               </span>
             </button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-md overflow-y-auto">
             <DialogHeader className="space-y-1">
               <DialogTitle className="flex items-center justify-between text-base">
                 <span>Notifications</span>
@@ -119,12 +164,12 @@ export function DashboardHeader() {
         {/* Wallet */}
         <Dialog>
           <DialogTrigger asChild>
-            <button className="flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-secondary-foreground transition-colors hover:bg-secondary/80">
-              <Wallet className="h-4 w-4 text-primary" />
+            <button className="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2 py-1.5 text-sm text-secondary-foreground transition-colors hover:bg-secondary/80 sm:gap-2 sm:px-3">
+              <Wallet className="h-4 w-4 shrink-0 text-primary" />
               <span>{walletBalance}$</span>
             </button>
           </DialogTrigger>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto">
             <DialogHeader className="space-y-1">
               <DialogTitle className="flex items-center justify-between text-base">
                 <span>Wallet</span>
@@ -137,7 +182,7 @@ export function DashboardHeader() {
               </DialogDescription>
             </DialogHeader>
             <div className="mt-4 space-y-4">
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="flex-1 rounded-2xl bg-secondary px-4 py-3">
                   <div className="text-xs text-muted-foreground">
                     Available balance
@@ -149,7 +194,7 @@ export function DashboardHeader() {
                     Ready to withdraw or use for new deals.
                   </div>
                 </div>
-                <div className="w-px bg-border" />
+                <div className="hidden w-px shrink-0 bg-border sm:block" />
                 <div className="flex flex-col justify-between rounded-2xl bg-card px-3 py-3 text-xs">
                   <div>
                     <div className="text-muted-foreground">In escrow</div>
@@ -223,7 +268,7 @@ export function DashboardHeader() {
               </div>
             </button>
           </DialogTrigger>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto">
             <DialogHeader className="space-y-1">
               <DialogTitle className="text-base">Profile</DialogTitle>
               <DialogDescription className="text-xs">
