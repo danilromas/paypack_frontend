@@ -17,15 +17,15 @@ const ACTIONS: Record<
   }
 > = {
   deal: {
-    title: "Deal",
+    title: "DEAL",
     hint: "Create secure escrow transaction",
     href: "/dashboard?mode=deal&new=1",
     icon: Handshake,
   },
   ship: {
-    title: "Shipment",
+    title: "SHIPMENT",
     hint: "Track & manage delivery",
-    href: "/dashboard/shipments?mode=ship&new=1",
+    href: "/dashboard/shipments?mode=ship",
     icon: Package,
   },
 }
@@ -41,8 +41,8 @@ export function LandingSplitHero() {
       className="relative overflow-hidden pt-28 pb-14 lg:pt-36 lg:pb-20"
     >
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-0 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute left-1/2 top-24 h-[320px] w-[520px] -translate-x-1/2 rounded-full bg-success/5 blur-3xl" />
+        <div className="absolute left-1/2 top-0 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute left-1/2 top-24 h-[320px] w-[520px] -translate-x-1/2 rounded-full bg-[#5E90B4]/15 blur-3xl" />
       </div>
 
       <div className="mx-auto max-w-7xl px-6 lg:px-8">

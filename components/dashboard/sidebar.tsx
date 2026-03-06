@@ -30,9 +30,9 @@ export function DashboardSidebar() {
           <Image
             src="/logo.png"
             alt="PayPack logo"
-            width={40}
-            height={40}
-            className="h-10 w-10 rounded-xl"
+            width={48}
+            height={48}
+            className="h-12 w-12 rounded-xl"
             priority
           />
           <div className="flex flex-col">

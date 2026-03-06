@@ -91,16 +91,16 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                   className={cn(
                     "flex h-10 w-10 items-center justify-center rounded-full font-semibold transition-all",
                     i + 1 <= step
-                      ? "bg-primary text-primary-foreground shadow-lg"
+                      ? "bg-[#5E90B4] text-primary-foreground shadow-lg"
                       : "bg-secondary text-muted-foreground",
                   )}
                 >
-                  {i + 1 < step ? <Check className="h-5 w-5" /> : i + 1}
+                  {i + 1 < step ? <Check className="h-5 w-5 text-primary-foreground" /> : i + 1}
                 </div>
                 <span
                   className={cn(
                     "ml-3 hidden text-sm font-medium md:block",
-                    i + 1 <= step ? "text-primary" : "text-muted-foreground",
+                    i + 1 <= step ? "text-[#5E90B4]" : "text-muted-foreground",
                   )}
                 >
                   {label}
@@ -109,7 +109,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                   <div className="mx-4 h-0.5 w-16 bg-border">
                     <div
                       className={cn(
-                        "h-full bg-primary transition-all",
+                        "h-full bg-[#5E90B4] transition-all",
                         i + 1 < step ? "w-full" : "w-0",
                       )}
                     />
@@ -138,14 +138,14 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                       <input
                         type="text"
                         defaultValue="Ivanov Ivan"
-                        className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-[#5E90B4]/40"
                       />
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-medium text-muted-foreground">
                         Country
                       </label>
-                      <select className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+                      <select className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-[#5E90B4]/40">
                         <option>Italy</option>
                         <option>Russia</option>
                         <option>Germany</option>
@@ -158,7 +158,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                       </label>
                       <textarea
                         defaultValue="Via Roma 123, Milano"
-                        className="h-24 w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="h-24 w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-[#5E90B4]/40"
                       />
                     </div>
                   </div>
@@ -172,7 +172,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                       <span className="font-medium text-foreground">
                         Default Package
                       </span>
-                      <button className="text-sm text-primary hover:underline">
+                      <button className="text-sm text-[#5E90B4] hover:underline">
                         + Add package
                       </button>
                     </div>
@@ -190,12 +190,12 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                           <input
                             type="number"
                             defaultValue={f.value}
-                            className="w-full rounded-lg border border-border px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="w-full rounded-lg border border-border px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-[#5E90B4]/40"
                           />
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 rounded-lg bg-primary/5 border border-primary/10 p-3 text-sm text-primary">
+                    <div className="mt-4 rounded-lg bg-[#5E90B4]/10 border border-[#5E90B4]/30 p-3 text-sm text-[#5E90B4]">
                       Volumetric weight: 1.8 kg
                     </div>
                   </div>
@@ -225,7 +225,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                     className={cn(
                       "rounded-2xl border-2 p-6 text-left transition-all hover:shadow-lg",
                       selectedService === i
-                        ? "border-primary bg-primary/5 shadow-lg"
+                        ? "border-[#5E90B4] bg-[#5E90B4]/5 shadow-lg"
                         : "border-border bg-card",
                     )}
                   >
@@ -251,7 +251,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                           key={f}
                           className="flex items-center gap-2 text-sm text-foreground"
                         >
-                          <Check className="h-4 w-4 text-success" />
+                          <Check className="h-4 w-4 text-[#5E90B4]" />
                           {f}
                         </div>
                       ))}
@@ -269,7 +269,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                         className={cn(
                           "rounded-xl px-4 py-2 text-sm font-medium",
                           selectedService === i
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-[#5E90B4] text-primary-foreground"
                             : "bg-secondary text-muted-foreground",
                         )}
                       >
@@ -302,7 +302,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                     {field.label}
                   </label>
                   {field.label === "Country" ? (
-                    <select className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <select className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-[#5E90B4]/40">
                       <option>Russia</option>
                       <option>Germany</option>
                       <option>UK</option>
@@ -311,7 +311,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                     <input
                       type="text"
                       defaultValue={field.value}
-                      className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-[#5E90B4]/40"
                     />
                   )}
                 </div>
@@ -341,7 +341,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="flex justify-between border-t border-border pt-3 font-semibold">
                     <span className="text-foreground">Total:</span>
-                    <span className="text-primary">
+                    <span className="text-[#5E90B4]">
                       EUR{services[selectedService].price}
                     </span>
                   </div>
@@ -349,7 +349,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
               </div>
               <button
                 onClick={() => setSuccessOpen(true)}
-                className="w-full rounded-xl bg-primary py-3 font-semibold text-primary-foreground transition-all hover:opacity-90"
+                className="w-full rounded-xl bg-[#5E90B4] py-3 font-semibold text-primary-foreground transition-all hover:opacity-90"
               >
                 Confirm & Pay
               </button>
@@ -371,7 +371,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
           {step < 4 && (
             <button
               onClick={() => setStep(step + 1)}
-              className="rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
+              className="rounded-xl bg-[#5E90B4] px-8 py-3 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
             >
               Continue
             </button>

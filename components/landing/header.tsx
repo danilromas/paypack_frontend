@@ -17,9 +17,9 @@ export function LandingHeader() {
           <Image
             src="/logo.png"
             alt="PayPack logo"
-            width={32}
-            height={32}
-            className="h-8 w-8"
+            width={40}
+            height={40}
+            className="h-10 w-10"
             priority
           />
           <span className="text-lg font-semibold tracking-tight text-foreground">

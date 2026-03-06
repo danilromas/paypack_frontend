@@ -1,6 +1,6 @@
 "use client";
 
-import { Wallet, ArrowLeftRight, Search } from "lucide-react";
+import { ArrowLeftRight, Search } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { useState } from "react";
 
@@ -32,13 +32,6 @@ export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
     <div className="space-y-6">
       {/* Stats */}
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-3">
-          <Wallet className="h-5 w-5 text-primary" />
-          <span className="text-muted-foreground">Wallet Balance:</span>
-          <span className="text-xl font-bold text-foreground">
-            {walletBalance}$
-          </span>
-        </div>
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-3">
           <ArrowLeftRight className="h-5 w-5 text-primary" />
           <span className="text-muted-foreground">Active Deals:</span>

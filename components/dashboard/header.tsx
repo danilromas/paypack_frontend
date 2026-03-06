@@ -16,30 +16,25 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 export function DashboardHeader() {
   const router = useRouter()
   const { mode, walletBalance } = useAppStore()
 
   return (
-    <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4">
+    <header
+      className={cn(
+        "flex items-center justify-between border-b px-8 py-4 transition-colors",
+        mode === "ship"
+          ? "border-[#4C7A99] bg-[#5E90B4] text-primary-foreground"
+          : "border-border bg-card text-foreground",
+      )}
+    >
       <div className="flex items-center gap-3">
-        {mode === "ship" ? (
-          <Button
-            onClick={() => {
-              router.push("/dashboard/shipments?mode=ship&new=1")
-            }}
-            className="gap-2 rounded-xl bg-primary px-8 py-3 font-semibold text-primary-foreground shadow-lg transition-all hover:shadow-xl"
-          >
-            <Plus className="h-4 w-4" />
-            NEW SHIPMENT
-            <Package className="ml-1 h-4 w-4" />
-          </Button>
-        ) : (
-          <span className="text-lg font-semibold text-foreground">
-            Dashboard
-          </span>
-        )}
+        <span className="text-lg font-semibold">
+          {mode === "ship" ? "Shipments" : "Dashboard"}
+        </span>
       </div>
 
       <div className="flex items-center gap-6">
