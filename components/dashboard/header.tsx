@@ -270,7 +270,7 @@ export function DashboardHeader() {
                 </div>
               </div>
               <Separator />
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-4">
                 <Button className="w-full" variant="outline">
                   View settings
                 </Button>

@@ -19,6 +19,7 @@ import {
   EyeOff,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 type SettingsTab = "profile" | "kyc" | "payment" | "api" | "security" | "notifications"
 
@@ -323,6 +324,8 @@ function APITab() {
 }
 
 function SecurityTab() {
+  const [passwordUpdatedAt, setPasswordUpdatedAt] = useState<string | null>(null)
+
   return (
     <div className="space-y-6">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -351,9 +354,27 @@ function SecurityTab() {
           <input type="password" placeholder="Current password" className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
           <input type="password" placeholder="New password" className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
           <input type="password" placeholder="Confirm new password" className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
-          <button className="w-full rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground">
+          <button
+            className="w-full rounded-lg bg-primary py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            onClick={() => {
+              const now = new Date()
+              const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              setPasswordUpdatedAt(time)
+            }}
+          >
             Update Password
           </button>
+          {passwordUpdatedAt && (
+            <Alert className="mt-2 border-success/40 bg-success/5">
+              <Check className="h-4 w-4 text-success" />
+              <AlertTitle className="text-xs text-success">
+                Password updated
+              </AlertTitle>
+              <AlertDescription className="text-[11px]">
+                Your password was changed at {passwordUpdatedAt}. If this wasn&apos;t you, revoke other sessions.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </div>
 

@@ -67,6 +67,7 @@ const shipments = [
 ];
 
 type SortDirection = "asc" | "desc";
+type SortField = "date" | "receiver" | "sender" | "status";
 
 function getStatusBadge(status: "arrived" | "in-transit" | "pending") {
   switch (status) {
@@ -100,15 +101,38 @@ function formatDate(dateString: string) {
 }
 
 export function ShipmentsTable() {
+  const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  const handleSort = () => {
-    setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
   };
 
   const sortedShipments = [...shipments].sort((a, b) => {
-    const comparison =
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    let comparison = 0;
+
+    switch (sortField) {
+      case "receiver":
+        comparison = a.receiver.name.localeCompare(b.receiver.name);
+        break;
+      case "sender":
+        comparison = a.sender.name.localeCompare(b.sender.name);
+        break;
+      case "status":
+        comparison = a.status.localeCompare(b.status);
+        break;
+      case "date":
+      default:
+        comparison =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        break;
+    }
+
     return sortDirection === "asc" ? comparison : -comparison;
   });
 
@@ -118,10 +142,44 @@ export function ShipmentsTable() {
         <thead className="border-b border-border bg-secondary/50">
           <tr>
             <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Receiver
+              <button
+                type="button"
+                onClick={() => handleSort("receiver")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1 transition-colors",
+                  sortField === "receiver"
+                    ? "bg-primary/10 text-primary"
+                    : "hover:bg-secondary/70 hover:text-foreground"
+                )}
+              >
+                Receiver
+                {sortField === "receiver" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  ))}
+              </button>
             </th>
             <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Sender
+              <button
+                type="button"
+                onClick={() => handleSort("sender")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1 transition-colors",
+                  sortField === "sender"
+                    ? "bg-primary/10 text-primary"
+                    : "hover:bg-secondary/70 hover:text-foreground"
+                )}
+              >
+                Sender
+                {sortField === "sender" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  ))}
+              </button>
             </th>
             <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Service
@@ -130,20 +188,44 @@ export function ShipmentsTable() {
               Dimensions/Weight
             </th>
             <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Status
-            </th>
-            <th
-              className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground"
-              onClick={handleSort}
-            >
-              <div className="flex items-center gap-1">
-                Date Created
-                {sortDirection === "asc" ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
+              <button
+                type="button"
+                onClick={() => handleSort("status")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1 transition-colors",
+                  sortField === "status"
+                    ? "bg-primary/10 text-primary"
+                    : "hover:bg-secondary/70 hover:text-foreground"
                 )}
-              </div>
+              >
+                Status
+                {sortField === "status" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  ))}
+              </button>
+            </th>
+            <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => handleSort("date")}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1 transition-colors",
+                  sortField === "date"
+                    ? "bg-primary/10 text-primary"
+                    : "hover:bg-secondary/70 hover:text-foreground"
+                )}
+              >
+                Date Created
+                {sortField === "date" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  ))}
+              </button>
             </th>
             <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Action
