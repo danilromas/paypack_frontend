@@ -37,13 +37,13 @@ export function DashboardHeader() {
         "flex items-center justify-between border-b px-4 py-3 transition-colors sm:px-6 md:px-8",
         mode === "ship"
           ? "border-[#4C7A99] bg-[#5E90B4] text-primary-foreground"
-          : "border-border bg-card text-foreground",
+          : "border-primary bg-primary text-primary-foreground",
       )}
     >
       <div className="flex items-center gap-3">
         <Sheet>
           <SheetTrigger asChild>
-            <button className="flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-inherit transition-colors hover:border-border hover:bg-background/10 md:hidden">
+            <button className="flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-inherit transition-colors hover:opacity-90 md:hidden">
               <Menu className="h-5 w-5" />
             </button>
           </SheetTrigger>
@@ -164,8 +164,8 @@ export function DashboardHeader() {
         {/* Wallet */}
         <Dialog>
           <DialogTrigger asChild>
-            <button className="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-2 py-1.5 text-sm text-secondary-foreground transition-colors hover:bg-secondary/80 sm:gap-2 sm:px-3">
-              <Wallet className="h-4 w-4 shrink-0 text-primary" />
+            <button className="flex items-center gap-1.5 rounded-lg border border-white/30 bg-white/15 px-2 py-1.5 text-sm text-inherit transition-colors hover:bg-white/25 sm:gap-2 sm:px-3">
+              <Wallet className="h-4 w-4 shrink-0 opacity-90" />
               <span>{walletBalance}$</span>
             </button>
           </DialogTrigger>
@@ -252,17 +252,17 @@ export function DashboardHeader() {
         {/* Profile */}
         <Dialog>
           <DialogTrigger asChild>
-            <button className="flex items-center gap-3 rounded-full border border-transparent px-1 py-1 transition-colors hover:border-border">
+            <button className="flex items-center gap-3 rounded-full border border-transparent px-1 py-1 text-inherit transition-colors hover:opacity-90">
               <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-sm font-bold text-primary-foreground">
+                <AvatarFallback className="bg-white/20 text-inherit text-sm font-bold">
                   JD
                 </AvatarFallback>
               </Avatar>
-              <div className="hidden flex-col text-left text-xs sm:flex">
-                <span className="font-semibold text-foreground">
+              <div className="hidden flex-col text-left text-xs sm:flex [color:inherit]">
+                <span className="font-semibold">
                   John Doe
                 </span>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-[10px] opacity-80">
                   Premium user
                 </span>
               </div>

@@ -158,7 +158,7 @@ export function ShipmentsTable() {
                 </div>
                 <span
                   className={cn(
-                    "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                    "shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold",
                     badge.className,
                   )}
                 >
@@ -336,7 +336,7 @@ export function ShipmentsTable() {
             <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Dimensions/Weight
             </th>
-            <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <button
                 type="button"
                 onClick={() => handleSort("status")}
@@ -424,10 +424,10 @@ export function ShipmentsTable() {
                   <br />
                   <span className="text-muted-foreground">{s.weight}</span>
                 </td>
-                <td className="px-6 py-5">
+                <td className="px-6 py-5 whitespace-nowrap">
                   <span
                     className={cn(
-                      "rounded-full px-3 py-1.5 text-xs font-semibold",
+                      "inline-block whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold",
                       badge.className,
                     )}
                   >

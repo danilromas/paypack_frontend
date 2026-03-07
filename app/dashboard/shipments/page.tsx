@@ -27,30 +27,17 @@ function ShipmentsPageContent() {
     <>
       <DashboardHeader />
 
-      {/* Hero Banner */}
-      <div className="relative overflow-hidden bg-card px-4 py-4 sm:px-6 md:px-8 md:py-6">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
-        <div className="relative z-10 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h1 className="mb-1 text-xl font-bold text-foreground sm:text-2xl">
-              Shipments Dashboard
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Manage and track all your deliveries
-            </p>
-          </div>
+      {/* Centered CTA - same as dashboard deals */}
+      <div className="flex flex-1 flex-col overflow-auto px-4 py-6 sm:px-6 md:p-8">
+        <div className="mb-6 flex justify-center md:mb-8">
           <button
             onClick={() => setWizardOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg transition-all hover:shadow-xl sm:px-6 sm:py-3 sm:text-base"
+            className="flex w-full max-w-[min(100%-2rem,28rem)] items-center justify-center gap-2 rounded-2xl bg-[#5E90B4] px-6 py-3 text-base font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl md:w-auto md:max-w-none md:px-10 md:py-3.5 md:text-lg"
           >
             <Package className="h-5 w-5" />
             NEW SHIPMENT
           </button>
         </div>
-      </div>
-
-      {/* Filters */}
-      <div className="space-y-6 px-4 py-6 sm:px-6 md:px-8">
         {/* <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-3">
             <Wallet className="h-5 w-5 text-primary" />

@@ -57,7 +57,7 @@ export function LandingSplitHero() {
 
         <div className="mx-auto mt-8 max-w-5xl sm:mt-12">
           <div
-            className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card/40 backdrop-blur-xl sm:rounded-3xl md:flex-row"
+            className="relative flex flex-row overflow-hidden rounded-2xl border border-border bg-card/40 backdrop-blur-xl sm:rounded-3xl md:flex-row"
             onMouseLeave={() => setHovered(null)}
           >
             {/* Left / Right cards */}
@@ -73,8 +73,8 @@ export function LandingSplitHero() {
                   href={action.href}
                   onMouseEnter={() => setHovered(key)}
                   className={cn(
-                    "group relative flex min-h-[200px] flex-1 items-center justify-center overflow-hidden px-6 py-10 transition-all duration-700 sm:min-h-[240px] sm:px-8 sm:py-12",
-                    idx === 0 && "md:border-r md:border-border/60",
+                    "group relative flex min-h-[160px] min-w-0 flex-1 items-center justify-center overflow-hidden px-4 py-8 transition-all duration-700 sm:min-h-[240px] sm:px-8 sm:py-12",
+                    idx === 0 && "border-r border-border/60",
                     isHovered && "md:flex-[1.35] bg-primary/[0.04]",
                     key === "ship" && isHovered && "bg-success/[0.04]",
                     otherHovered && "md:flex-[0.85] opacity-70 md:blur-[0.6px]",

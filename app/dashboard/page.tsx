@@ -25,7 +25,7 @@ export default function DashboardPage() {
         <div className="mb-6 flex justify-center md:mb-8">
           <Button
             onClick={() => setNewDealModalOpen(true)}
-            className="h-12 rounded-2xl bg-primary px-8 text-base font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl md:h-14 md:px-10 md:text-lg"
+            className="h-12 w-full max-w-[min(100%-2rem,28rem)] rounded-2xl bg-primary px-8 text-base font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl md:h-14 md:w-auto md:max-w-none md:px-10 md:text-lg"
           >
             NEW DEAL
           </Button>
