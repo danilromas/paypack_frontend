@@ -11,9 +11,10 @@ export function NewDealModal() {
   const { setNewDealModalOpen } = useAppStore()
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<"buyer" | "seller" | null>(null)
-  const [productLink, setProductLink] = useState('');
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [description, setDescription] = useState('');
+  const [productLink, setProductLink] = useState("")
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [description, setDescription] = useState("")
+  const [successOpen, setSuccessOpen] = useState(false)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-0 backdrop-blur-sm sm:p-4">
@@ -184,14 +185,14 @@ export function NewDealModal() {
                   <input
                     type="file"
                     className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setUploadedFile(file);
-                        setDescription('');
-                      }
-                    }}
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setUploadedFile(file)
+                            setDescription("")
+                          }
+                        }}
                   />
                   <svg className="mb-2 h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -216,7 +217,7 @@ export function NewDealModal() {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Additional info about the deal..."
-                    className="w-full rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                    className="w-full resize-none rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
               )}
@@ -372,7 +373,7 @@ export function NewDealModal() {
               </div>
             </div>
             <button
-              onClick={() => setNewDealModalOpen(false)}
+              onClick={() => setSuccessOpen(true)}
               className="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-all hover:opacity-90"
             >
               Create Deal
@@ -380,6 +381,65 @@ export function NewDealModal() {
           </div>
         )}
       </div>
+      {successOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-foreground/80 backdrop-blur-sm" />
+          <div className="absolute inset-0 grid place-items-center p-4">
+            <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-2xl">
+              <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
+              <div className="relative z-10">
+                <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
+                  <Gift className="h-9 w-9" />
+                </div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  Deal Created!
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Share this QR code with your counterparty to join the deal.
+                </p>
+                <div className="mx-auto mt-6 w-40 rounded-2xl bg-background p-3 shadow-inner">
+                  <div className="grid grid-cols-5 gap-1 rounded-xl bg-card p-2">
+                    {Array.from({ length: 25 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "h-3 w-3 rounded-[2px]",
+                          (i % 2 === 0 && i % 3 !== 0) || i === 0 || i === 4 || i === 20
+                            ? "bg-foreground"
+                            : "bg-transparent",
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-3 break-all text-[10px] font-mono text-muted-foreground">
+                    DEAL: DL-2026-84211
+                  </p>
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setSuccessOpen(false)
+                      setNewDealModalOpen(false)
+                    }}
+                    className="rounded-xl border border-border py-3 text-sm font-medium text-foreground transition-all hover:bg-secondary"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSuccessOpen(false)
+                      setNewDealModalOpen(false)
+                    }}
+                    className="rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
+                  >
+                    Go to dashboard
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
