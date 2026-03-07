@@ -50,7 +50,14 @@ export function DashboardHeader() {
           <SheetContent side="left" className="w-72 p-0">
             <SheetHeader className="border-b border-border bg-sidebar px-6 py-4 text-left">
               <SheetTitle className="text-sm font-semibold text-sidebar-foreground">
-                PayPack<span className="font-light text-primary">.uno</span>
+                <SheetClose asChild>
+                  <Link
+                    href="/"
+                    className="inline-flex items-center gap-0.5 hover:opacity-90"
+                  >
+                    PayPack<span className="font-light text-primary">.uno</span>
+                  </Link>
+                </SheetClose>
               </SheetTitle>
             </SheetHeader>
             <nav className="space-y-1 px-3 py-4 text-sm">
