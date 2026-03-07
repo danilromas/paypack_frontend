@@ -8,6 +8,7 @@ import { NewDealModal } from "@/components/dashboard/new-deal-modal";
 import { useAppStore } from "@/store/app-store";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Handshake } from "lucide-react";
 
 export default function DashboardPage() {
   const { newDealModalOpen, setNewDealModalOpen, setMode } = useAppStore();
@@ -25,8 +26,9 @@ export default function DashboardPage() {
         <div className="mb-6 flex justify-center md:mb-8">
           <Button
             onClick={() => setNewDealModalOpen(true)}
-            className="h-12 w-full max-w-[min(100%-2rem,28rem)] rounded-2xl bg-primary px-8 text-base font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl md:h-14 md:w-auto md:max-w-none md:px-10 md:text-lg"
+            className="h-12 w-full max-w-[min(100%-2rem,28rem)] gap-2 rounded-2xl bg-primary px-8 text-base font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-[1.02] hover:shadow-2xl md:h-14 md:w-auto md:max-w-none md:gap-3 md:px-10 md:text-lg"
           >
+            <Handshake className="h-5 w-5" />
             NEW DEAL
           </Button>
         </div>

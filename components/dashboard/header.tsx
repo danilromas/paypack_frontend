@@ -76,10 +76,6 @@ export function DashboardHeader() {
             </nav>
           </SheetContent>
         </Sheet>
-
-        <span className="text-base font-semibold sm:text-lg">
-          {mode === "ship" ? "Shipments" : "Dashboard"}
-        </span>
       </div>
 
       <div className="flex items-center gap-4 sm:gap-6">

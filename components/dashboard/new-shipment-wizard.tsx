@@ -17,7 +17,7 @@ const services = [
     provider: "DHL Express Worldwide",
     time: "24 hours",
     timeColor: "bg-destructive/10 text-destructive",
-    price: "99.90",
+    price: "5.90",
     features: ["Door to door", "Real-time tracking"],
   },
   {
@@ -25,7 +25,7 @@ const services = [
     provider: "FedEx International",
     time: "3-5 days",
     timeColor: "bg-primary/10 text-primary",
-    price: "45.50",
+    price: "15.50",
     features: ["Pickup Point", "Insurance included"],
   },
   {
@@ -455,7 +455,7 @@ export function NewShipmentWizard({ onClose }: { onClose: () => void }) {
                       setSuccessOpen(false);
                       onClose();
                     }}
-                    className="rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
+                    className="rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 bg-[#5E90B4]"
                   >
                     View tracking
                   </button>
