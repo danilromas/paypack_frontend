@@ -67,6 +67,7 @@ export function DashboardHeader() {
                 { href: "/dashboard/chats", label: "Chats" },
                 { href: "/dashboard/support", label: "Support" },
                 { href: "/dashboard/settings", label: "Settings" },
+                { href: "/admin", label: "Admin" },
               ].map((item) => (
                 <SheetClose key={item.href} asChild>
                   <Link
