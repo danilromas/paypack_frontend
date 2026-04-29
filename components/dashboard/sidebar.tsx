@@ -9,6 +9,8 @@ import {
   HelpCircle,
   Settings,
   ShieldCheck,
+  Bell,
+  Wallet,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +20,8 @@ const navItems = [
   { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: 3 },
   { href: "/dashboard/support", icon: HelpCircle, label: "Support" },
   { href: "/dashboard/settings", icon: Settings, label: "Settings" },
+  { href: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: 3 },
+  { href: "/dashboard/wallet", icon: Wallet, label: "Wallet" },
   { href: "/admin", icon: ShieldCheck, label: "Admin" },
 ];
 
