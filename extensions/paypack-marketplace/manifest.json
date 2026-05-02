@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "PayPack Marketplace",
+  "version": "0.1.0",
+  "description": "Открыть объявление Facebook Marketplace в PayPack с префиллом данных.",
+  "permissions": ["activeTab"],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://facebook.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/marketplace/*",
+        "https://facebook.com/marketplace/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -4,18 +4,38 @@ import { DashboardHeader } from "@/components/dashboard/header";
 import { DealsList } from "@/components/dashboard/deals-list";
 import { DealDetail } from "@/components/dashboard/deal-detail";
 import { StatsRow } from "@/components/dashboard/stats-row";
-import { NewDealModal } from "@/components/dashboard/new-deal-modal";
+import {
+  NewDealModal,
+  type DealImportPrefill,
+} from "@/components/dashboard/new-deal-modal";
 import { useAppStore } from "@/store/app-store";
-import type { Deal } from "@/types";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Handshake } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function DashboardPage() {
-  const { newDealModalOpen, setNewDealModalOpen, setMode, setDeals } = useAppStore();
+function DashboardPageInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const {
+    newDealModalOpen,
+    setNewDealModalOpen,
+    setMode,
+    setDeals,
+  } = useAppStore();
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [dealsError, setDealsError] = useState<string | null>(null);
+  const [importPrefill, setImportPrefill] = useState<
+    DealImportPrefill | undefined
+  >(undefined);
+  const importConsumed = useRef(false);
+
+  useEffect(() => {
+    if (searchParams.get("pp_import") !== "1") {
+      importConsumed.current = false;
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setMode("deal");
@@ -31,7 +51,10 @@ export default function DashboardPage() {
         const data = (await res.json()) as Deal[];
         if (!cancelled) setDeals(data);
       } catch {
-        if (!cancelled) setDealsError("Could not load deals. Check DATABASE_URL and run init.sql on Neon.");
+        if (!cancelled)
+          setDealsError(
+            "Could not load deals. Check DATABASE_URL and run init.sql on Neon.",
+          );
       }
     }
     loadDeals();
@@ -39,6 +62,37 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [setDeals]);
+
+  useEffect(() => {
+    if (searchParams.get("pp_import") !== "1") return;
+    if (importConsumed.current) return;
+    importConsumed.current = true;
+
+    const priceRaw = searchParams.get("price");
+    let price: number | undefined;
+    if (priceRaw) {
+      const n = Number(priceRaw);
+      if (Number.isFinite(n) && n > 0) price = Math.round(n);
+    }
+
+    const draft: DealImportPrefill = {
+      productLink: searchParams.get("link") ?? "",
+      title: searchParams.get("title") ?? "",
+      price,
+      itemDetailDesc: searchParams.get("desc") ?? "",
+    };
+    setImportPrefill(draft);
+    setNewDealModalOpen(true);
+    router.replace("/dashboard/", { scroll: false });
+  }, [searchParams, router, setNewDealModalOpen]);
+
+  const prevModalOpen = useRef(false);
+  useEffect(() => {
+    if (prevModalOpen.current && !newDealModalOpen) {
+      setImportPrefill(undefined);
+    }
+    prevModalOpen.current = newDealModalOpen;
+  }, [newDealModalOpen]);
 
   return (
     <>
@@ -71,7 +125,17 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-      {newDealModalOpen && <NewDealModal />}
+      {newDealModalOpen && (
+        <NewDealModal importPrefill={importPrefill} />
+      )}
     </>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageInner />
+    </Suspense>
   );
 }

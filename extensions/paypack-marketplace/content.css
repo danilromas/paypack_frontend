@@ -1,0 +1,50 @@
+/* Scoped container — avoids leaking styles into Facebook */
+#paypack-mp-root {
+  all: initial;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+}
+
+#paypack-mp-root * {
+  box-sizing: border-box;
+}
+
+.paypack-mp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #5e90b4 0%, #4a7390 100%);
+  box-shadow: 0 8px 28px rgba(94, 144, 180, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.paypack-mp-btn:hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 32px rgba(94, 144, 180, 0.55);
+}
+
+.paypack-mp-btn:active {
+  transform: scale(0.98);
+}
+
+.paypack-mp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+}

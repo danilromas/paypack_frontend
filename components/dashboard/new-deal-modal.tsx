@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, X, ChevronLeft, ChevronRight, Gift } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,19 @@ import type { Deal } from "@/types";
 
 const stepLabels = ["Role", "Product Link", "Item Details", "Summary"];
 
-export function NewDealModal() {
+/** Поля с расширения / query `pp_import=1` */
+export type DealImportPrefill = {
+  productLink?: string;
+  title?: string;
+  price?: number;
+  itemDetailDesc?: string;
+};
+
+export function NewDealModal({
+  importPrefill,
+}: {
+  importPrefill?: DealImportPrefill | null;
+}) {
   const { setNewDealModalOpen, addDeal, selectedDealId } = useAppStore()
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<"buyer" | "seller" | null>(null)
@@ -27,6 +39,28 @@ export function NewDealModal() {
 
   const fee = Math.round(price * 0.03 * 100) / 100
   const total = price + shippingPrice + fee
+
+  useEffect(() => {
+    if (!importPrefill) return
+    const hasData =
+      importPrefill.productLink ||
+      importPrefill.title ||
+      importPrefill.price ||
+      importPrefill.itemDetailDesc
+    if (!hasData) return
+    if (importPrefill.productLink) setProductLink(importPrefill.productLink)
+    if (importPrefill.title) setItemTitle(importPrefill.title)
+    if (
+      importPrefill.price != null &&
+      Number.isFinite(importPrefill.price) &&
+      importPrefill.price > 0
+    ) {
+      setPrice(Math.round(importPrefill.price))
+    }
+    if (importPrefill.itemDetailDesc) setItemDetailDesc(importPrefill.itemDetailDesc)
+    setRole("buyer")
+    setStep(3)
+  }, [importPrefill])
 
   async function handleCreateDeal() {
     if (!role) return
