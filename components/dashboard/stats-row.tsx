@@ -12,7 +12,10 @@ interface StatsRowProps {
 }
 
 export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
-  const { walletBalance } = useAppStore();
+  const { walletBalance, deals } = useAppStore();
+  const activeDealsCount = deals.filter((d) =>
+    ["pending", "escrow", "shipped", "in-transit"].includes(d.status),
+  ).length;
   const [activeFilter, setActiveFilter] = useState("All");
 
   const handleFilterClick = (filter: string) => {
@@ -35,7 +38,7 @@ export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-6 py-3">
           <ArrowLeftRight className="h-5 w-5 text-primary" />
           <span className="text-muted-foreground">Active Deals:</span>
-          <span className="text-xl font-bold text-foreground">3</span>
+          <span className="text-xl font-bold text-foreground">{activeDealsCount}</span>
         </div>
       </div>
 

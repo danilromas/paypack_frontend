@@ -6,18 +6,39 @@ import { DealDetail } from "@/components/dashboard/deal-detail";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { NewDealModal } from "@/components/dashboard/new-deal-modal";
 import { useAppStore } from "@/store/app-store";
+import type { Deal } from "@/types";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Handshake } from "lucide-react";
 
 export default function DashboardPage() {
-  const { newDealModalOpen, setNewDealModalOpen, setMode } = useAppStore();
+  const { newDealModalOpen, setNewDealModalOpen, setMode, setDeals } = useAppStore();
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dealsError, setDealsError] = useState<string | null>(null);
 
   useEffect(() => {
     setMode("deal");
   }, [setMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDeals() {
+      setDealsError(null);
+      try {
+        const res = await fetch("/api/deals", { cache: "no-store" });
+        if (!res.ok) throw new Error("Could not load deals");
+        const data = (await res.json()) as Deal[];
+        if (!cancelled) setDeals(data);
+      } catch {
+        if (!cancelled) setDealsError("Could not load deals. Check DATABASE_URL and run init.sql on Neon.");
+      }
+    }
+    loadDeals();
+    return () => {
+      cancelled = true;
+    };
+  }, [setDeals]);
 
   return (
     <>
@@ -36,6 +57,11 @@ export default function DashboardPage() {
           onFilterChange={setActiveFilter}
           onSearchChange={setSearchQuery}
         />
+        {dealsError && (
+          <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {dealsError}
+          </div>
+        )}
         <div className="mt-6 grid grid-cols-1 gap-6 lg:mt-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <DealsList activeFilter={activeFilter} searchQuery={searchQuery} />

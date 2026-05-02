@@ -4,14 +4,18 @@ import { Suspense, useEffect, useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { ShipmentsTable } from "@/components/dashboard/shipments-table"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
-import { Search, Package, Wallet } from "lucide-react"
+import { Search, Package } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useAppStore } from "@/store/app-store"
+import type { Shipment, ShipmentPayload } from "@/lib/shipments"
 
 function ShipmentsPageContent() {
   const searchParams = useSearchParams()
-  const { setMode, walletBalance } = useAppStore()
+  const { setMode } = useAppStore()
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [shipments, setShipments] = useState<Shipment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const mode = searchParams.get("mode")
@@ -22,6 +26,53 @@ function ShipmentsPageContent() {
       setWizardOpen(true)
     }
   }, [searchParams, setMode])
+
+  const loadShipments = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/shipments", { cache: "no-store" })
+      if (!response.ok) throw new Error("Could not load shipments")
+      const data = (await response.json()) as Shipment[]
+      setShipments(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadShipments()
+  }, [])
+
+  const createShipment = async (payload: ShipmentPayload) => {
+    const response = await fetch("/api/shipments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) throw new Error("Failed to create shipment")
+    await loadShipments()
+  }
+
+  const updateShipment = async (id: string, payload: ShipmentPayload) => {
+    const response = await fetch(`/api/shipments/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) throw new Error("Failed to update shipment")
+    await loadShipments()
+  }
+
+  const deleteShipment = async (id: string) => {
+    const response = await fetch(`/api/shipments/${id}`, {
+      method: "DELETE",
+    })
+    if (!response.ok) throw new Error("Failed to delete shipment")
+    await loadShipments()
+  }
 
   return (
     <>
@@ -73,7 +124,18 @@ function ShipmentsPageContent() {
           </div>
         </div>
 
-        <ShipmentsTable />
+        {error && (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <ShipmentsTable
+          shipments={shipments}
+          isLoading={loading}
+          onUpdate={updateShipment}
+          onDelete={deleteShipment}
+        />
 
         {/* Pagination */}
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -100,7 +162,12 @@ function ShipmentsPageContent() {
         </div>
       </div>
 
-      {wizardOpen && <NewShipmentWizard onClose={() => setWizardOpen(false)} />}
+      {wizardOpen && (
+        <NewShipmentWizard
+          onClose={() => setWizardOpen(false)}
+          onCreate={createShipment}
+        />
+      )}
     </>
   )
 }

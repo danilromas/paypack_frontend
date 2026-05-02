@@ -1,20 +1,73 @@
 "use client";
 
 import { useState } from "react";
-import { X, ChevronLeft, ChevronRight, Gift } from "lucide-react";
+import { Loader2, X, ChevronLeft, ChevronRight, Gift } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
+import type { Deal } from "@/types";
 
 const stepLabels = ["Role", "Product Link", "Item Details", "Summary"];
 
 export function NewDealModal() {
-  const { setNewDealModalOpen } = useAppStore()
+  const { setNewDealModalOpen, addDeal, selectedDealId } = useAppStore()
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<"buyer" | "seller" | null>(null)
   const [productLink, setProductLink] = useState("")
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [description, setDescription] = useState("")
+  const [itemTitle, setItemTitle] = useState("iPhone 15 (256 GB, Pink)")
+  const [itemDetailDesc, setItemDetailDesc] = useState(
+    "Lightly used, minor screen scratches. Fully functional. Comes with original box and charger.",
+  )
+  const [price, setPrice] = useState(500)
+  const [shippingPrice, setShippingPrice] = useState(5)
   const [successOpen, setSuccessOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const fee = Math.round(price * 0.03 * 100) / 100
+  const total = price + shippingPrice + fee
+
+  async function handleCreateDeal() {
+    if (!role) return
+    const parts = [
+      itemDetailDesc.trim(),
+      description.trim(),
+      uploadedFile ? `File: ${uploadedFile.name}` : "",
+      productLink.trim(),
+    ].filter(Boolean)
+    const payload = {
+      title: itemTitle.trim() || "Untitled deal",
+      description: parts.join(" · ") || "",
+      price,
+      shippingPrice,
+      currency: "EUR",
+      status: "pending" as const,
+      role,
+      counterparty: "Awaiting counterparty",
+    }
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const res = await fetch("/api/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = (await res.json()) as Deal & { error?: string }
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Failed to create deal",
+        )
+      }
+      addDeal(data)
+      setSuccessOpen(true)
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "Failed to create deal")
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-0 backdrop-blur-sm sm:p-4">
@@ -264,7 +317,8 @@ export function NewDealModal() {
                   <label className="mb-1 block text-xs text-muted-foreground">Title</label>
                   <input
                     type="text"
-                    defaultValue="iPhone 15 (256 GB, Pink)"
+                    value={itemTitle}
+                    onChange={(e) => setItemTitle(e.target.value)}
                     className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                 </div>
@@ -273,7 +327,8 @@ export function NewDealModal() {
                   <label className="mb-1 block text-xs text-muted-foreground">Description</label>
                   <textarea
                     rows={2}
-                    defaultValue="Lightly used, minor screen scratches. Fully functional. Comes with original box and charger."
+                    value={itemDetailDesc}
+                    onChange={(e) => setItemDetailDesc(e.target.value)}
                     className="w-full resize-none rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
                 </div>
@@ -307,7 +362,10 @@ export function NewDealModal() {
                     <div className="flex items-center rounded-lg border border-border bg-secondary px-3 py-1.5">
                       <input
                         type="number"
-                        defaultValue={500}
+                        min={0}
+                        step={1}
+                        value={price}
+                        onChange={(e) => setPrice(Number(e.target.value) || 0)}
                         className="w-full bg-transparent text-sm text-foreground focus:outline-none"
                       />
                       <span className="text-xs text-muted-foreground">EUR</span>
@@ -318,7 +376,10 @@ export function NewDealModal() {
                     <div className="flex items-center rounded-lg border border-border bg-secondary px-3 py-1.5">
                       <input
                         type="number"
-                        defaultValue={5}
+                        min={0}
+                        step={1}
+                        value={shippingPrice}
+                        onChange={(e) => setShippingPrice(Number(e.target.value) || 0)}
                         className="w-full bg-transparent text-sm text-foreground focus:outline-none"
                       />
                       <span className="text-xs text-muted-foreground">EUR</span>
@@ -349,34 +410,46 @@ export function NewDealModal() {
             <div className="mb-8 space-y-3 rounded-2xl border border-border bg-secondary p-6 text-left">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Item:</span>
-                <span className="font-medium text-foreground">
-                  iPhone 15 (256 GB, Pink)
+                <span className="max-w-[60%] text-right font-medium text-foreground">
+                  {itemTitle || "Untitled deal"}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Price:</span>
-                <span className="font-medium text-foreground">500 EUR</span>
+                <span className="font-medium text-foreground">{price} EUR</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping:</span>
-                <span className="font-medium text-foreground">5 EUR</span>
+                <span className="font-medium text-foreground">{shippingPrice} EUR</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Fee (3%):</span>
-                <span className="font-medium text-foreground">15 EUR</span>
+                <span className="font-medium text-foreground">{fee} EUR</span>
               </div>
               <div className="border-t border-border pt-3">
                 <div className="flex justify-between font-semibold">
                   <span className="text-foreground">Total:</span>
-                  <span className="text-primary">520 EUR</span>
+                  <span className="text-primary">{total} EUR</span>
                 </div>
               </div>
             </div>
+            {submitError && (
+              <p className="mb-3 text-left text-sm text-destructive">{submitError}</p>
+            )}
             <button
-              onClick={() => setSuccessOpen(true)}
-              className="w-full rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-all hover:opacity-90"
+              type="button"
+              onClick={handleCreateDeal}
+              disabled={submitting}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Create Deal
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating…
+                </>
+              ) : (
+                "Create Deal"
+              )}
             </button>
           </div>
         )}
@@ -412,7 +485,7 @@ export function NewDealModal() {
                     ))}
                   </div>
                   <p className="mt-3 break-all text-[10px] font-mono text-muted-foreground">
-                    DEAL: DL-2026-84211
+                    DEAL: {selectedDealId ?? "—"}
                   </p>
                 </div>
                 <div className="mt-6 grid grid-cols-2 gap-3">

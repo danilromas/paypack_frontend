@@ -1,8 +1,8 @@
 "use client"
 
 import { FileText, User } from "lucide-react"
-import { useAppStore, mockDeals } from "@/store/app-store"
-import { cn } from "@/lib/utils"
+import { useAppStore } from "@/store/app-store"
+import { cn, formatDealDateTime } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -18,8 +18,23 @@ import { Badge } from "@/components/ui/badge"
 const progressSteps = ["Created", "Funds Locked", "Shipped", "In Transit", "Received"]
 
 export function DealDetail() {
-  const { selectedDealId } = useAppStore()
-  const deal = mockDeals.find((d) => d.id === selectedDealId) || mockDeals[0]
+  const { selectedDealId, deals } = useAppStore()
+  const deal =
+    deals.find((d) => d.id === selectedDealId) ?? deals[0]
+
+  if (!deal) {
+    return (
+      <div>
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+          <FileText className="h-5 w-5 text-primary" />
+          Deal Detail
+        </h2>
+        <p className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+          No deals yet. Create one from the dashboard.
+        </p>
+      </div>
+    )
+  }
 
   const activeStep =
     deal.status === "pending"
@@ -48,7 +63,7 @@ export function DealDetail() {
             </h3>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge variant="secondary" className="text-[10px]">
-                #{deal.id.padStart(8, "2531149")}
+                #{deal.id.slice(0, 8)}
               </Badge>
               <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-foreground">
                 {deal.status === "escrow"
@@ -246,13 +261,13 @@ export function DealDetail() {
                   <div>
                     Created:{" "}
                     <span className="font-medium text-foreground">
-                      {deal.createdAt}
+                      {formatDealDateTime(deal.createdAt)}
                     </span>
                   </div>
                   <div>
                     Updated:{" "}
                     <span className="font-medium text-foreground">
-                      {deal.updatedAt}
+                      {formatDealDateTime(deal.updatedAt)}
                     </span>
                   </div>
                 </div>

@@ -10,8 +10,8 @@ import {
   Clock,
   MoreVertical,
 } from "lucide-react";
-import { useAppStore, mockDeals } from "@/store/app-store";
-import { cn } from "@/lib/utils";
+import { useAppStore } from "@/store/app-store";
+import { cn, formatDealRelativeTime } from "@/lib/utils";
 import type { DealStatus } from "@/types";
 
 const statusSortOrder: DealStatus[] = [
@@ -94,11 +94,11 @@ export function DealsList({
   activeFilter = "All",
   searchQuery = "",
 }: DealsListProps) {
-  const { selectedDealId, setSelectedDealId } = useAppStore();
+  const { selectedDealId, setSelectedDealId, deals } = useAppStore();
 
   // Функция для фильтрации сделок
   const getFilteredDeals = () => {
-    let filtered = [...mockDeals];
+    let filtered = [...deals];
 
     // Фильтр по статусу
     if (activeFilter !== "All") {
@@ -187,7 +187,8 @@ export function DealsList({
                       {getEventLabel(deal.status)}
                     </h4>
                     <p className="truncate text-sm text-muted-foreground">
-                      {deal.createdAt} &bull; #{deal.id.padStart(8, "4431754")}
+                      {formatDealRelativeTime(deal.createdAt)} &bull; #
+                      {deal.id.slice(0, 8)}
                     </p>
                   </div>
                 </div>

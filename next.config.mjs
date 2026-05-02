@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -9,7 +8,7 @@ const nextConfig = {
   },
 
   basePath: '', 
-  assetPrefix: '',           // ← меняем на пустую строку
+  assetPrefix: '',
   trailingSlash: true,
 }
 
