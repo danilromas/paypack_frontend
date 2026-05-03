@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { LandingHeader } from "@/components/landing/header"
 import { LandingSplitHero } from "@/components/landing/split-hero"
 import { HowItWorks } from "@/components/landing/how-it-works"
@@ -15,6 +16,14 @@ export default function LandingPage() {
       <BuyerSeller />
       <SecuritySection />
       <FAQSection />
+      <p className="border-t border-border/40 py-3 text-center text-[11px] leading-snug text-muted-foreground/70">
+        <Link
+          href="/extension/"
+          className="underline decoration-transparent underline-offset-2 transition-colors hover:text-muted-foreground hover:decoration-border"
+        >
+          PayPack browser extension — import Facebook Marketplace listings
+        </Link>
+      </p>
       <LandingFooter />
     </div>
   )

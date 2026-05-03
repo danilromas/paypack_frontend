@@ -1,0 +1,135 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  width: 320px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #0f172a;
+  background: #f8fafc;
+}
+.wrap {
+  padding: 14px 16px 16px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.logo {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #5e90b4, #4a7390);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #64748b;
+}
+.lbl {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+#origin {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+}
+#origin:focus {
+  outline: 2px solid #5e90b4;
+  outline-offset: 1px;
+}
+.row.chk {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 14px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #334155;
+  cursor: pointer;
+}
+.row.chk input {
+  margin-top: 2px;
+}
+.btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, #5e90b4, #4a7390);
+}
+.btn.primary:hover {
+  filter: brightness(1.05);
+}
+.toast {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #15803d;
+}
+.card {
+  margin-top: 14px;
+  padding: 10px 10px 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.card h2 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+.muted {
+  margin: 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.last {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 120px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f1f5f9;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+.link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #4a7390;
+  font-weight: 600;
+  text-decoration: none;
+}
+.link:hover {
+  text-decoration: underline;
+}

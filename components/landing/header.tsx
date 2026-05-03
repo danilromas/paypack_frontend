@@ -20,6 +20,7 @@ const navLinks = [
   { href: "#how-it-works", label: "How it works" },
   { href: "#security", label: "Security" },
   { href: "#faq", label: "FAQ" },
+  { href: "/extension/", label: "Extension" },
 ]
 
 export function LandingHeader() {

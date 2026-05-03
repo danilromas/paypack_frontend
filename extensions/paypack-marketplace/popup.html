@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PayPack Marketplace</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="head">
+        <span class="logo">PP</span>
+        <div>
+          <h1>PayPack</h1>
+          <p class="sub">Marketplace helper</p>
+        </div>
+      </header>
+
+      <label class="lbl" for="origin">PayPack site URL</label>
+      <input
+        id="origin"
+        type="url"
+        autocomplete="url"
+        placeholder="https://paypack.uno"
+        spellcheck="false"
+      />
+
+      <label class="row chk">
+        <input id="showFab" type="checkbox" />
+        <span>Show floating button on FB Marketplace</span>
+      </label>
+
+      <button id="save" type="button" class="btn primary">Save</button>
+      <p id="toast" class="toast" hidden>Saved</p>
+
+      <section class="card">
+        <h2>Last import</h2>
+        <p id="lastEmpty" class="muted">No imports yet from this browser.</p>
+        <pre id="last" class="last" hidden></pre>
+      </section>
+
+      <a id="help" class="link" href="#" target="_blank" rel="noopener noreferrer"
+        >Installation & extension page</a
+      >
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

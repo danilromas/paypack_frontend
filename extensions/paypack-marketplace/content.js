@@ -1,8 +1,9 @@
 /**
- * PayPack Marketplace helper — MVP proof-of-concept.
- * Change PAYPACK_ORIGIN if your app runs on another host/port.
+ * PayPack Marketplace — floating actions + dashboard import.
+ * Site URL and FAB visibility: extension icon → popup.
  */
-const PAYPACK_ORIGIN = "http://localhost:3000";
+
+const DEFAULT_PAYPACK_ORIGIN = "http://localhost:3000";
 
 /** Служебные заголовки страницы FB — не использовать как название товара */
 const GARBAGE_TITLES = new Set([
@@ -358,7 +359,7 @@ function scrapeListing() {
   return { title, link, price, desc };
 }
 
-function openPayPack() {
+function buildImportUrl(paypackOrigin) {
   const { title, link, price, desc } = scrapeListing();
   const params = new URLSearchParams();
   params.set("pp_import", "1");
@@ -367,35 +368,159 @@ function openPayPack() {
   if (price > 0) params.set("price", String(price));
   if (desc) params.set("desc", desc);
 
-  const url = `${PAYPACK_ORIGIN}/dashboard?${params.toString()}`;
+  const base = (paypackOrigin || DEFAULT_PAYPACK_ORIGIN).replace(/\/$/, "");
+  return `${base}/dashboard/?${params.toString()}`;
+}
+
+function rememberLastImport(paypackOrigin, importUrl) {
+  const snap = scrapeListing();
+  const payload = {
+    at: Date.now(),
+    paypackOrigin,
+    importUrl,
+    title: snap.title,
+    link: snap.link,
+    price: snap.price,
+  };
+  try {
+    chrome.storage.local.set({
+      lastImport: JSON.stringify(payload),
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+function openPayPack(paypackOrigin) {
+  const url = buildImportUrl(paypackOrigin);
+  rememberLastImport(paypackOrigin, url);
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-function injectUi() {
+async function copyImportLink(paypackOrigin) {
+  const url = buildImportUrl(paypackOrigin);
+  rememberLastImport(paypackOrigin, url);
+  try {
+    await navigator.clipboard.writeText(url);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function injectUi(settings) {
   if (document.getElementById("paypack-mp-root")) return;
+
+  const paypackOrigin =
+    (settings && settings.paypackOrigin) || DEFAULT_PAYPACK_ORIGIN;
 
   const root = document.createElement("div");
   root.id = "paypack-mp-root";
 
+  const panel = document.createElement("div");
+  panel.className = "paypack-mp-panel";
+  panel.setAttribute("role", "group");
+  panel.setAttribute("aria-label", "PayPack listing tools");
+
+  const stack = document.createElement("div");
+  stack.className = "paypack-mp-stack";
+
+  const iconExternal =
+    '<svg class="paypack-mp-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+  const iconCopy =
+    '<svg class="paypack-mp-icon paypack-mp-icon--muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "paypack-mp-btn";
-  btn.title = "Открыть создание сделки в PayPack с данными с этой страницы";
-  btn.innerHTML =
-    '<span class="paypack-mp-badge">PP</span><span>Купить на PayPack</span>';
+  btn.className = "paypack-mp-btn paypack-mp-btn--primary";
+  btn.title =
+    "Open PayPack in a new tab with this listing prefilled (title, price, description).";
+  btn.innerHTML = `<span class="paypack-mp-btn__row">
+    <span class="paypack-mp-badge">PP</span>
+    <span class="paypack-mp-btn__label">Open in PayPack</span>
+    ${iconExternal}
+  </span>`;
 
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    openPayPack();
+    openPayPack(paypackOrigin);
   });
 
-  root.appendChild(btn);
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "paypack-mp-btn paypack-mp-btn--secondary";
+  copyBtn.title = "Copy the dashboard import URL to your clipboard.";
+  copyBtn.innerHTML = `<span class="paypack-mp-btn__row paypack-mp-btn__row--secondary">
+    ${iconCopy}
+    <span class="paypack-mp-copy-label">Copy import link</span>
+  </span>`;
+
+  copyBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void copyImportLink(paypackOrigin).then((ok) => {
+      const label = copyBtn.querySelector(".paypack-mp-copy-label");
+      if (!label) return;
+      const prev = label.textContent;
+      label.textContent = ok ? "Copied" : "Copy failed";
+      setTimeout(() => {
+        label.textContent = prev;
+      }, 2000);
+    });
+  });
+
+  stack.appendChild(btn);
+  stack.appendChild(copyBtn);
+  panel.appendChild(stack);
+  root.appendChild(panel);
   document.documentElement.appendChild(root);
 }
 
+function removeFab() {
+  document.getElementById("paypack-mp-root")?.remove();
+}
+
+function applySettings(settings) {
+  removeFab();
+  if (!settings || settings.showFab === false) return;
+  injectUi(settings);
+}
+
+function bootstrap() {
+  const defaults = {
+    paypackOrigin: DEFAULT_PAYPACK_ORIGIN,
+    showFab: true,
+  };
+
+  if (typeof chrome !== "undefined" && chrome.storage?.sync) {
+    chrome.storage.sync.get(defaults, (sync) => {
+      applySettings(sync);
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "sync") return;
+      if (!changes.paypackOrigin && !changes.showFab) return;
+      chrome.storage.sync.get(defaults, applySettings);
+    });
+  } else {
+    applySettings(defaults);
+  }
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", injectUi);
+  document.addEventListener("DOMContentLoaded", bootstrap);
 } else {
-  injectUi();
+  bootstrap();
 }
