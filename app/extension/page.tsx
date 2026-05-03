@@ -54,9 +54,9 @@ export default function ExtensionPage() {
                 folder.
               </li>
               <li>
-                Click the extension icon → enter your PayPack site URL (for example{" "}
-                <code className="text-foreground">https://paypack.uno</code> or{" "}
-                <code className="text-foreground">http://localhost:3000</code>).
+                Click the extension icon → the default site is{" "}
+                <code className="text-foreground">https://paypack.uno</code>; change it in the popup
+                if you use another origin.
               </li>
               <li>
                 Open a Marketplace listing — use <em>Open in PayPack</em> or{" "}

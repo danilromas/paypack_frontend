@@ -3,8 +3,6 @@
  * Site URL and FAB visibility: extension icon → popup.
  */
 
-const DEFAULT_PAYPACK_ORIGIN = "http://localhost:3000";
-
 /** Служебные заголовки страницы FB — не использовать как название товара */
 const GARBAGE_TITLES = new Set([
   "marketplace",
@@ -360,16 +358,7 @@ function scrapeListing() {
 }
 
 function buildImportUrl(paypackOrigin) {
-  const { title, link, price, desc } = scrapeListing();
-  const params = new URLSearchParams();
-  params.set("pp_import", "1");
-  params.set("link", link);
-  if (title) params.set("title", title);
-  if (price > 0) params.set("price", String(price));
-  if (desc) params.set("desc", desc);
-
-  const base = (paypackOrigin || DEFAULT_PAYPACK_ORIGIN).replace(/\/$/, "");
-  return `${base}/dashboard/?${params.toString()}`;
+  return PayPackUrlBuild.buildDashboardImportUrl(paypackOrigin, scrapeListing());
 }
 
 function rememberLastImport(paypackOrigin, importUrl) {
@@ -424,7 +413,7 @@ function injectUi(settings) {
   if (document.getElementById("paypack-mp-root")) return;
 
   const paypackOrigin =
-    (settings && settings.paypackOrigin) || DEFAULT_PAYPACK_ORIGIN;
+    (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
 
   const root = document.createElement("div");
   root.id = "paypack-mp-root";
@@ -501,7 +490,7 @@ function applySettings(settings) {
 
 function bootstrap() {
   const defaults = {
-    paypackOrigin: DEFAULT_PAYPACK_ORIGIN,
+    paypackOrigin: PayPackUrlBuild.DEFAULT_ORIGIN,
     showFab: true,
   };
 

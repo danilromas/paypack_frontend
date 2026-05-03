@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PayPack Marketplace",
-  "version": "0.2.1",
+  "version": "0.2.3",
   "description": "Import Facebook Marketplace listings into PayPack with one click.",
   "permissions": ["activeTab", "storage"],
   "action": {
@@ -11,8 +11,6 @@
   "host_permissions": [
     "https://www.facebook.com/*",
     "https://facebook.com/*",
-    "http://localhost/*",
-    "http://127.0.0.1/*",
     "https://paypack.uno/*",
     "https://*.vercel.app/*"
   ],
@@ -22,7 +20,7 @@
         "https://www.facebook.com/marketplace/*",
         "https://facebook.com/marketplace/*"
       ],
-      "js": ["content.js"],
+      "js": ["url-build.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }

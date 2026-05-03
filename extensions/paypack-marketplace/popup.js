@@ -1,4 +1,4 @@
-const DEFAULT_ORIGIN = "http://localhost:3000";
+const DEFAULT_ORIGIN = "https://paypack.uno";
 
 function normalizeOrigin(raw) {
   let s = (raw || "").trim();
