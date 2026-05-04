@@ -1,9 +1,17 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ChevronDown, ChevronUp, Loader2, Pencil, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Eye, Loader2, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Shipment, ShipmentPayload, ShipmentStatus } from "@/lib/shipments"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 
 type SortDirection = "asc" | "desc"
 type SortField = "date" | "receiver" | "sender" | "status"
@@ -60,6 +68,7 @@ export function ShipmentsTable({
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [detailShipment, setDetailShipment] = useState<Shipment | null>(null)
 
   const sortedShipments = useMemo(() => {
     return [...shipments].sort((a, b) => {
@@ -138,6 +147,7 @@ export function ShipmentsTable({
           No shipments yet. Create the first one using the button above.
         </div>
       ) : (
+        <>
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
           <table className="w-full">
             <thead className="border-b border-border bg-secondary/50">
@@ -333,8 +343,17 @@ export function ShipmentsTable({
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
+                            type="button"
+                            onClick={() => setDetailShipment(shipment)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Details
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => openEditor(shipment)}
                             className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs"
                           >
@@ -342,6 +361,7 @@ export function ShipmentsTable({
                             Edit
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleDelete(shipment.id)}
                             disabled={deletingId === shipment.id}
                             className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-2 text-xs text-destructive disabled:opacity-60"
@@ -358,6 +378,65 @@ export function ShipmentsTable({
             </tbody>
           </table>
         </div>
+
+        <Dialog
+          open={!!detailShipment}
+          onOpenChange={(open) => !open && setDetailShipment(null)}
+        >
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" showCloseButton>
+            <DialogHeader>
+              <DialogTitle>Shipment details</DialogTitle>
+              <DialogDescription>
+                Read-only view of this delivery. Use Edit to change fields.
+              </DialogDescription>
+            </DialogHeader>
+            {detailShipment && (
+              <dl className="grid gap-3 text-sm">
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">ID</dt>
+                  <dd className="font-mono text-xs break-all">{detailShipment.id}</dd>
+                </div>
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">Sender</dt>
+                  <dd>
+                    <div className="font-medium">{detailShipment.senderName}</div>
+                    <div className="text-muted-foreground">{detailShipment.senderLocation}</div>
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">Receiver</dt>
+                  <dd>
+                    <div className="font-medium">{detailShipment.receiverName}</div>
+                    <div className="text-muted-foreground">{detailShipment.receiverLocation}</div>
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">Service</dt>
+                  <dd>{detailShipment.service}</dd>
+                </div>
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">Dimensions</dt>
+                  <dd>{detailShipment.dimensions}</dd>
+                </div>
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">Weight</dt>
+                  <dd>{detailShipment.weight}</dd>
+                </div>
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd>
+                    <Badge variant="secondary">{detailShipment.status}</Badge>
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[7.5rem_1fr] gap-2">
+                  <dt className="text-muted-foreground">Created</dt>
+                  <dd>{formatDate(detailShipment.createdAt)}</dd>
+                </div>
+              </dl>
+            )}
+          </DialogContent>
+        </Dialog>
+        </>
       )}
     </div>
   )

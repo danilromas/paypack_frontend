@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { ArrowRight, Handshake, Package, Shield } from "lucide-react"
+import { Handshake, Package } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type ActionKey = "deal" | "ship"
@@ -97,11 +97,6 @@ export function LandingSplitHero() {
                       <p className="mt-2 text-sm text-muted-foreground opacity-100 transition-all duration-500 md:opacity-0 md:group-hover:opacity-100">
                         {action.hint}
                       </p>
-                    </div>
-
-                    <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground opacity-100 backdrop-blur transition-all duration-500 md:opacity-0 md:group-hover:opacity-100">
-                      Open
-                      <ArrowRight className="h-4 w-4 text-primary" />
                     </div>
                   </div>
                 </Link>

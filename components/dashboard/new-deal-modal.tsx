@@ -262,6 +262,19 @@ export function NewDealModal({
               </div>
             </div>
 
+            <div className="mx-auto max-w-md">
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                className="w-full rounded-xl border border-border bg-secondary/80 py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+              >
+                Continue without link
+              </button>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Fill in title and details on the next step
+              </p>
+            </div>
+
             {/* Upload file + description */}
             <div className="mx-auto max-w-md space-y-3">
               <div>
