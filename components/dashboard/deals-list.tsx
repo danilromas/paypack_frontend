@@ -10,9 +10,18 @@ import {
   Clock,
   MoreVertical,
 } from "lucide-react";
+import { useState } from "react";
 import { useAppStore } from "@/store/app-store";
 import { cn, formatDealRelativeTime } from "@/lib/utils";
-import type { DealStatus } from "@/types";
+import type { Deal, DealStatus } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 const statusSortOrder: DealStatus[] = [
   "pending",
@@ -95,6 +104,7 @@ export function DealsList({
   searchQuery = "",
 }: DealsListProps) {
   const { selectedDealId, setSelectedDealId, deals } = useAppStore();
+  const [detailDeal, setDetailDeal] = useState<Deal | null>(null);
 
   // Функция для фильтрации сделок
   const getFilteredDeals = () => {
@@ -165,7 +175,10 @@ export function DealsList({
             return (
               <div
                 key={deal.id}
-                onClick={() => setSelectedDealId(deal.id)}
+                onClick={() => {
+                  setSelectedDealId(deal.id);
+                  setDetailDeal(deal);
+                }}
                 className={cn(
                   "flex w-full cursor-pointer flex-col gap-3 rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:gap-0",
                   selectedDealId === deal.id
@@ -221,6 +234,63 @@ export function DealsList({
       <button className="mt-4 w-full rounded-xl border border-border bg-card py-3 text-center text-sm font-medium text-primary transition-all hover:bg-secondary">
         All Deals...
       </button>
+
+      <Dialog open={!!detailDeal} onOpenChange={(open) => !open && setDetailDeal(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Deal details</DialogTitle>
+            <DialogDescription>
+              Read-only deal info. Use New Deal or update flow to change data.
+            </DialogDescription>
+          </DialogHeader>
+          {detailDeal && (
+            <dl className="grid gap-3 text-sm">
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">ID</dt>
+                <dd className="font-mono text-xs break-all">{detailDeal.id}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Title</dt>
+                <dd className="font-medium">{detailDeal.title}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Description</dt>
+                <dd className="whitespace-pre-wrap break-words">{detailDeal.description || "—"}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Amount</dt>
+                <dd>{detailDeal.price} {detailDeal.currency}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Shipping</dt>
+                <dd>{detailDeal.shippingPrice} {detailDeal.currency}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Status</dt>
+                <dd>
+                  <Badge variant="secondary">{detailDeal.status}</Badge>
+                </dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Role</dt>
+                <dd className="capitalize">{detailDeal.role}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Counterparty</dt>
+                <dd>{detailDeal.counterparty}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Created</dt>
+                <dd>{new Date(detailDeal.createdAt).toLocaleString()}</dd>
+              </div>
+              <div className="grid grid-cols-[7.5rem_1fr] gap-2">
+                <dt className="text-muted-foreground">Updated</dt>
+                <dd>{new Date(detailDeal.updatedAt).toLocaleString()}</dd>
+              </div>
+            </dl>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
