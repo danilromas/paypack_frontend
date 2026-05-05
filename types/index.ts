@@ -4,6 +4,7 @@ export interface Deal {
   id: string
   title: string
   description: string
+  imageUrl?: string
   price: number
   shippingPrice: number
   currency: string

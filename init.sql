@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS deals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
+  image_url TEXT,
   price INTEGER NOT NULL,
   shipping_price INTEGER NOT NULL,
   currency TEXT NOT NULL DEFAULT 'EUR',
@@ -59,3 +60,6 @@ CREATE TABLE IF NOT EXISTS deals (
 );
 
 CREATE INDEX IF NOT EXISTS deals_created_at_idx ON deals (created_at DESC);
+
+ALTER TABLE deals
+ADD COLUMN IF NOT EXISTS image_url TEXT;

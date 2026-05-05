@@ -77,6 +77,7 @@ function DealConfirmPageContent() {
         body: JSON.stringify({
           title: deal.title,
           description: deal.description,
+          imageUrl: deal.imageUrl ?? null,
           price: deal.price,
           shippingPrice: deal.shippingPrice,
           currency: deal.currency,

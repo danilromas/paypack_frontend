@@ -9,6 +9,7 @@ import {
   type DealImportPrefill,
 } from "@/components/dashboard/new-deal-modal";
 import { useAppStore } from "@/store/app-store";
+import type { Deal } from "@/types";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Handshake } from "lucide-react";
@@ -80,6 +81,7 @@ function DashboardPageInner() {
       title: searchParams.get("title") ?? "",
       price,
       itemDetailDesc: searchParams.get("desc") ?? "",
+      imageUrl: searchParams.get("image") ?? "",
     };
     setImportPrefill(draft);
     setNewDealModalOpen(true);

@@ -11,6 +11,7 @@ interface DealRow {
   id: string
   title: string
   description: string
+  image_url: string | null
   price: number
   shipping_price: number
   currency: string
@@ -26,6 +27,7 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
   return {
     title: typeof body.title === "string" ? body.title : "",
     description: typeof body.description === "string" ? body.description : "",
+    imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : null,
     price: typeof body.price === "number" ? body.price : Number(body.price),
     shippingPrice:
       typeof body.shippingPrice === "number"
@@ -87,6 +89,7 @@ export async function PUT(
       SET
         title = ${payload.title.trim()},
         description = ${payload.description},
+        image_url = ${payload.imageUrl ?? null},
         price = ${Math.round(payload.price)},
         shipping_price = ${Math.round(payload.shippingPrice)},
         currency = ${payload.currency},

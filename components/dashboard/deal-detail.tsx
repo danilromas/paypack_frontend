@@ -127,6 +127,17 @@ export function DealDetail() {
           </Dialog>
         </div>
 
+        {deal.imageUrl ? (
+          <div className="mb-6 overflow-hidden rounded-xl border border-border bg-secondary">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={deal.imageUrl}
+              alt={deal.title}
+              className="h-44 w-full object-cover"
+            />
+          </div>
+        ) : null}
+
         {/* Progress Steps */}
         <div className="mb-6 flex justify-between gap-1 md:mb-8">
           {progressSteps.map((step, i) => (
@@ -231,6 +242,16 @@ export function DealDetail() {
                 </DialogDescription>
               </DialogHeader>
               <div className="mt-4 space-y-4 text-sm">
+                {deal.imageUrl ? (
+                  <div className="overflow-hidden rounded-xl border border-border bg-secondary">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={deal.imageUrl}
+                      alt={deal.title}
+                      className="h-40 w-full object-cover"
+                    />
+                  </div>
+                ) : null}
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">
                     Item

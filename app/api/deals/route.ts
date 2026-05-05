@@ -11,6 +11,7 @@ interface DealRow {
   id: string
   title: string
   description: string
+  image_url: string | null
   price: number
   shipping_price: number
   currency: string
@@ -26,6 +27,7 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
   return {
     title: typeof body.title === "string" ? body.title : "",
     description: typeof body.description === "string" ? body.description : "",
+    imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : null,
     price: typeof body.price === "number" ? body.price : Number(body.price),
     shippingPrice:
       typeof body.shippingPrice === "number"
@@ -70,12 +72,13 @@ export async function POST(req: Request) {
 
     const inserted = await sql<DealRow[]>`
       INSERT INTO deals (
-        title, description, price, shipping_price, currency,
+        title, description, image_url, price, shipping_price, currency,
         status, role, counterparty, counterparty_avatar
       )
       VALUES (
         ${payload.title.trim()},
         ${payload.description},
+        ${payload.imageUrl ?? null},
         ${Math.round(payload.price)},
         ${Math.round(payload.shippingPrice)},
         ${payload.currency},

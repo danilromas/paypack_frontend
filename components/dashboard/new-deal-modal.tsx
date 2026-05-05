@@ -24,6 +24,7 @@ export type DealImportPrefill = {
   title?: string;
   price?: number;
   itemDetailDesc?: string;
+  imageUrl?: string;
 };
 
 export function NewDealModal({
@@ -41,6 +42,7 @@ export function NewDealModal({
   const [itemDetailDesc, setItemDetailDesc] = useState(
     "Lightly used, minor screen scratches. Fully functional. Comes with original box and charger.",
   )
+  const [itemImageUrl, setItemImageUrl] = useState("")
   const [price, setPrice] = useState(500)
   const [shippingPrice, setShippingPrice] = useState(5)
   const [successOpen, setSuccessOpen] = useState(false)
@@ -75,7 +77,8 @@ export function NewDealModal({
       importPrefill.productLink ||
       importPrefill.title ||
       importPrefill.price ||
-      importPrefill.itemDetailDesc
+      importPrefill.itemDetailDesc ||
+      importPrefill.imageUrl
     if (!hasData) return
     if (importPrefill.productLink) setProductLink(importPrefill.productLink)
     if (importPrefill.title) setItemTitle(importPrefill.title)
@@ -87,6 +90,7 @@ export function NewDealModal({
       setPrice(Math.round(importPrefill.price))
     }
     if (importPrefill.itemDetailDesc) setItemDetailDesc(importPrefill.itemDetailDesc)
+    if (importPrefill.imageUrl) setItemImageUrl(importPrefill.imageUrl)
     setRole("buyer")
     setStep(3)
   }, [importPrefill])
@@ -102,6 +106,7 @@ export function NewDealModal({
     const payload = {
       title: itemTitle.trim() || "Untitled deal",
       description: parts.join(" · ") || "",
+      imageUrl: itemImageUrl.trim() || null,
       price,
       shippingPrice,
       currency: "EUR",
@@ -414,11 +419,29 @@ export function NewDealModal({
 
             <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 md:gap-5">
 
-              {/* Product Image Placeholder */}
+              {/* Product image */}
               <div className="space-y-2">
-                <div className="aspect-[4/3] w-full max-w-[340px] mx-auto flex items-center justify-center rounded-xl border border-border bg-secondary text-sm text-muted-foreground"> {/* aspect-square → 4/3, убрано лишнее */}
-                  Product Image Preview
+                <div className="aspect-[4/3] w-full max-w-[340px] mx-auto overflow-hidden rounded-xl border border-border bg-secondary">
+                  {itemImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={itemImageUrl}
+                      alt="Imported product"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                      Product Image Preview
+                    </div>
+                  )}
                 </div>
+                <input
+                  type="url"
+                  value={itemImageUrl}
+                  onChange={(e) => setItemImageUrl(e.target.value)}
+                  placeholder="Image URL (optional)"
+                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
 
                 <div className="grid grid-cols-3 gap-3">
                   {["Front", "Back", "Side"].map((label) => (

@@ -219,8 +219,11 @@ function extractListingPriceFromText(headerText) {
       [/(\d[\d\s\u00A0.,]*)\s*MXN\b/gi, 1],
       [/MXN\s*(\d[\d\s\u00A0.,]*)/gi, 1],
       [/(\d[\d\s\u00A0.,]*)\s*(€|EUR|eur)\b/gi, 1],
+      [/(€|EUR|eur)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
       [/(\d[\d\s\u00A0.,]*)\s*(USD)\b/gi, 1],
+      [/(USD)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
       [/(\d[\d\s\u00A0.,]*)\s*(руб|₽|RUB|rub)\b/gi, 1],
+      [/(руб|₽|RUB|rub)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
     ];
     for (const [re, g] of patterns) {
       re.lastIndex = 0;
@@ -337,6 +340,35 @@ function extractSellerDescription(mainText) {
   return d || "";
 }
 
+function normalizeDescription(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/\u00A0/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, 2000);
+}
+
+function extractPrimaryImageUrl() {
+  const fromMeta =
+    document.querySelector('meta[property="og:image"]')?.getAttribute("content") || "";
+  if (/^https?:\/\//i.test(fromMeta)) return fromMeta;
+
+  const main = document.querySelector('[role="main"]');
+  if (!main) return "";
+  const imgs = main.querySelectorAll("img");
+  for (const img of imgs) {
+    const src = img.getAttribute("src") || "";
+    if (!/^https?:\/\//i.test(src)) continue;
+    if (/data:image/i.test(src)) continue;
+    const alt = (img.getAttribute("alt") || "").toLowerCase();
+    if (alt.includes("profile") || alt.includes("avatar")) continue;
+    return src;
+  }
+  return "";
+}
+
 function scrapeListing() {
   const link = window.location.href;
   const title = pickListingTitle();
@@ -346,15 +378,15 @@ function scrapeListing() {
 
   let price = extractListingPrice();
 
-  let desc = extractSellerDescription(mainText);
+  let desc = normalizeDescription(extractSellerDescription(mainText));
   if (!desc) {
     const og =
       document.querySelector('meta[property="og:description"]') ||
       document.querySelector('meta[name="description"]');
-    desc = og?.getAttribute("content")?.trim().slice(0, 2000) || "";
+    desc = normalizeDescription(og?.getAttribute("content") || "");
   }
-
-  return { title, link, price, desc };
+  const image = extractPrimaryImageUrl();
+  return { title, link, price, desc, image };
 }
 
 function buildImportUrl(paypackOrigin) {
@@ -409,83 +441,73 @@ async function copyImportLink(paypackOrigin) {
   }
 }
 
-function injectUi(settings) {
-  if (document.getElementById("paypack-mp-root")) return;
-
-  const paypackOrigin =
-    (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
-
-  const root = document.createElement("div");
-  root.id = "paypack-mp-root";
-
-  const panel = document.createElement("div");
-  panel.className = "paypack-mp-panel";
-  panel.setAttribute("role", "group");
-  panel.setAttribute("aria-label", "PayPack listing tools");
-
-  const stack = document.createElement("div");
-  stack.className = "paypack-mp-stack";
-
-  const iconExternal =
-    '<svg class="paypack-mp-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
-  const iconCopy =
-    '<svg class="paypack-mp-icon paypack-mp-icon--muted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+function createActionButton(paypackOrigin, compact) {
+  const resolvedOrigin = paypackOrigin || PayPackUrlBuild.DEFAULT_ORIGIN;
 
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "paypack-mp-btn paypack-mp-btn--primary";
+  btn.className = compact
+    ? "paypack-mp-inline-btn paypack-mp-inline-btn--compact"
+    : "paypack-mp-inline-btn";
   btn.title =
-    "Open PayPack in a new tab with this listing prefilled (title, price, description).";
-  btn.innerHTML = `<span class="paypack-mp-btn__row">
-    <span class="paypack-mp-badge">PP</span>
-    <span class="paypack-mp-btn__label">Open in PayPack</span>
-    ${iconExternal}
-  </span>`;
+    "Open PayPack with this listing prefilled (title, price, description, image).";
+  btn.textContent = compact ? "PayPack" : "Open in PayPack";
 
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    openPayPack(paypackOrigin);
+    openPayPack(resolvedOrigin);
   });
-
-  const copyBtn = document.createElement("button");
-  copyBtn.type = "button";
-  copyBtn.className = "paypack-mp-btn paypack-mp-btn--secondary";
-  copyBtn.title = "Copy the dashboard import URL to your clipboard.";
-  copyBtn.innerHTML = `<span class="paypack-mp-btn__row paypack-mp-btn__row--secondary">
-    ${iconCopy}
-    <span class="paypack-mp-copy-label">Copy import link</span>
-  </span>`;
-
-  copyBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    void copyImportLink(paypackOrigin).then((ok) => {
-      const label = copyBtn.querySelector(".paypack-mp-copy-label");
-      if (!label) return;
-      const prev = label.textContent;
-      label.textContent = ok ? "Copied" : "Copy failed";
-      setTimeout(() => {
-        label.textContent = prev;
-      }, 2000);
-    });
-  });
-
-  stack.appendChild(btn);
-  stack.appendChild(copyBtn);
-  panel.appendChild(stack);
-  root.appendChild(panel);
-  document.documentElement.appendChild(root);
+  return btn;
 }
 
-function removeFab() {
-  document.getElementById("paypack-mp-root")?.remove();
+function injectButtonsIntoListings(settings) {
+  const paypackOrigin =
+    (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
+
+  const listingLinks = document.querySelectorAll('a[href*="/marketplace/item/"]');
+  listingLinks.forEach((a) => {
+    const card =
+      a.closest('[role="article"]') ||
+      a.closest('[data-testid]') ||
+      a.parentElement;
+    if (!card || !(card instanceof HTMLElement)) return;
+    if (card.querySelector(".paypack-mp-inline-btn")) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "paypack-mp-inline-wrap";
+    wrap.appendChild(createActionButton(paypackOrigin, true));
+    card.appendChild(wrap);
+  });
+
+  const main = document.querySelector('[role="main"]');
+  if (main && !main.querySelector(".paypack-mp-listing-actions")) {
+    const actionBar = document.createElement("div");
+    actionBar.className = "paypack-mp-listing-actions";
+    actionBar.appendChild(createActionButton(paypackOrigin, false));
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "paypack-mp-inline-btn paypack-mp-inline-btn--secondary";
+    copyBtn.textContent = "Copy import link";
+    copyBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void copyImportLink(paypackOrigin).then((ok) => {
+        const prev = copyBtn.textContent;
+        copyBtn.textContent = ok ? "Copied" : "Copy failed";
+        setTimeout(() => {
+          copyBtn.textContent = prev;
+        }, 1700);
+      });
+    });
+    actionBar.appendChild(copyBtn);
+    main.prepend(actionBar);
+  }
 }
 
 function applySettings(settings) {
-  removeFab();
   if (!settings || settings.showFab === false) return;
-  injectUi(settings);
+  injectButtonsIntoListings(settings);
 }
 
 function bootstrap() {
@@ -506,6 +528,15 @@ function bootstrap() {
   } else {
     applySettings(defaults);
   }
+
+  const obs = new MutationObserver(() => {
+    if (typeof chrome !== "undefined" && chrome.storage?.sync) {
+      chrome.storage.sync.get(defaults, applySettings);
+    } else {
+      applySettings(defaults);
+    }
+  });
+  obs.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 if (document.readyState === "loading") {
