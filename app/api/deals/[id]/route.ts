@@ -40,6 +40,33 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
   }
 }
 
+export async function GET(
+  _req: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    await ensureDealsTable()
+    const sql = getSql()
+    const { id } = await context.params
+    const rows = await sql<DealRow[]>`
+      SELECT * FROM deals
+      WHERE id = ${id}
+      LIMIT 1
+    `
+
+    if (!rows[0]) {
+      return NextResponse.json({ error: "Deal not found" }, { status: 404 })
+    }
+
+    return NextResponse.json(toDealFromRow(rows[0]))
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch deal", details: String(error) },
+      { status: 500 },
+    )
+  }
+}
+
 export async function PUT(
   req: Request,
   context: { params: Promise<{ id: string }> },

@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, X, ChevronLeft, ChevronRight, Gift } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Loader2,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Gift,
+  Copy,
+  Share2,
+  CheckCircle2,
+} from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "@/store/app-store";
 import { cn } from "@/lib/utils";
 import type { Deal } from "@/types";
@@ -21,7 +31,7 @@ export function NewDealModal({
 }: {
   importPrefill?: DealImportPrefill | null;
 }) {
-  const { setNewDealModalOpen, addDeal, selectedDealId } = useAppStore()
+  const { setNewDealModalOpen, addDeal } = useAppStore()
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<"buyer" | "seller" | null>(null)
   const [productLink, setProductLink] = useState("")
@@ -36,9 +46,28 @@ export function NewDealModal({
   const [successOpen, setSuccessOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [createdDealId, setCreatedDealId] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [confirmInput, setConfirmInput] = useState("")
+  const [confirmState, setConfirmState] = useState<"idle" | "ok" | "error">("idle")
 
   const fee = Math.round(price * 0.03 * 100) / 100
   const total = price + shippingPrice + fee
+
+  const sharePayload = useMemo(() => {
+    if (!createdDealId) return ""
+    return JSON.stringify({
+      type: "deal-confirm",
+      dealId: createdDealId,
+      role,
+      ts: Date.now(),
+    })
+  }, [createdDealId, role])
+
+  const confirmUrl = useMemo(() => {
+    if (!sharePayload) return ""
+    return `/dashboard/deals/confirm?payload=${encodeURIComponent(sharePayload)}`
+  }, [sharePayload])
 
   useEffect(() => {
     if (!importPrefill) return
@@ -95,11 +124,56 @@ export function NewDealModal({
         )
       }
       addDeal(data)
+      setCreatedDealId(data.id)
       setSuccessOpen(true)
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Failed to create deal")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleCopy() {
+    if (!sharePayload) return
+    try {
+      await navigator.clipboard.writeText(sharePayload)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  async function handleShare() {
+    if (!sharePayload) return
+    const text = `PayPack deal confirmation payload:\n${sharePayload}`
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Deal confirmation",
+          text,
+          url: confirmUrl,
+        })
+      } else {
+        await navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }
+    } catch {
+      // user cancelled share
+    }
+  }
+
+  function handleConfirmFromScan() {
+    try {
+      const parsed = JSON.parse(confirmInput)
+      if (parsed?.type === "deal-confirm" && parsed?.dealId === createdDealId) {
+        setConfirmState("ok")
+      } else {
+        setConfirmState("error")
+      }
+    } catch {
+      setConfirmState("error")
     }
   }
 
@@ -517,24 +591,81 @@ export function NewDealModal({
                 <p className="mt-2 text-sm text-muted-foreground">
                   Share this QR code with your counterparty to join the deal.
                 </p>
-                <div className="mx-auto mt-6 w-40 rounded-2xl bg-background p-3 shadow-inner">
-                  <div className="grid grid-cols-5 gap-1 rounded-xl bg-card p-2">
-                    {Array.from({ length: 25 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          "h-3 w-3 rounded-[2px]",
-                          (i % 2 === 0 && i % 3 !== 0) || i === 0 || i === 4 || i === 20
-                            ? "bg-foreground"
-                            : "bg-transparent",
-                        )}
-                      />
-                    ))}
+                <div className="mx-auto mt-6 w-fit rounded-2xl bg-background p-3 shadow-inner">
+                  <div className="rounded-xl bg-white p-2">
+                    <QRCodeSVG
+                      value={sharePayload || "pending"}
+                      size={160}
+                      includeMargin
+                      level="M"
+                    />
                   </div>
                   <p className="mt-3 break-all text-[10px] font-mono text-muted-foreground">
-                    DEAL: {selectedDealId ?? "—"}
+                    DEAL: {createdDealId ?? "—"}
                   </p>
                 </div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleCopy}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-xs font-medium text-foreground transition-all hover:bg-secondary"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copied ? "Copied" : "Copy payload"}
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-xs font-medium text-foreground transition-all hover:bg-secondary"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    Share
+                  </button>
+                </div>
+                <a
+                  href={confirmUrl || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(
+                    "mt-2 inline-flex w-full items-center justify-center rounded-xl border border-border py-2 text-xs font-medium text-foreground transition-all hover:bg-secondary",
+                    !confirmUrl && "pointer-events-none opacity-50",
+                  )}
+                >
+                  Open confirm page
+                </a>
+
+                <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-3 text-left">
+                  <p className="mb-2 text-xs font-medium text-foreground">
+                    Simulate scan confirmation
+                  </p>
+                  <textarea
+                    value={confirmInput}
+                    onChange={(e) => {
+                      setConfirmInput(e.target.value)
+                      setConfirmState("idle")
+                    }}
+                    placeholder="Paste scanned payload here..."
+                    className="h-20 w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <button
+                      onClick={handleConfirmFromScan}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90"
+                    >
+                      Confirm via scan
+                    </button>
+                    {confirmState === "ok" && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Confirmed
+                      </span>
+                    )}
+                    {confirmState === "error" && (
+                      <span className="text-xs font-medium text-destructive">
+                        Invalid payload
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 <div className="mt-6 grid grid-cols-2 gap-3">
                   <button
                     onClick={() => {
