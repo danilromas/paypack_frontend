@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS deals (
   title TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   image_url TEXT,
+  images_json TEXT NOT NULL DEFAULT '',
   price INTEGER NOT NULL,
   shipping_price INTEGER NOT NULL,
   currency TEXT NOT NULL DEFAULT 'EUR',
@@ -63,3 +64,6 @@ CREATE INDEX IF NOT EXISTS deals_created_at_idx ON deals (created_at DESC);
 
 ALTER TABLE deals
 ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+ALTER TABLE deals
+ADD COLUMN IF NOT EXISTS images_json TEXT NOT NULL DEFAULT '';

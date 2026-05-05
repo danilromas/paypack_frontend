@@ -442,17 +442,6 @@ export function NewDealModal({
                   placeholder="Image URL (optional)"
                   className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
                 />
-
-                <div className="grid grid-cols-3 gap-3">
-                  {["Front", "Back", "Side"].map((label) => (
-                    <div
-                      key={label}
-                      className="aspect-square flex items-center justify-center rounded-lg border border-border bg-secondary text-xs text-muted-foreground transition-all hover:ring-1 hover:ring-primary"
-                    >
-                      {label}
-                    </div>
-                  ))}
-                </div>
               </div>
 
               {/* Правая колонка — форма */}

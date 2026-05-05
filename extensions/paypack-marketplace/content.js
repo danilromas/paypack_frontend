@@ -107,6 +107,19 @@ function pickListingTitle() {
   return "";
 }
 
+function getCardTitleFromAnchor(anchor) {
+  if (!anchor) return "";
+  const container = anchor.closest("a") || anchor;
+  const titleNode =
+    container.querySelector('span[style*="-webkit-line-clamp"]') ||
+    container.querySelector('span[dir="auto"]');
+  const t = titleNode?.innerText?.trim() || "";
+  if (!t || isGarbageTitle(t)) return "";
+  if (/^\d[\d\s\u00A0.,]*(MX\$|€|\$|USD|EUR|руб|₽|MXN)/i.test(t)) return "";
+  if (/reciente|недавно|recent/i.test(t.toLowerCase())) return "";
+  return t.slice(0, 400);
+}
+
 /** Убираем пробелы/неразрывные пробелы как разделители тысяч; запятая как десятичная только если после неё 1–2 цифры в конце */
 function parseMoneyToInt(raw) {
   if (!raw) return 0;
@@ -253,6 +266,20 @@ function extractListingPrice() {
   return extractListingPriceFromText(full.slice(0, 6000));
 }
 
+function extractPriceFromCard(anchor) {
+  if (!anchor) return 0;
+  const card = anchor.closest("a") || anchor;
+  const texts = card.querySelectorAll('span[dir="auto"]');
+  for (const node of texts) {
+    const t = node.innerText?.trim();
+    if (!t) continue;
+    if (!/(MX\$|MXN|€|EUR|USD|руб|₽)/i.test(t)) continue;
+    const n = extractListingPriceFromText(t);
+    if (n > 0) return n;
+  }
+  return 0;
+}
+
 /**
  * FB часто кладёт заголовок и текст в один блок — ищем по DOM (innerText начинается с метки).
  */
@@ -350,51 +377,94 @@ function normalizeDescription(text) {
     .slice(0, 2000);
 }
 
-function extractPrimaryImageUrl() {
+function extractCardSummary(anchor) {
+  if (!anchor) return "";
+  const card = anchor.closest("a") || anchor;
+  const chunks = [];
+  const nodes = card.querySelectorAll('span[dir="auto"]');
+  for (const node of nodes) {
+    const t = node.innerText?.trim();
+    if (!t) continue;
+    if (/^\d[\d\s\u00A0.,]*(MX\$|MXN|€|EUR|USD|руб|₽)/i.test(t)) continue;
+    if (/reciente|недавно|recent/i.test(t.toLowerCase())) continue;
+    if (isGarbageTitle(t)) continue;
+    if (t.length < 2 || t.length > 220) continue;
+    chunks.push(t);
+  }
+  const uniq = [...new Set(chunks)];
+  return normalizeDescription(uniq.slice(0, 4).join(". "));
+}
+
+function collectImageUrls(sourceEl) {
+  const urls = [];
+  const add = (u) => {
+    if (!u || !/^https?:\/\//i.test(u)) return;
+    if (/data:image/i.test(u)) return;
+    if (urls.includes(u)) return;
+    urls.push(u);
+  };
+
   const fromMeta =
     document.querySelector('meta[property="og:image"]')?.getAttribute("content") || "";
-  if (/^https?:\/\//i.test(fromMeta)) return fromMeta;
+  add(fromMeta);
+
+  if (sourceEl) {
+    const card = sourceEl.closest("a") || sourceEl;
+    for (const img of card.querySelectorAll("img")) {
+      add(img.getAttribute("src") || "");
+    }
+  }
 
   const main = document.querySelector('[role="main"]');
-  if (!main) return "";
-  const imgs = main.querySelectorAll("img");
-  for (const img of imgs) {
-    const src = img.getAttribute("src") || "";
-    if (!/^https?:\/\//i.test(src)) continue;
-    if (/data:image/i.test(src)) continue;
-    const alt = (img.getAttribute("alt") || "").toLowerCase();
-    if (alt.includes("profile") || alt.includes("avatar")) continue;
+  if (main) {
+    const imgs = main.querySelectorAll("img");
+    for (const img of imgs) {
+      const src = img.getAttribute("src") || "";
+      const alt = (img.getAttribute("alt") || "").toLowerCase();
+      if (alt.includes("profile") || alt.includes("avatar")) continue;
+      add(src);
+    }
+  }
+  return urls.slice(0, 1);
+}
+
+function extractPrimaryImageUrl(sourceEl) {
+  const urls = collectImageUrls(sourceEl);
+  for (const src of urls) {
+    if (!src) continue;
     return src;
   }
   return "";
 }
 
-function scrapeListing() {
-  const link = window.location.href;
-  const title = pickListingTitle();
+function scrapeListing(sourceEl) {
+  const link = sourceEl?.href || window.location.href;
+  const title = getCardTitleFromAnchor(sourceEl) || pickListingTitle();
 
   const main = document.querySelector('[role="main"]');
   const mainText = main?.innerText || "";
 
-  let price = extractListingPrice();
+  let price = extractPriceFromCard(sourceEl);
+  if (!price) price = extractListingPrice();
 
-  let desc = normalizeDescription(extractSellerDescription(mainText));
+  let desc = extractCardSummary(sourceEl);
+  if (!desc) desc = normalizeDescription(extractSellerDescription(mainText));
   if (!desc) {
     const og =
       document.querySelector('meta[property="og:description"]') ||
       document.querySelector('meta[name="description"]');
     desc = normalizeDescription(og?.getAttribute("content") || "");
   }
-  const image = extractPrimaryImageUrl();
+  const image = extractPrimaryImageUrl(sourceEl);
   return { title, link, price, desc, image };
 }
 
-function buildImportUrl(paypackOrigin) {
-  return PayPackUrlBuild.buildDashboardImportUrl(paypackOrigin, scrapeListing());
+function buildImportUrl(paypackOrigin, sourceEl) {
+  return PayPackUrlBuild.buildDashboardImportUrl(paypackOrigin, scrapeListing(sourceEl));
 }
 
-function rememberLastImport(paypackOrigin, importUrl) {
-  const snap = scrapeListing();
+function rememberLastImport(paypackOrigin, importUrl, sourceEl) {
+  const snap = scrapeListing(sourceEl);
   const payload = {
     at: Date.now(),
     paypackOrigin,
@@ -412,15 +482,15 @@ function rememberLastImport(paypackOrigin, importUrl) {
   }
 }
 
-function openPayPack(paypackOrigin) {
-  const url = buildImportUrl(paypackOrigin);
-  rememberLastImport(paypackOrigin, url);
+function openPayPack(paypackOrigin, sourceEl) {
+  const url = buildImportUrl(paypackOrigin, sourceEl);
+  rememberLastImport(paypackOrigin, url, sourceEl);
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-async function copyImportLink(paypackOrigin) {
-  const url = buildImportUrl(paypackOrigin);
-  rememberLastImport(paypackOrigin, url);
+async function copyImportLink(paypackOrigin, sourceEl) {
+  const url = buildImportUrl(paypackOrigin, sourceEl);
+  rememberLastImport(paypackOrigin, url, sourceEl);
   try {
     await navigator.clipboard.writeText(url);
     return true;
@@ -441,7 +511,7 @@ async function copyImportLink(paypackOrigin) {
   }
 }
 
-function createActionButton(paypackOrigin, compact) {
+function createActionButton(paypackOrigin, compact, sourceEl) {
   const resolvedOrigin = paypackOrigin || PayPackUrlBuild.DEFAULT_ORIGIN;
 
   const btn = document.createElement("button");
@@ -451,12 +521,12 @@ function createActionButton(paypackOrigin, compact) {
     : "paypack-mp-inline-btn";
   btn.title =
     "Open PayPack with this listing prefilled (title, price, description, image).";
-  btn.textContent = compact ? "PayPack" : "Open in PayPack";
+  btn.textContent = compact ? "Open in PayPack" : "Open in PayPack";
 
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    openPayPack(resolvedOrigin);
+    openPayPack(resolvedOrigin, sourceEl);
   });
   return btn;
 }
@@ -476,7 +546,7 @@ function injectButtonsIntoListings(settings) {
 
     const wrap = document.createElement("div");
     wrap.className = "paypack-mp-inline-wrap";
-    wrap.appendChild(createActionButton(paypackOrigin, true));
+    wrap.appendChild(createActionButton(paypackOrigin, true, a));
     card.appendChild(wrap);
   });
 
@@ -484,7 +554,7 @@ function injectButtonsIntoListings(settings) {
   if (main && !main.querySelector(".paypack-mp-listing-actions")) {
     const actionBar = document.createElement("div");
     actionBar.className = "paypack-mp-listing-actions";
-    actionBar.appendChild(createActionButton(paypackOrigin, false));
+    actionBar.appendChild(createActionButton(paypackOrigin, false, null));
     const copyBtn = document.createElement("button");
     copyBtn.type = "button";
     copyBtn.className = "paypack-mp-inline-btn paypack-mp-inline-btn--secondary";
@@ -492,7 +562,7 @@ function injectButtonsIntoListings(settings) {
     copyBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      void copyImportLink(paypackOrigin).then((ok) => {
+      void copyImportLink(paypackOrigin, null).then((ok) => {
         const prev = copyBtn.textContent;
         copyBtn.textContent = ok ? "Copied" : "Copy failed";
         setTimeout(() => {
