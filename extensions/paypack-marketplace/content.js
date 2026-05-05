@@ -549,30 +549,6 @@ function injectButtonsIntoListings(settings) {
     wrap.appendChild(createActionButton(paypackOrigin, true, a));
     card.appendChild(wrap);
   });
-
-  const main = document.querySelector('[role="main"]');
-  if (main && !main.querySelector(".paypack-mp-listing-actions")) {
-    const actionBar = document.createElement("div");
-    actionBar.className = "paypack-mp-listing-actions";
-    actionBar.appendChild(createActionButton(paypackOrigin, false, null));
-    const copyBtn = document.createElement("button");
-    copyBtn.type = "button";
-    copyBtn.className = "paypack-mp-inline-btn paypack-mp-inline-btn--secondary";
-    copyBtn.textContent = "Copy import link";
-    copyBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      void copyImportLink(paypackOrigin, null).then((ok) => {
-        const prev = copyBtn.textContent;
-        copyBtn.textContent = ok ? "Copied" : "Copy failed";
-        setTimeout(() => {
-          copyBtn.textContent = prev;
-        }, 1700);
-      });
-    });
-    actionBar.appendChild(copyBtn);
-    main.prepend(actionBar);
-  }
 }
 
 function applySettings(settings) {
