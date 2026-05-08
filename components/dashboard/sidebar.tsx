@@ -12,6 +12,7 @@ import {
   Bell,
   Wallet,
   LogOut,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +20,13 @@ const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: 3 },
   { href: "/dashboard/support", icon: HelpCircle, label: "Support" },
-  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   { href: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: 3 },
   { href: "/dashboard/wallet", icon: Wallet, label: "Wallet" },
+];
+
+const lowerNavItems = [
+  { href: "/dashboard/profile", icon: User, label: "Profile" },
+  { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   { href: "/admin", icon: ShieldCheck, label: "Admin" },
 ];
 
@@ -79,6 +84,27 @@ export function DashboardSidebar() {
           );
         })}
       </nav>
+
+      <div className="space-y-1 border-t border-sidebar-border px-4 py-3">
+        {lowerNavItems.map((item) => {
+          const isActive = pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all",
+                isActive
+                  ? "bg-sidebar-accent text-primary"
+                  : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+              )}
+            >
+              <item.icon className="h-5 w-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Logout */}
       <div className="border-t border-sidebar-border p-4">

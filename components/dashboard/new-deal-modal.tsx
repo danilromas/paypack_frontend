@@ -10,6 +10,7 @@ import {
   Copy,
   Share2,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "@/store/app-store";
@@ -569,6 +570,15 @@ export function NewDealModal({
             {submitError && (
               <p className="mb-3 text-left text-sm text-destructive">{submitError}</p>
             )}
+            <a
+              href="https://awallet.tech"
+              target="_blank"
+              rel="noreferrer"
+              className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#1b74e4]/30 bg-[#1b74e4]/10 py-3 text-sm font-semibold text-[#1b74e4] transition-all hover:bg-[#1b74e4]/15"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Pay via cryptotransfer aWallet
+            </a>
             <button
               type="button"
               onClick={handleCreateDeal}

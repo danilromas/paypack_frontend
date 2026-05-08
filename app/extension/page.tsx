@@ -59,7 +59,7 @@ export default function ExtensionPage() {
                 if you use another origin.
               </li>
               <li>
-                Open a Marketplace listing — use <em>Open in PayPack</em> or{" "}
+                Open a Marketplace listing — use <em>Buy in PayPack</em> or{" "}
                 <em>Copy import link</em>. See <code className="text-foreground">INSTALL.txt</code>{" "}
                 inside the ZIP for a short recap.
               </li>

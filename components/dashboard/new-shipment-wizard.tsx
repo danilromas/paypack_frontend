@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Loader2, X } from "lucide-react"
+import { Check, ExternalLink, Loader2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ShipmentPayload, ShipmentStatus } from "@/lib/shipments"
 
@@ -136,6 +136,15 @@ export function NewShipmentWizard({
 
         <div className="border-t border-border p-6">
           {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
+          <a
+            href="https://awallet.tech"
+            target="_blank"
+            rel="noreferrer"
+            className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#1b74e4]/30 bg-[#1b74e4]/10 py-3 text-sm font-semibold text-[#1b74e4] transition-all hover:bg-[#1b74e4]/15"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Оплатить через криптотрансфер aWallet
+          </a>
           <button
             onClick={handleSubmit}
             disabled={submitting}

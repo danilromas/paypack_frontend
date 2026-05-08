@@ -107,6 +107,29 @@ function pickListingTitle() {
   return "";
 }
 
+function titleFromListingPageStructure() {
+  const main = document.querySelector('[role="main"]');
+  if (!main) return "";
+  const selectors = [
+    'h1 span[dir="auto"]',
+    'h1',
+    '[role="main"] [role="heading"][aria-level="1"]',
+    '[role="main"] [role="heading"][aria-level="2"]',
+    '[role="main"] [data-testid] span[dir="auto"]',
+  ];
+  for (const sel of selectors) {
+    const nodes = main.querySelectorAll(sel);
+    for (const node of nodes) {
+      const t = node.innerText?.trim();
+      if (!t || t.length < 4 || t.length > 420) continue;
+      if (isGarbageTitle(t)) continue;
+      if (/^\d[\d\s\u00A0.,]*(MX\$|€|\$|USD|EUR|руб|₽|MXN)/i.test(t)) continue;
+      return t.slice(0, 400);
+    }
+  }
+  return "";
+}
+
 function getCardTitleFromAnchor(anchor) {
   if (!anchor) return "";
   const container = anchor.closest("a") || anchor;
@@ -264,6 +287,20 @@ function extractListingPrice() {
   n = extractListingPriceFromText(header);
   if (n > 0) return n;
   return extractListingPriceFromText(full.slice(0, 6000));
+}
+
+function extractListingPriceFromDom() {
+  const main = document.querySelector('[role="main"]');
+  if (!main) return 0;
+  const nodes = main.querySelectorAll('span[dir="auto"], div[dir="auto"], h1, h2');
+  for (const node of nodes) {
+    const t = node.innerText?.trim();
+    if (!t || t.length > 80) continue;
+    if (!/(MX\$|MXN|€|EUR|USD|руб|₽|\$)/i.test(t)) continue;
+    const n = extractListingPriceFromText(t);
+    if (n > 0 && n < 1e10) return n;
+  }
+  return 0;
 }
 
 function extractPriceFromCard(anchor) {
@@ -439,12 +476,16 @@ function extractPrimaryImageUrl(sourceEl) {
 
 function scrapeListing(sourceEl) {
   const link = sourceEl?.href || window.location.href;
-  const title = getCardTitleFromAnchor(sourceEl) || pickListingTitle();
+  const title =
+    getCardTitleFromAnchor(sourceEl) ||
+    titleFromListingPageStructure() ||
+    pickListingTitle();
 
   const main = document.querySelector('[role="main"]');
   const mainText = main?.innerText || "";
 
   let price = extractPriceFromCard(sourceEl);
+  if (!price) price = extractListingPriceFromDom();
   if (!price) price = extractListingPrice();
 
   let desc = extractCardSummary(sourceEl);
@@ -520,8 +561,8 @@ function createActionButton(paypackOrigin, compact, sourceEl) {
     ? "paypack-mp-inline-btn paypack-mp-inline-btn--compact"
     : "paypack-mp-inline-btn";
   btn.title =
-    "Open PayPack with this listing prefilled (title, price, description, image).";
-  btn.textContent = compact ? "Open in PayPack" : "Open in PayPack";
+    "Buy in PayPack with this listing prefilled (title, price, description, image).";
+  btn.textContent = compact ? "Buy in PayPack" : "Buy in PayPack";
 
   btn.addEventListener("click", (e) => {
     e.preventDefault();
@@ -531,29 +572,59 @@ function createActionButton(paypackOrigin, compact, sourceEl) {
   return btn;
 }
 
-function injectButtonsIntoListings(settings) {
+function isListingPage() {
+  return /\/marketplace\/item\//i.test(window.location.pathname || "");
+}
+
+function injectButtonIntoListingPage(settings) {
   const paypackOrigin =
     (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
+  if (!isListingPage()) return;
+  if (document.querySelector(".paypack-mp-inline-btn")) return;
 
-  const listingLinks = document.querySelectorAll('a[href*="/marketplace/item/"]');
-  listingLinks.forEach((a) => {
-    const card =
-      a.closest('[role="article"]') ||
-      a.closest('[data-testid]') ||
-      a.parentElement;
-    if (!card || !(card instanceof HTMLElement)) return;
-    if (card.querySelector(".paypack-mp-inline-btn")) return;
+  const listingAnchor = document.querySelector('a[href*="/marketplace/item/"]');
+  const sourceEl = listingAnchor || null;
+  const main = document.querySelector('[role="main"]');
+  if (!main) return;
 
-    const wrap = document.createElement("div");
-    wrap.className = "paypack-mp-inline-wrap";
-    wrap.appendChild(createActionButton(paypackOrigin, true, a));
-    card.appendChild(wrap);
-  });
+  const actionHostCandidates = [
+    '[role="main"] [aria-label*="Message" i]',
+    '[role="main"] [aria-label*="Send message" i]',
+    '[role="main"] [aria-label*="Купить" i]',
+    '[role="main"] [aria-label*="Buy" i]',
+  ];
+
+  let anchorNode = null;
+  for (const sel of actionHostCandidates) {
+    const n = document.querySelector(sel);
+    if (n) {
+      anchorNode = n;
+      break;
+    }
+  }
+
+  let host = null;
+  if (anchorNode) {
+    host =
+      anchorNode.closest('[role="group"]') ||
+      anchorNode.closest("div");
+  }
+  if (!host) {
+    host =
+      main.querySelector("h1")?.parentElement ||
+      main.firstElementChild;
+  }
+  if (!host) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "paypack-mp-inline-wrap";
+  wrap.appendChild(createActionButton(paypackOrigin, false, sourceEl));
+  host.appendChild(wrap);
 }
 
 function applySettings(settings) {
   if (!settings || settings.showFab === false) return;
-  injectButtonsIntoListings(settings);
+  injectButtonIntoListingPage(settings);
 }
 
 function bootstrap() {

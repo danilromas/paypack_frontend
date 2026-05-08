@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Menu, Wallet, User } from "lucide-react"
+import { Bell, Menu, Wallet } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -66,9 +66,10 @@ export function DashboardHeader() {
                 { href: "/dashboard/shipments", label: "Shipments" },
                 { href: "/dashboard/chats", label: "Chats" },
                 { href: "/dashboard/support", label: "Support" },
-                { href: "/dashboard/settings", label: "Settings" },
                 { href: "/dashboard/notifications", label: "Notifications" },
                 { href: "/dashboard/wallet", label: "Wallet" },
+                { href: "/dashboard/profile", label: "Profile" },
+                { href: "/dashboard/settings", label: "Settings" },
                 { href: "/admin", label: "Admin" },
               ].map((item) => (
                 <SheetClose key={item.href} asChild>
@@ -256,77 +257,23 @@ export function DashboardHeader() {
         </Dialog>
 
         {/* Profile */}
-        <Dialog>
-          <DialogTrigger asChild>
-            <button className="flex items-center gap-3 rounded-full border border-transparent px-1 py-1 text-inherit transition-colors hover:opacity-90">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-white/20 text-inherit text-sm font-bold">
-                  JD
-                </AvatarFallback>
-              </Avatar>
-              <div className="hidden flex-col text-left text-xs sm:flex [color:inherit]">
-                <span className="font-semibold">
-                  John Doe
-                </span>
-                <span className="text-[10px] opacity-80">
-                  Premium user
-                </span>
-              </div>
-            </button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto">
-            <DialogHeader className="space-y-1">
-              <DialogTitle className="text-base">Profile</DialogTitle>
-              <DialogDescription className="text-xs">
-                Account details and security settings.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="mt-4 space-y-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-12 w-12">
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-base font-bold text-primary-foreground">
-                    JD
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold text-foreground">
-                      John Doe
-                    </div>
-                    <Badge variant="secondary" className="text-[10px]">
-                      Premium
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    john.doe@example.com
-                  </div>
-                </div>
-              </div>
-              <Separator />
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Verification</span>
-                  <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
-                    KYC Passed
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">2FA</span>
-                  <span className="text-xs text-foreground">Enabled</span>
-                </div>
-              </div>
-              <Separator />
-              <div className="flex flex-col gap-4">
-                <Button className="w-full" variant="outline">
-                  View settings
-                </Button>
-                <Button className="w-full" variant="destructive">
-                  Logout
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Link href="/dashboard/profile" aria-label="Open profile">
+          <span className="flex items-center gap-3 rounded-full border border-transparent px-1 py-1 text-inherit transition-colors hover:opacity-90">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="bg-white/20 text-inherit text-sm font-bold">
+                JD
+              </AvatarFallback>
+            </Avatar>
+            <span className="hidden flex-col text-left text-xs sm:flex [color:inherit]">
+              <span className="font-semibold">
+                John Doe
+              </span>
+              <span className="text-[10px] opacity-80">
+                Premium user
+              </span>
+            </span>
+          </span>
+        </Link>
       </div>
     </header>
   )
