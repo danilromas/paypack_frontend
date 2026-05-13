@@ -387,6 +387,8 @@ function extractListingPriceFromText(headerText) {
       [/(?:USD)\s*(\d[\d\s\u00A0.,]*)/gi, 1],
       [/(\d[\d\s\u00A0.,]*)\s*(?:руб|₽|RUB|rub)(?=\s|$|[^\w])/gi, 1],
       [/(?:руб|₽|RUB|rub)\s*(\d[\d\s\u00A0.,]*)/gi, 1],
+      [/\$\s*(\d[\d\s\u00A0.,]*)/gi, 1],
+      [/(\d[\d\s\u00A0.,]*)\s*\$/gi, 1],
     ];
     for (const [re, g] of patterns) {
       re.lastIndex = 0;
@@ -439,7 +441,7 @@ function extractPriceFromCard(anchor) {
   for (const node of texts) {
     const t = node.innerText?.trim();
     if (!t) continue;
-    if (!/(MX\$|MXN|€|EUR|USD|руб|₽)/i.test(t)) continue;
+    if (!/(MX\$|MXN|€|EUR|USD|руб|₽|\$)/i.test(t)) continue;
     const n = extractListingPriceFromText(t);
     if (n > 0) return n;
   }
