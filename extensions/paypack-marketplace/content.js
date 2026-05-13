@@ -16,10 +16,14 @@ function ppWarn(...args) {
 let ppInjectScheduled = false;
 let ppLastRunAt = 0;
 let ppMutationTimer = null;
+let ppListingWatchInterval = null;
 let ppLastUrl = "";
 let ppUrlInjectAttempts = 0;
 const PP_RUN_COOLDOWN_MS = 1200;
-const PP_MAX_ATTEMPTS_PER_URL = 6;
+const PP_MAX_ATTEMPTS_PER_URL = 40;
+const PP_SHADOW_HOST_ID = "paypack-mp-shadow-host";
+const MESSAGE_ACTION_LABEL =
+  /send|message|contact seller|enviar|mensaje|отправ|сообщ|написать|seller/i;
 
 function resetUrlAttemptsIfNeeded() {
   const nowUrl = window.location.href;
@@ -641,55 +645,322 @@ function createNativeComposerButton(sendButton, paypackOrigin, sourceEl) {
 }
 
 function isListingPage() {
-  return /\/marketplace\/item\//i.test(window.location.pathname || "");
+  return /\/marketplace\/item\/\d+/i.test(window.location.pathname || "");
+}
+
+function extractListingIdFromPath(pathname) {
+  const match = String(pathname || "").match(/\/marketplace\/item\/(\d+)/i);
+  return match ? match[1] : "";
+}
+
+function extractListingIdFromHref(href) {
+  const match = String(href || "").match(/\/marketplace\/item\/(\d+)/i);
+  return match ? match[1] : "";
+}
+
+function getListingRoots() {
+  const roots = [];
+  const seen = new Set();
+  const add = (el) => {
+    if (!el || seen.has(el)) return;
+    seen.add(el);
+    roots.push(el);
+  };
+
+  add(document.querySelector('[role="main"]'));
+  for (const dialog of document.querySelectorAll('[role="dialog"]')) add(dialog);
+  for (const modal of document.querySelectorAll('[aria-modal="true"]')) add(modal);
+  return roots;
+}
+
+function getButtonLabelText(btn) {
+  const text = (btn?.textContent || "").trim();
+  if (text) return text;
+  return (
+    btn?.getAttribute("aria-label") ||
+    btn?.getAttribute("title") ||
+    ""
+  ).trim();
+}
+
+function isMessageActionButton(btn) {
+  if (!btn) return false;
+  const hay = getButtonLabelText(btn).toLowerCase();
+  if (!hay) return false;
+  if (/buy in paypack/.test(hay)) return false;
+  return MESSAGE_ACTION_LABEL.test(hay);
+}
+
+function hasListingSellerComposer(root) {
+  if (!root) return false;
+  const textbox =
+    root.querySelector("textarea") ||
+    root.querySelector('[contenteditable="true"]') ||
+    root.querySelector('[role="textbox"]');
+  if (!textbox || !isVisibleElement(textbox)) return false;
+  const textboxRect = textbox.getBoundingClientRect();
+  if (textboxRect.left < window.innerWidth * 0.25) return false;
+
+  for (const btn of root.querySelectorAll('[role="button"], button')) {
+    if (!isVisibleElement(btn)) continue;
+    if (isMessageActionButton(btn)) return true;
+  }
+  return false;
+}
+
+function isListingDetailView() {
+  if (isListingPage()) return true;
+
+  for (const root of getListingRoots()) {
+    if (hasListingSellerComposer(root)) return true;
+  }
+
+  const title = pickListingTitle() || titleFromListingPageStructure();
+  const price =
+    extractListingPriceFromDom() ||
+    extractPriceFromMeta() ||
+    extractListingPrice();
+  return price > 0 && !!title && !isGarbageTitle(title);
+}
+
+function isMarketplaceContext() {
+  return /\/marketplace\//i.test(window.location.pathname || "");
+}
+
+function shouldShowListingOverlay() {
+  if (!isMarketplaceContext()) return false;
+  if (isListingPage()) return true;
+  if (/marketplace\s*[·—-]\s+/i.test(document.title || "")) return true;
+  return isListingDetailView();
+}
+
+function hideListingOverlay() {
+  const host = document.getElementById(PP_SHADOW_HOST_ID);
+  if (host) host.style.display = "none";
+}
+
+function syncFacebookOverlayTheme(host) {
+  if (!host) return;
+  const dark = document.documentElement.classList.contains("__fb-dark-mode");
+  host.setAttribute("data-theme", dark ? "dark" : "light");
+}
+
+function applyShadowListingOverlayStyles(shadow) {
+  if (!shadow) return;
+  let style = shadow.querySelector("style");
+  if (!style) {
+    style = document.createElement("style");
+    shadow.prepend(style);
+  }
+  style.textContent = `
+    :host {
+      all: initial;
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 2147483647;
+      pointer-events: auto;
+      display: block;
+      font-family: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+    .wrap {
+      display: flex;
+      align-items: stretch;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #d0d3d7;
+      border-radius: 8px;
+      background: #f0f2f5;
+      color: #050505;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 18px;
+      min-height: 36px;
+      padding: 8px 12px;
+      box-shadow: none;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .btn:hover {
+      background: #e4e6eb;
+      border-color: #c9ccd1;
+    }
+    .btn:active { background: #d8dadf; }
+    .btn:focus-visible {
+      outline: 2px solid rgba(8, 102, 255, 0.35);
+      outline-offset: 2px;
+    }
+    :host([data-theme="dark"]) .btn {
+      background: rgba(58, 59, 60, 0.92);
+      color: #e4e6eb;
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+    :host([data-theme="dark"]) .btn:hover {
+      background: rgba(72, 73, 75, 0.96);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+  `;
+}
+
+function ensureShadowListingOverlay(paypackOrigin) {
+  const resolvedOrigin = paypackOrigin || PayPackUrlBuild.DEFAULT_ORIGIN;
+  let host = document.getElementById(PP_SHADOW_HOST_ID);
+  if (!host) {
+    host = document.createElement("div");
+    host.id = PP_SHADOW_HOST_ID;
+    host.setAttribute("data-paypack-placement", "listing-page-shadow");
+    const shadow = host.attachShadow({ mode: "open" });
+    applyShadowListingOverlayStyles(shadow);
+    const wrap = document.createElement("div");
+    wrap.className = "wrap";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = "Buy in PayPack";
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const origin = host.dataset.paypackOrigin || PayPackUrlBuild.DEFAULT_ORIGIN;
+      openPayPack(origin, getActiveListingAnchor());
+    });
+
+    wrap.appendChild(btn);
+    shadow.appendChild(wrap);
+    document.documentElement.appendChild(host);
+  } else {
+    applyShadowListingOverlayStyles(host.shadowRoot);
+    host.shadowRoot?.querySelector(".badge")?.remove();
+  }
+
+  syncFacebookOverlayTheme(host);
+  host.dataset.paypackOrigin = resolvedOrigin;
+  host.style.display = "block";
+  return host;
+}
+
+function getActiveListingAnchor() {
+  const idFromPath = extractListingIdFromPath(window.location.pathname);
+  const selectById = (id) => {
+    if (!id) return null;
+    for (const root of getListingRoots()) {
+      const link = root.querySelector(`a[href*="/marketplace/item/${id}"]`);
+      if (link instanceof HTMLAnchorElement) return link;
+    }
+    const fallback = document.querySelector(`a[href*="/marketplace/item/${id}"]`);
+    return fallback instanceof HTMLAnchorElement ? fallback : null;
+  };
+
+  if (idFromPath) {
+    const byId = selectById(idFromPath);
+    if (byId) return byId;
+  }
+
+  for (const root of getListingRoots()) {
+    for (const link of root.querySelectorAll('a[href*="/marketplace/item/"]')) {
+      if (!(link instanceof HTMLAnchorElement)) continue;
+      const rect = link.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) continue;
+      const id = extractListingIdFromHref(link.href);
+      if (!id) continue;
+      if (idFromPath && id !== idFromPath) continue;
+      return link;
+    }
+  }
+  return null;
+}
+
+function hasVisibleListingPayPackButton() {
+  const shadowHost = document.getElementById(PP_SHADOW_HOST_ID);
+  return !!(shadowHost && shadowHost.style.display !== "none");
+}
+
+function removeListingPayPackButtons(scope) {
+  const root = scope || document;
+  for (const el of root.querySelectorAll(".paypack-mp-native-btn")) {
+    el.remove();
+  }
+  for (const el of root.querySelectorAll(
+    '.paypack-mp-inline-wrap[data-paypack-placement="listing-page"]',
+  )) {
+    el.remove();
+  }
+  document.getElementById("paypack-mp-listing-fab")?.remove();
+}
+
+function createListingButtonWrap(paypackOrigin, sourceEl) {
+  const wrap = document.createElement("div");
+  wrap.className = "paypack-mp-inline-wrap paypack-mp-listing-actions";
+  wrap.setAttribute("data-paypack-placement", "listing-page");
+  wrap.appendChild(createActionButton(paypackOrigin, false, sourceEl));
+  return wrap;
+}
+
+function injectInlineListingButton(host, paypackOrigin, sourceEl, beforeNode) {
+  const wrap = createListingButtonWrap(paypackOrigin, sourceEl);
+  if (beforeNode?.parentElement) {
+    beforeNode.parentElement.insertBefore(wrap, beforeNode);
+    return wrap;
+  }
+  host.appendChild(wrap);
+  return wrap;
+}
+
+function ensureListingFab(paypackOrigin, sourceEl) {
+  let host = document.getElementById("paypack-mp-listing-fab");
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = "paypack-mp-listing-fab";
+  host.className = "paypack-mp-listing-fab";
+  host.setAttribute("data-paypack-placement", "listing-page");
+  host.appendChild(createActionButton(paypackOrigin, false, sourceEl));
+  document.body.appendChild(host);
+  return host;
 }
 
 function isActionButtonLike(el) {
-  if (!el) return false;
-  const t = (el.textContent || "").trim().toLowerCase();
-  if (!t) return false;
-  return (
-    t === "send" ||
-    t === "send message" ||
-    t === "message" ||
-    t === "contact seller" ||
-    t === "enviar" ||
-    t === "enviar mensaje" ||
-    t === "отправить" ||
-    t === "сообщение" ||
-    t === "написать"
-  );
+  return isMessageActionButton(el);
 }
 
 function isSendButtonLike(el) {
-  if (!el) return false;
-  const t = (el.textContent || "").trim().toLowerCase();
-  if (!t) return false;
-  return (
-    t === "send" ||
-    t === "send message" ||
-    t === "отправить" ||
-    t === "enviar" ||
-    t === "enviar mensaje"
-  );
+  return isMessageActionButton(el);
 }
 
-function findListingActionAnchor(main) {
+function findListingActionAnchor(root) {
+  if (!root) return null;
   const strictSelectors = [
-    '[role="main"] [aria-label*="Send" i]',
-    '[role="main"] [aria-label*="Message" i]',
-    '[role="main"] [aria-label*="Contact seller" i]',
-    '[role="main"] [aria-label*="Отправить" i]',
-    '[role="main"] [aria-label*="Сообщение" i]',
+    '[aria-label*="Send" i]',
+    '[aria-label*="Message" i]',
+    '[aria-label*="Contact seller" i]',
+    '[aria-label*="Enviar" i]',
+    '[aria-label*="Mensaje" i]',
+    '[aria-label*="Отправить" i]',
+    '[aria-label*="Сообщение" i]',
+    '[aria-label*="Написать" i]',
   ];
   for (const sel of strictSelectors) {
-    const n = document.querySelector(sel);
-    if (n) return n;
+    const nodes = root.querySelectorAll(sel);
+    let best = null;
+    let bestScore = -Infinity;
+    for (const node of nodes) {
+      if (!isVisibleElement(node)) continue;
+      const rect = node.getBoundingClientRect();
+      const score = rect.left * 2 + rect.top;
+      if (score > bestScore) {
+        bestScore = score;
+        best = node;
+      }
+    }
+    if (best) return best;
   }
 
-  const buttonLikes = main.querySelectorAll('[role="button"], button, a[role="button"]');
+  const buttonLikes = root.querySelectorAll('[role="button"], button, a[role="button"]');
   for (const el of buttonLikes) {
-    if (isActionButtonLike(el)) return el;
+    if (isMessageActionButton(el)) return el;
   }
   return null;
 }
@@ -739,7 +1010,19 @@ function findMessageComposerHost(main) {
 function isVisibleElement(el) {
   if (!el || !el.isConnected) return false;
   const rect = el.getBoundingClientRect();
-  return rect.width > 2 && rect.height > 2;
+  if (rect.width < 2 || rect.height < 2) return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  if (Number(style.opacity) === 0) return false;
+  return true;
+}
+
+function isListingPayPackButtonVisible(el) {
+  if (!isVisibleElement(el)) return false;
+  const rect = el.getBoundingClientRect();
+  if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
+  if (rect.right < 0 || rect.left > window.innerWidth) return false;
+  return true;
 }
 
 function removeAllPayPackButtons(scope) {
@@ -775,10 +1058,7 @@ function getComposerContext(main) {
     const localButtons = container.querySelectorAll('button, [role="button"]');
     for (const btn of localButtons) {
       if (!isVisibleElement(btn)) continue;
-      const t = (btn.textContent || "").trim().toLowerCase();
-      if (!t) continue;
-      if (/buy in paypack/.test(t)) continue;
-      if (/send|message|enviar|mensaje|отправ|сообщ|написать/.test(t)) {
+      if (isMessageActionButton(btn)) {
         sendButton = btn;
         break;
       }
@@ -793,9 +1073,9 @@ function getComposerContext(main) {
       for (const btn of candidates) {
         if (!isVisibleElement(btn)) continue;
         const bRect = btn.getBoundingClientRect();
-        if (bRect.top < tRect.top) continue;
-        if (bRect.left < window.innerWidth * 0.52) continue;
-        if (bRect.width < 100 || bRect.height < 28) continue;
+        if (bRect.top < tRect.top - 4) continue;
+        if (bRect.left < window.innerWidth * 0.45) continue;
+        if (bRect.width < 56 || bRect.height < 24) continue;
         const score = bRect.top - tRect.top - Math.abs(bRect.left - tRect.left) * 0.1;
         if (score > bestScore) {
           bestScore = score;
@@ -813,91 +1093,63 @@ function getComposerContext(main) {
   return null;
 }
 
+function resolveListingComposer(preferredRoot) {
+  const roots = [];
+  const seen = new Set();
+  const add = (root) => {
+    if (!root || seen.has(root)) return;
+    seen.add(root);
+    roots.push(root);
+  };
+  add(preferredRoot);
+  for (const root of getListingRoots()) add(root);
+
+  for (const root of roots) {
+    const composerContext = getComposerContext(root);
+    if (composerContext?.host && composerContext?.sendButton) {
+      return composerContext;
+    }
+
+    const composerHost = findMessageComposerHost(root);
+    if (composerHost?.host && composerHost?.anchor) {
+      return { host: composerHost.host, sendButton: composerHost.anchor };
+    }
+
+    const actionAnchor = findListingActionAnchor(root);
+    if (actionAnchor) {
+      const sendButton =
+        actionAnchor.matches('[role="button"], button, a[role="button"]')
+          ? actionAnchor
+          : actionAnchor.querySelector('[role="button"], button, a[role="button"]');
+      if (sendButton) {
+        return { host: sendButton.parentElement || actionAnchor, sendButton };
+      }
+    }
+  }
+
+  return null;
+}
+
 function injectButtonIntoListingPage(settings) {
   resetUrlAttemptsIfNeeded();
-  if (ppUrlInjectAttempts >= PP_MAX_ATTEMPTS_PER_URL) {
-    ppWarn("skip: max attempts reached for url", {
-      attempts: ppUrlInjectAttempts,
-      url: window.location.href,
-    });
+  if (!shouldShowListingOverlay()) {
+    ppLog("skip: not listing detail view");
     return;
   }
-  ppUrlInjectAttempts += 1;
 
   const paypackOrigin =
     (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
-  ppLog("injectButtonIntoListingPage:start", {
-    href: window.location.href,
-    path: window.location.pathname,
-    isListing: isListingPage(),
-    paypackOrigin,
-    hasSettings: !!settings,
-  });
-  if (!isListingPage()) {
-    ppLog("skip: not listing page");
-    return;
+  for (const root of getListingRoots()) {
+    removeListingPayPackButtons(root);
   }
-
-  const sourceEl = null;
-  const main = document.querySelector('[role="main"]');
-  ppLog("dom probes", {
-    listingAnchorFound: !!listingAnchor,
-    mainFound: !!main,
-  });
-  if (!main) {
-    ppWarn("skip: [role=main] not found");
-    return;
-  }
-
-  const composerContext = getComposerContext(main);
-  ppLog("anchor probes", {
-    composerFound: !!composerContext,
-    sendFound: !!composerContext?.sendButton,
-    sendText: composerContext?.sendButton
-      ? (composerContext.sendButton.textContent || "").trim()
-      : "",
-  });
-
-  const host = composerContext?.host || null;
-  ppLog("host probe", {
-    hostFound: !!host,
-    hostTag: host?.tagName || null,
-    hostClass: host?.className || null,
-  });
-  if (!host) {
-    ppLog("skip: host not found");
-    return;
-  }
-
-  const sendButton = composerContext?.sendButton || null;
-  if (!sendButton) {
-    ppLog("skip: send button not found");
-    return;
-  }
-
-  if (!sendButton.parentElement) {
-    ppLog("skip: send container invalid");
-    return;
-  }
-
-  const sibling = sendButton.previousElementSibling;
-  if (sibling && sibling.classList?.contains("paypack-mp-native-btn") && isVisibleElement(sibling)) {
-    ppLog("skip: native button already placed near send");
-    return;
-  }
-
-  removeAllPayPackButtons(main);
-  const nativeBtn = createNativeComposerButton(sendButton, paypackOrigin, sourceEl);
-  sendButton.parentElement.insertBefore(nativeBtn, sendButton);
-  ppLog("injected: native button before send");
-  ppLog("post-check", {
-    totalButtons: document.querySelectorAll(".paypack-mp-inline-btn").length,
-    totalWraps: document.querySelectorAll(".paypack-mp-inline-wrap").length,
-    totalNativeButtons: document.querySelectorAll(".paypack-mp-native-btn").length,
-  });
+  ensureShadowListingOverlay(paypackOrigin);
+  ppUrlInjectAttempts = 0;
+  ppLog("injected: listing shadow button");
 }
 
 function injectButtonsIntoFeedBlocks(settings) {
+  if (shouldShowListingOverlay()) return;
+
   const paypackOrigin =
     (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
 
@@ -920,26 +1172,57 @@ function injectButtonsIntoFeedBlocks(settings) {
 
 function applySettings(settings) {
   injectButtonsIntoFeedBlocks(settings);
+  if (shouldShowListingOverlay()) {
+    if (settings?.showFab !== false) {
+      injectButtonIntoListingPage(settings);
+    } else {
+      hideListingOverlay();
+      for (const root of getListingRoots()) {
+        removeListingPayPackButtons(root);
+      }
+    }
+  } else {
+    hideListingOverlay();
+  }
 }
 
-function scheduleApplySettings(defaults, reason) {
+function scheduleApplySettings(defaults, reason, force = false) {
   if (ppInjectScheduled) return;
   const now = Date.now();
-  if (now - ppLastRunAt < PP_RUN_COOLDOWN_MS) return;
+  const listingPending =
+    shouldShowListingOverlay() && !hasVisibleListingPayPackButton();
+  if (!force && !listingPending && now - ppLastRunAt < PP_RUN_COOLDOWN_MS) return;
   ppInjectScheduled = true;
   ppLastRunAt = now;
   setTimeout(() => {
     ppInjectScheduled = false;
     if (typeof chrome !== "undefined" && chrome.storage?.sync) {
       chrome.storage.sync.get(defaults, (sync) => {
-        ppLog("scheduled apply", { reason });
+        ppLog("scheduled apply", { reason, force });
         applySettings(sync);
       });
     } else {
-      ppLog("scheduled apply defaults", { reason });
+      ppLog("scheduled apply defaults", { reason, force });
       applySettings(defaults);
     }
   }, 100);
+}
+
+function hookSpaNavigation(onNavigate) {
+  const notify = () => onNavigate();
+  window.addEventListener("popstate", notify);
+  const wrap = (original) =>
+    function (...args) {
+      const result = original.apply(this, args);
+      notify();
+      return result;
+    };
+  try {
+    history.pushState = wrap(history.pushState);
+    history.replaceState = wrap(history.replaceState);
+  } catch {
+    // ignore
+  }
 }
 
 function bootstrap() {
@@ -976,7 +1259,21 @@ function bootstrap() {
     }, 350);
   });
   obs.observe(document.documentElement, { childList: true, subtree: true });
+  hookSpaNavigation(() => scheduleApplySettings(defaults, "spa-nav", true));
+  startListingWatch(defaults);
   ppLog("bootstrap:observer attached");
+}
+
+function startListingWatch(defaults) {
+  if (ppListingWatchInterval) return;
+  ppListingWatchInterval = window.setInterval(() => {
+    if (!shouldShowListingOverlay()) {
+      hideListingOverlay();
+      return;
+    }
+    if (hasVisibleListingPayPackButton()) return;
+    scheduleApplySettings(defaults, "listing-watch", true);
+  }, 1500);
 }
 
 if (document.readyState === "loading") {

@@ -90,11 +90,3 @@
   width: 100%;
   min-height: 40px;
 }
-
-.paypack-mp-listing-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-  align-items: center;
-}

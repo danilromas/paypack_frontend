@@ -17,6 +17,16 @@ export async function GET() {
     )
   }
 
+  let extensionVersion = "0.4.0"
+  try {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(extDir, "manifest.json"), "utf8"),
+    ) as { version?: string }
+    if (manifest.version) extensionVersion = manifest.version
+  } catch {
+    // keep fallback version
+  }
+
   const pass = new PassThrough()
   const archive = archiver("zip", { zlib: { level: 9 } })
   archive.on("error", (err) => pass.destroy(err))
@@ -37,8 +47,7 @@ export async function GET() {
   return new NextResponse(webStream, {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition":
-        'attachment; filename="paypack-marketplace-extension.zip"',
+      "Content-Disposition": `attachment; filename="paypack-marketplace-extension-${extensionVersion}.zip"`,
       "Cache-Control": "no-store",
     },
   })

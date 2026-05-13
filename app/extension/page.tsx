@@ -1,7 +1,23 @@
 import Link from "next/link"
+import path from "path"
+import { readFileSync } from "fs"
 import { LandingHeader } from "@/components/landing/header"
 import { LandingFooter } from "@/components/landing/footer"
 import { Download, Puzzle, Settings2, MousePointerClick, Copy } from "lucide-react"
+
+function getExtensionVersion() {
+  try {
+    const manifestPath = path.join(
+      process.cwd(),
+      "extensions",
+      "paypack-marketplace",
+      "manifest.json",
+    )
+    return JSON.parse(readFileSync(manifestPath, "utf8")).version as string
+  } catch {
+    return "0.4.0"
+  }
+}
 
 export const metadata = {
   title: "Browser extension | PayPack",
@@ -10,6 +26,8 @@ export const metadata = {
 }
 
 export default function ExtensionPage() {
+  const extensionVersion = getExtensionVersion()
+
   return (
     <div className="min-h-screen bg-background">
       <LandingHeader />
@@ -33,7 +51,7 @@ export default function ExtensionPage() {
           className="mb-8 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 py-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-secondary/60 sm:text-base"
         >
           <Download className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-          Download ZIP (paypack-marketplace-extension.zip)
+          Download v{extensionVersion} (paypack-marketplace-extension.zip)
         </a>
 
         <div className="max-w-none space-y-8 text-foreground">
@@ -67,7 +85,9 @@ export default function ExtensionPage() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-foreground">What it does (v0.2)</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              What it does (v{extensionVersion})
+            </h2>
             <ul className="mt-3 space-y-3 text-sm text-muted-foreground">
               <li className="flex gap-3">
                 <MousePointerClick className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
