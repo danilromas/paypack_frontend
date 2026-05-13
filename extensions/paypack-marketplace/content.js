@@ -281,16 +281,18 @@ function extractPriceFromJsonLd() {
 function extractListingPriceFromText(headerText) {
   const tryPatterns = (text) => {
     const patterns = [
-      [/(\d[\d\s\u00A0.,]*)\s*MX\$/gi, 1],
-      [/MX\$\s*(\d[\d\s\u00A0.,]*)/gi, 1],
-      [/(\d[\d\s\u00A0.,]*)\s*MXN\b/gi, 1],
-      [/MXN\s*(\d[\d\s\u00A0.,]*)/gi, 1],
-      [/(\d[\d\s\u00A0.,]*)\s*(€|EUR|eur)\b/gi, 1],
-      [/(€|EUR|eur)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
-      [/(\d[\d\s\u00A0.,]*)\s*(USD)\b/gi, 1],
-      [/(USD)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
-      [/(\d[\d\s\u00A0.,]*)\s*(руб|₽|RUB|rub)\b/gi, 1],
-      [/(руб|₽|RUB|rub)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
+      [/(\d[\d \u00A0.,]*)\s*MX\$/gi, 1],
+      [/MX\$\s*(\d[\d \u00A0.,]*)/gi, 1],
+      [/(\d[\d \u00A0.,]*)\s*MXN\b/gi, 1],
+      [/MXN\s*(\d[\d \u00A0.,]*)/gi, 1],
+      [/(\d[\d \u00A0.,]*)\s*(€|EUR|eur)\b/gi, 1],
+      [/(€|EUR|eur)\s*(\d[\d \u00A0.,]*)/gi, 2],
+      [/(\d[\d \u00A0.,]*)\s*(USD)\b/gi, 1],
+      [/(USD)\s*(\d[\d \u00A0.,]*)/gi, 2],
+      [/(\d[\d \u00A0.,]*)\s*(руб|₽|RUB|rub)\b/gi, 1],
+      [/(руб|₽|RUB|rub)\s*(\d[\d \u00A0.,]*)/gi, 2],
+      [/\$\s*(\d[\d \u00A0.,]*)/gi, 1],
+      [/(\d[\d \u00A0.,]*)\s*\$/gi, 1],
     ];
     for (const [re, g] of patterns) {
       re.lastIndex = 0;
@@ -341,7 +343,7 @@ function extractPriceFromCard(anchor) {
   for (const node of texts) {
     const t = node.innerText?.trim();
     if (!t) continue;
-    if (!/(MX\$|MXN|€|EUR|USD|руб|₽)/i.test(t)) continue;
+    if (!/(MX\$|MXN|€|EUR|USD|руб|₽|\$)/i.test(t)) continue;
     const n = extractListingPriceFromText(t);
     if (n > 0) return n;
   }
