@@ -8,7 +8,7 @@
   padding: 8px 14px;
 
   border-radius: 8px;
-  border: 1px solid #1b74e4;
+  border: 1px solid #22a559;
 
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
@@ -17,7 +17,7 @@
   letter-spacing: 0.01em;
 
   color: #ffffff;
-  background: #1b74e4;
+  background: #22a559;
 
   cursor: pointer;
   user-select: none;
@@ -31,17 +31,17 @@
 }
 
 .paypack-mp-inline-btn:hover {
-  background: #1666c5;
-  border-color: #1666c5;
+  background: #1d8f4d;
+  border-color: #1d8f4d;
   color: #ffffff;
 }
 
 .paypack-mp-inline-btn:active {
-  background: #1257a6;
+  background: #187642;
 }
 
 .paypack-mp-inline-btn:focus-visible {
-  outline: 2px solid rgba(27, 116, 228, 0.45);
+  outline: 2px solid rgba(34, 165, 89, 0.45);
   outline-offset: 2px;
 }
 
@@ -75,13 +75,20 @@
 
 .paypack-mp-inline-wrap {
   margin-top: 8px;
+  margin-left: 0;
   display: flex;
   gap: 6px;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: stretch;
   position: relative;
   top: 0;
   opacity: 1;
+  width: 100%;
+}
+
+.paypack-mp-inline-wrap .paypack-mp-inline-btn {
+  width: 100%;
+  min-height: 40px;
 }
 
 .paypack-mp-listing-actions {

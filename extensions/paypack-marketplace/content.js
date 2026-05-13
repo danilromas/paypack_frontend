@@ -2,6 +2,33 @@
  * PayPack Marketplace — floating actions + dashboard import.
  * Site URL and FAB visibility: extension icon → popup.
  */
+const PP_DEBUG = false;
+function ppLog(...args) {
+  if (!PP_DEBUG) return;
+  console.log("[PayPackExt]", ...args);
+}
+
+function ppWarn(...args) {
+  if (!PP_DEBUG) return;
+  console.log("[PayPackExt]", ...args);
+}
+
+let ppInjectScheduled = false;
+let ppLastRunAt = 0;
+let ppMutationTimer = null;
+let ppLastUrl = "";
+let ppUrlInjectAttempts = 0;
+const PP_RUN_COOLDOWN_MS = 1200;
+const PP_MAX_ATTEMPTS_PER_URL = 6;
+
+function resetUrlAttemptsIfNeeded() {
+  const nowUrl = window.location.href;
+  if (nowUrl !== ppLastUrl) {
+    ppLastUrl = nowUrl;
+    ppUrlInjectAttempts = 0;
+    ppLog("url changed, reset attempts", { nowUrl });
+  }
+}
 
 /** Служебные заголовки страницы FB — не использовать как название товара */
 const GARBAGE_TITLES = new Set([
@@ -572,62 +599,354 @@ function createActionButton(paypackOrigin, compact, sourceEl) {
   return btn;
 }
 
+function createNativeComposerButton(sendButton, paypackOrigin, sourceEl) {
+  const resolvedOrigin = paypackOrigin || PayPackUrlBuild.DEFAULT_ORIGIN;
+  const clone = sendButton.cloneNode(true);
+  clone.classList.add("paypack-mp-native-btn");
+  clone.removeAttribute?.("id");
+  clone.removeAttribute?.("data-testid");
+  clone.removeAttribute?.("aria-describedby");
+  clone.removeAttribute?.("aria-controls");
+  clone.removeAttribute?.("disabled");
+  clone.setAttribute?.("aria-label", "Buy in PayPack");
+
+  if ("disabled" in clone) {
+    try {
+      clone.disabled = false;
+    } catch {
+      // ignore
+    }
+  }
+
+  const labelNode =
+    clone.querySelector('span[dir="auto"]') ||
+    clone.querySelector("span") ||
+    clone;
+  if (labelNode) labelNode.textContent = "Buy in PayPack";
+
+  const roots = [clone, ...clone.querySelectorAll("*")];
+  roots.forEach((n) => {
+    if (!(n instanceof HTMLElement)) return;
+    n.style.setProperty("background", "#22a559", "important");
+    n.style.setProperty("border-color", "#22a559", "important");
+    n.style.setProperty("color", "#ffffff", "important");
+  });
+
+  clone.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openPayPack(resolvedOrigin, sourceEl);
+  });
+  return clone;
+}
+
 function isListingPage() {
   return /\/marketplace\/item\//i.test(window.location.pathname || "");
 }
 
+function isActionButtonLike(el) {
+  if (!el) return false;
+  const t = (el.textContent || "").trim().toLowerCase();
+  if (!t) return false;
+  return (
+    t === "send" ||
+    t === "send message" ||
+    t === "message" ||
+    t === "contact seller" ||
+    t === "enviar" ||
+    t === "enviar mensaje" ||
+    t === "отправить" ||
+    t === "сообщение" ||
+    t === "написать"
+  );
+}
+
+function isSendButtonLike(el) {
+  if (!el) return false;
+  const t = (el.textContent || "").trim().toLowerCase();
+  if (!t) return false;
+  return (
+    t === "send" ||
+    t === "send message" ||
+    t === "отправить" ||
+    t === "enviar" ||
+    t === "enviar mensaje"
+  );
+}
+
+function findListingActionAnchor(main) {
+  const strictSelectors = [
+    '[role="main"] [aria-label*="Send" i]',
+    '[role="main"] [aria-label*="Message" i]',
+    '[role="main"] [aria-label*="Contact seller" i]',
+    '[role="main"] [aria-label*="Отправить" i]',
+    '[role="main"] [aria-label*="Сообщение" i]',
+  ];
+  for (const sel of strictSelectors) {
+    const n = document.querySelector(sel);
+    if (n) return n;
+  }
+
+  const buttonLikes = main.querySelectorAll('[role="button"], button, a[role="button"]');
+  for (const el of buttonLikes) {
+    if (isActionButtonLike(el)) return el;
+  }
+  return null;
+}
+
+function findMessageComposerHost(main) {
+  const sendCandidates = main.querySelectorAll('[role="button"], button');
+  for (const el of sendCandidates) {
+    if (!isSendButtonLike(el)) continue;
+    const formHost =
+      el.closest("form") ||
+      el.closest('[role="form"]') ||
+      null;
+
+    if (formHost) {
+      return { host: formHost, anchor: el };
+    }
+
+    let p = el.parentElement;
+    let depth = 0;
+    while (p && depth < 10 && p !== main) {
+      const hasInput =
+        !!p.querySelector("textarea") || !!p.querySelector('[contenteditable="true"]');
+      const btnCount = p.querySelectorAll('[role="button"], button').length;
+      if (hasInput || btnCount >= 2) {
+        return { host: p, anchor: el };
+      }
+      p = p.parentElement;
+      depth += 1;
+    }
+
+    if (el.parentElement) return { host: el.parentElement, anchor: el };
+  }
+
+  const textarea =
+    main.querySelector("textarea") ||
+    main.querySelector('[contenteditable="true"]');
+  if (!textarea) return null;
+
+  const box =
+    textarea.closest("form") ||
+    textarea.closest('[role="group"]') ||
+    textarea.closest("div");
+  if (!box) return null;
+  return { host: box, anchor: null };
+}
+
+function isVisibleElement(el) {
+  if (!el || !el.isConnected) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 2 && rect.height > 2;
+}
+
+function removeAllPayPackButtons(scope) {
+  const root = scope || document;
+  for (const el of root.querySelectorAll(".paypack-mp-inline-wrap")) {
+    el.remove();
+  }
+  for (const el of root.querySelectorAll(".paypack-mp-native-btn")) {
+    el.remove();
+  }
+}
+
+function getComposerContext(main) {
+  const textboxes = main.querySelectorAll(
+    'textarea, [contenteditable="true"], [role="textbox"]',
+  );
+  const visibleTextboxes = [...textboxes].filter(isVisibleElement);
+  if (!visibleTextboxes.length) return null;
+
+  // Prefer the right-panel composer (highest left coordinate).
+  visibleTextboxes.sort(
+    (a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left,
+  );
+
+  for (const textbox of visibleTextboxes) {
+    let container =
+      textbox.closest("form") ||
+      textbox.closest('[role="group"]') ||
+      textbox.closest("div");
+    if (!container) continue;
+
+    let sendButton = null;
+    const localButtons = container.querySelectorAll('button, [role="button"]');
+    for (const btn of localButtons) {
+      if (!isVisibleElement(btn)) continue;
+      const t = (btn.textContent || "").trim().toLowerCase();
+      if (!t) continue;
+      if (/buy in paypack/.test(t)) continue;
+      if (/send|message|enviar|mensaje|отправ|сообщ|написать/.test(t)) {
+        sendButton = btn;
+        break;
+      }
+    }
+
+    // Fallback: if exact text wasn't found, pick a visible action button below textbox.
+    if (!sendButton) {
+      const tRect = textbox.getBoundingClientRect();
+      const candidates = main.querySelectorAll('button, [role="button"]');
+      let best = null;
+      let bestScore = -Infinity;
+      for (const btn of candidates) {
+        if (!isVisibleElement(btn)) continue;
+        const bRect = btn.getBoundingClientRect();
+        if (bRect.top < tRect.top) continue;
+        if (bRect.left < window.innerWidth * 0.52) continue;
+        if (bRect.width < 100 || bRect.height < 28) continue;
+        const score = bRect.top - tRect.top - Math.abs(bRect.left - tRect.left) * 0.1;
+        if (score > bestScore) {
+          bestScore = score;
+          best = btn;
+        }
+      }
+      sendButton = best;
+    }
+
+    if (!sendButton) continue;
+    const host = sendButton.parentElement || container;
+    if (!host) continue;
+    return { host, sendButton };
+  }
+  return null;
+}
+
 function injectButtonIntoListingPage(settings) {
+  resetUrlAttemptsIfNeeded();
+  if (ppUrlInjectAttempts >= PP_MAX_ATTEMPTS_PER_URL) {
+    ppWarn("skip: max attempts reached for url", {
+      attempts: ppUrlInjectAttempts,
+      url: window.location.href,
+    });
+    return;
+  }
+  ppUrlInjectAttempts += 1;
+
   const paypackOrigin =
     (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
-  if (!isListingPage()) return;
-  if (document.querySelector(".paypack-mp-inline-btn")) return;
+  ppLog("injectButtonIntoListingPage:start", {
+    href: window.location.href,
+    path: window.location.pathname,
+    isListing: isListingPage(),
+    paypackOrigin,
+    hasSettings: !!settings,
+  });
+  if (!isListingPage()) {
+    ppLog("skip: not listing page");
+    return;
+  }
 
-  const listingAnchor = document.querySelector('a[href*="/marketplace/item/"]');
-  const sourceEl = listingAnchor || null;
+  const sourceEl = null;
   const main = document.querySelector('[role="main"]');
-  if (!main) return;
-
-  const actionHostCandidates = [
-    '[role="main"] [aria-label*="Message" i]',
-    '[role="main"] [aria-label*="Send message" i]',
-    '[role="main"] [aria-label*="Купить" i]',
-    '[role="main"] [aria-label*="Buy" i]',
-  ];
-
-  let anchorNode = null;
-  for (const sel of actionHostCandidates) {
-    const n = document.querySelector(sel);
-    if (n) {
-      anchorNode = n;
-      break;
-    }
+  ppLog("dom probes", {
+    listingAnchorFound: !!listingAnchor,
+    mainFound: !!main,
+  });
+  if (!main) {
+    ppWarn("skip: [role=main] not found");
+    return;
   }
 
-  let host = null;
-  if (anchorNode) {
-    host =
-      anchorNode.closest('[role="group"]') ||
-      anchorNode.closest("div");
-  }
+  const composerContext = getComposerContext(main);
+  ppLog("anchor probes", {
+    composerFound: !!composerContext,
+    sendFound: !!composerContext?.sendButton,
+    sendText: composerContext?.sendButton
+      ? (composerContext.sendButton.textContent || "").trim()
+      : "",
+  });
+
+  const host = composerContext?.host || null;
+  ppLog("host probe", {
+    hostFound: !!host,
+    hostTag: host?.tagName || null,
+    hostClass: host?.className || null,
+  });
   if (!host) {
-    host =
-      main.querySelector("h1")?.parentElement ||
-      main.firstElementChild;
+    ppLog("skip: host not found");
+    return;
   }
-  if (!host) return;
 
-  const wrap = document.createElement("div");
-  wrap.className = "paypack-mp-inline-wrap";
-  wrap.appendChild(createActionButton(paypackOrigin, false, sourceEl));
-  host.appendChild(wrap);
+  const sendButton = composerContext?.sendButton || null;
+  if (!sendButton) {
+    ppLog("skip: send button not found");
+    return;
+  }
+
+  if (!sendButton.parentElement) {
+    ppLog("skip: send container invalid");
+    return;
+  }
+
+  const sibling = sendButton.previousElementSibling;
+  if (sibling && sibling.classList?.contains("paypack-mp-native-btn") && isVisibleElement(sibling)) {
+    ppLog("skip: native button already placed near send");
+    return;
+  }
+
+  removeAllPayPackButtons(main);
+  const nativeBtn = createNativeComposerButton(sendButton, paypackOrigin, sourceEl);
+  sendButton.parentElement.insertBefore(nativeBtn, sendButton);
+  ppLog("injected: native button before send");
+  ppLog("post-check", {
+    totalButtons: document.querySelectorAll(".paypack-mp-inline-btn").length,
+    totalWraps: document.querySelectorAll(".paypack-mp-inline-wrap").length,
+    totalNativeButtons: document.querySelectorAll(".paypack-mp-native-btn").length,
+  });
+}
+
+function injectButtonsIntoFeedBlocks(settings) {
+  const paypackOrigin =
+    (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
+
+  const links = document.querySelectorAll('a[href*="/marketplace/item/"]');
+  links.forEach((a) => {
+    const card =
+      a.closest('[role="article"]') ||
+      a.closest('[data-testid]') ||
+      a.parentElement;
+    if (!card || !(card instanceof HTMLElement)) return;
+    if (card.querySelector(".paypack-mp-inline-wrap")) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "paypack-mp-inline-wrap";
+    wrap.setAttribute("data-paypack-placement", "feed-card");
+    wrap.appendChild(createActionButton(paypackOrigin, true, a));
+    card.appendChild(wrap);
+  });
 }
 
 function applySettings(settings) {
-  if (!settings || settings.showFab === false) return;
-  injectButtonIntoListingPage(settings);
+  injectButtonsIntoFeedBlocks(settings);
+}
+
+function scheduleApplySettings(defaults, reason) {
+  if (ppInjectScheduled) return;
+  const now = Date.now();
+  if (now - ppLastRunAt < PP_RUN_COOLDOWN_MS) return;
+  ppInjectScheduled = true;
+  ppLastRunAt = now;
+  setTimeout(() => {
+    ppInjectScheduled = false;
+    if (typeof chrome !== "undefined" && chrome.storage?.sync) {
+      chrome.storage.sync.get(defaults, (sync) => {
+        ppLog("scheduled apply", { reason });
+        applySettings(sync);
+      });
+    } else {
+      ppLog("scheduled apply defaults", { reason });
+      applySettings(defaults);
+    }
+  }, 100);
 }
 
 function bootstrap() {
+  ppLog("bootstrap:start", {
+    href: window.location.href,
+    readyState: document.readyState,
+  });
   const defaults = {
     paypackOrigin: PayPackUrlBuild.DEFAULT_ORIGIN,
     showFab: true,
@@ -635,25 +954,29 @@ function bootstrap() {
 
   if (typeof chrome !== "undefined" && chrome.storage?.sync) {
     chrome.storage.sync.get(defaults, (sync) => {
+      ppLog("storage.sync.get", sync);
       applySettings(sync);
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
       if (!changes.paypackOrigin && !changes.showFab) return;
-      chrome.storage.sync.get(defaults, applySettings);
+      ppLog("storage.onChanged", { area, changes });
+      scheduleApplySettings(defaults, "storage.onChanged");
     });
   } else {
+    ppWarn("chrome.storage.sync unavailable, using defaults");
     applySettings(defaults);
   }
 
   const obs = new MutationObserver(() => {
-    if (typeof chrome !== "undefined" && chrome.storage?.sync) {
-      chrome.storage.sync.get(defaults, applySettings);
-    } else {
-      applySettings(defaults);
-    }
+    if (ppMutationTimer) clearTimeout(ppMutationTimer);
+    ppMutationTimer = setTimeout(() => {
+      ppLog("mutation observed (debounced)");
+      scheduleApplySettings(defaults, "mutation");
+    }, 350);
   });
   obs.observe(document.documentElement, { childList: true, subtree: true });
+  ppLog("bootstrap:observer attached");
 }
 
 if (document.readyState === "loading") {
