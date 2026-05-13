@@ -161,8 +161,104 @@ function titleFromListingPageStructure() {
   return "";
 }
 
+function titleFromAnchorAriaLabel(anchor) {
+  if (!anchor) return "";
+  const container = anchor.closest("a") || anchor;
+  const label = container.getAttribute("aria-label") || "";
+  if (!label) return "";
+  const parts = label.split(/,\s*/);
+  const first = parts[0]?.trim() || "";
+  if (first.length < 4 || isGarbageTitle(first)) return "";
+  if (/^\d[\d\s\u00A0.,]*(€|EUR|MX\$|MXN|\$|USD)/i.test(first)) return "";
+  return first.slice(0, 400);
+}
+
+function extractPriceFromAnchorAriaLabel(anchor) {
+  if (!anchor) return 0;
+  const container = anchor.closest("a") || anchor;
+  const label = container.getAttribute("aria-label") || "";
+  if (!label) return 0;
+  return extractListingPriceFromText(label);
+}
+
+function listingIdFromSource(sourceEl) {
+  const href = sourceEl?.href || window.location.href;
+  return extractListingIdFromHref(href) || extractListingIdFromPath(window.location.pathname);
+}
+
+function walkListingPayload(node, depth, out, listingId) {
+  if (depth > 22 || node == null) return;
+  if (Array.isArray(node)) {
+    for (const item of node) walkListingPayload(item, depth + 1, out, listingId);
+    return;
+  }
+  if (typeof node !== "object") return;
+
+  const nodeId = String(node.id || node.listing_id || "");
+  const nodeUrl = typeof node.url === "string" ? node.url : "";
+  const matchesListing =
+    !listingId ||
+    nodeId === listingId ||
+    nodeUrl.includes(`/marketplace/item/${listingId}`);
+
+  if (matchesListing) {
+    if (typeof node.marketplace_listing_title === "string" && node.marketplace_listing_title.trim()) {
+      out.title = node.marketplace_listing_title.trim().slice(0, 400);
+    } else if (typeof node.custom_title === "string" && node.custom_title.trim()) {
+      out.title = node.custom_title.trim().slice(0, 400);
+    }
+
+    if (node.listing_price) {
+      const amount = node.listing_price.amount;
+      if (amount != null && amount !== "") {
+        const n = parseMoneyToInt(String(amount));
+        if (n > 0) out.price = n;
+      }
+    }
+    if (!out.price && node.formatted_price?.text) {
+      const n = extractListingPriceFromText(String(node.formatted_price.text));
+      if (n > 0) out.price = n;
+    }
+
+    const descText =
+      node.redacted_description?.text ||
+      node.listing_description?.text ||
+      node.seller_description?.text ||
+      "";
+    if (descText) {
+      const d = normalizeDescription(String(descText));
+      if (d.length > out.desc.length) out.desc = d;
+    }
+  }
+
+  for (const value of Object.values(node)) {
+    if (value && typeof value === "object") walkListingPayload(value, depth + 1, out, listingId);
+  }
+}
+
+function extractListingFromEmbeddedJson(listingId) {
+  const out = { title: "", price: 0, desc: "" };
+  if (!listingId) return out;
+  const scripts = document.querySelectorAll(
+    'script[type="application/json"], script[type="application/ld+json"]',
+  );
+  for (const script of scripts) {
+    const text = script.textContent || "";
+    if (!text.includes(listingId)) continue;
+    try {
+      walkListingPayload(JSON.parse(text), 0, out, listingId);
+    } catch {
+      // ignore malformed JSON blocks
+    }
+    if (out.title && out.price > 0 && out.desc) break;
+  }
+  return out;
+}
+
 function getCardTitleFromAnchor(anchor) {
   if (!anchor) return "";
+  const fromAria = titleFromAnchorAriaLabel(anchor);
+  if (fromAria) return fromAria;
   const container = anchor.closest("a") || anchor;
   const titleNode =
     container.querySelector('span[style*="-webkit-line-clamp"]') ||
@@ -170,7 +266,7 @@ function getCardTitleFromAnchor(anchor) {
   const t = titleNode?.innerText?.trim() || "";
   if (!t || isGarbageTitle(t)) return "";
   if (/^\d[\d\s\u00A0.,]*(MX\$|€|\$|USD|EUR|руб|₽|MXN)/i.test(t)) return "";
-  if (/reciente|недавно|recent/i.test(t.toLowerCase())) return "";
+  if (/reciente|recentemente|недавно|recent|ieri|oggi|ore fa|giorni fa/i.test(t.toLowerCase())) return "";
   return t.slice(0, 400);
 }
 
@@ -200,7 +296,7 @@ function parseMoneyToInt(raw) {
 function sliceListingHeader(mainText) {
   if (!mainText) return "";
   const stop =
-    /(?:Описание\s+от\s+продавца|Seller(?:'s)?\s+description|Descripción\s+del\s+vendedor|About\s+this\s+item|Similar\s+listings|Похожие|Related\s+items|You\s+might\s+also)/i;
+    /(?:Описание\s+от\s+продавца|Seller(?:'s)?\s+description|Descripción\s+del\s+vendedor|Descrizione\s+del\s+venditore|About\s+this\s+item|Similar\s+listings|Похожие|Related\s+items|You\s+might\s+also|Annunci\s+simili)/i;
   const idx = mainText.search(stop);
   if (idx > 0) return mainText.slice(0, idx);
   return mainText.slice(0, 9000);
@@ -285,12 +381,12 @@ function extractListingPriceFromText(headerText) {
       [/MX\$\s*(\d[\d\s\u00A0.,]*)/gi, 1],
       [/(\d[\d\s\u00A0.,]*)\s*MXN\b/gi, 1],
       [/MXN\s*(\d[\d\s\u00A0.,]*)/gi, 1],
-      [/(\d[\d\s\u00A0.,]*)\s*(€|EUR|eur)\b/gi, 1],
-      [/(€|EUR|eur)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
-      [/(\d[\d\s\u00A0.,]*)\s*(USD)\b/gi, 1],
-      [/(USD)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
-      [/(\d[\d\s\u00A0.,]*)\s*(руб|₽|RUB|rub)\b/gi, 1],
-      [/(руб|₽|RUB|rub)\s*(\d[\d\s\u00A0.,]*)/gi, 2],
+      [/(\d[\d\s\u00A0.,]*)\s*(?:€|EUR|eur)(?=\s|$|[^\w])/gi, 1],
+      [/(?:€|EUR|eur)\s*(\d[\d\s\u00A0.,]*)/gi, 1],
+      [/(\d[\d\s\u00A0.,]*)\s*(?:USD)(?=\s|$|[^\w])/gi, 1],
+      [/(?:USD)\s*(\d[\d\s\u00A0.,]*)/gi, 1],
+      [/(\d[\d\s\u00A0.,]*)\s*(?:руб|₽|RUB|rub)(?=\s|$|[^\w])/gi, 1],
+      [/(?:руб|₽|RUB|rub)\s*(\d[\d\s\u00A0.,]*)/gi, 1],
     ];
     for (const [re, g] of patterns) {
       re.lastIndex = 0;
@@ -336,6 +432,8 @@ function extractListingPriceFromDom() {
 
 function extractPriceFromCard(anchor) {
   if (!anchor) return 0;
+  const fromAria = extractPriceFromAnchorAriaLabel(anchor);
+  if (fromAria > 0) return fromAria;
   const card = anchor.closest("a") || anchor;
   const texts = card.querySelectorAll('span[dir="auto"]');
   for (const node of texts) {
@@ -359,6 +457,7 @@ function extractSellerDescriptionFromDom() {
     /^Описание\s+от\s+продавца\s*/i,
     /^Seller(?:'s)?\s+description\s*/i,
     /^Descripción(?:\s+del\s+vendedor)?\s*/i,
+    /^Descrizione(?:\s+del\s+venditore)?\s*/i,
     /^About\s+this\s+item\s*/i,
   ];
 
@@ -383,7 +482,8 @@ function extractSellerDescriptionFromDom() {
     if (!tx) continue;
     if (
       /^Описание\s+от\s+продавца$/i.test(tx) ||
-      /^Seller(?:'s)?\s+description$/i.test(tx)
+      /^Seller(?:'s)?\s+description$/i.test(tx) ||
+      /^Descrizione(?:\s+del\s+venditore)?$/i.test(tx)
     ) {
       next = el.nextElementSibling;
       break;
@@ -411,6 +511,7 @@ function extractSellerDescriptionFromFullText(mainText) {
     /Описание\s+от\s+продавца\s*[\n\r\t\f\v\:\s]*([\s\S]+?)(?=\n\s*(?:Location|Местоположение|Listed|Похожие|Similar|Related|See\s+more\s*$)|$)/i,
     /Seller(?:'s)?\s+description\s*[\n\r\t\f\v\:\s]*([\s\S]+?)(?=\n\s*(?:Location|Listed|Similar)|$)/i,
     /Descripción(?:\s+del\s+vendedor)?\s*[\n\r\t\f\v\:\s]*([\s\S]+?)(?=\n\s*(?:Location|Listed|Ubicación)|$)/i,
+    /Descrizione(?:\s+del\s+venditore)?\s*[\n\r\t\f\v\:\s]*([\s\S]+?)(?=\n\s*(?:Posizione|Pubblicato|Location|Listed|Annunci)|$)/i,
     /About\s+this\s+item\s*[\n\r\t\f\v\:\s]*([\s\S]+?)(?=\n\s*(?:Location|Listed)|$)/i,
   ];
 
@@ -419,7 +520,7 @@ function extractSellerDescriptionFromFullText(mainText) {
     if (m && m[1]) {
       let block = m[1].trim();
       const stopRe =
-        /\n\s*(?:Location|Местоположение|Listed\s|Указано|Seller information|See less|Показать полностью)/i;
+        /\n\s*(?:Location|Местоположение|Listed\s|Указано|Seller information|See less|Показать полностью|Posizione|Pubblicato|Annunci)/i;
       const si = block.search(stopRe);
       if (si > 0) block = block.slice(0, si).trim();
       if (block.length > 15) return block.slice(0, 2000);
@@ -454,7 +555,7 @@ function extractCardSummary(anchor) {
     const t = node.innerText?.trim();
     if (!t) continue;
     if (/^\d[\d\s\u00A0.,]*(MX\$|MXN|€|EUR|USD|руб|₽)/i.test(t)) continue;
-    if (/reciente|недавно|recent/i.test(t.toLowerCase())) continue;
+  if (/reciente|recentemente|недавно|recent|ieri|oggi|ore fa|giorni fa/i.test(t.toLowerCase())) continue;
     if (isGarbageTitle(t)) continue;
     if (t.length < 2 || t.length > 220) continue;
     chunks.push(t);
@@ -507,10 +608,14 @@ function extractPrimaryImageUrl(sourceEl) {
 
 function scrapeListing(sourceEl) {
   const link = sourceEl?.href || window.location.href;
+  const listingId = listingIdFromSource(sourceEl);
+  const embedded = extractListingFromEmbeddedJson(listingId);
+
   const title =
     getCardTitleFromAnchor(sourceEl) ||
     titleFromListingPageStructure() ||
-    pickListingTitle();
+    pickListingTitle() ||
+    embedded.title;
 
   const main = document.querySelector('[role="main"]');
   const mainText = main?.innerText || "";
@@ -518,9 +623,11 @@ function scrapeListing(sourceEl) {
   let price = extractPriceFromCard(sourceEl);
   if (!price) price = extractListingPriceFromDom();
   if (!price) price = extractListingPrice();
+  if (!price) price = embedded.price;
 
   let desc = extractCardSummary(sourceEl);
   if (!desc) desc = normalizeDescription(extractSellerDescription(mainText));
+  if (!desc) desc = embedded.desc;
   if (!desc) {
     const og =
       document.querySelector('meta[property="og:description"]') ||
