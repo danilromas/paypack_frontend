@@ -90,3 +90,42 @@
   width: 100%;
   min-height: 40px;
 }
+
+.paypack-mp-listing-actions {
+  margin-top: 0;
+  margin-bottom: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.paypack-mp-listing-detail-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #0866ff;
+  color: #ffffff;
+  font-family: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-transform: none;
+  box-shadow: none;
+}
+
+.paypack-mp-listing-detail-btn:hover {
+  background: #0755d8;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.paypack-mp-listing-detail-btn:active {
+  background: #064fc7;
+}
+
+.paypack-mp-listing-detail-btn:focus-visible {
+  outline: 2px solid rgba(8, 102, 255, 0.45);
+  outline-offset: 2px;
+}

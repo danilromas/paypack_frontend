@@ -2,10 +2,10 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Handshake, Package } from "lucide-react"
+import { ArrowLeftRight, Handshake, Package } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type ActionKey = "deal" | "ship"
+type ActionKey = "deal" | "ship" | "transfer"
 
 const ACTIONS: Record<
   ActionKey,
@@ -14,6 +14,8 @@ const ACTIONS: Record<
     hint: string
     href: string
     icon: typeof Handshake
+    external?: boolean
+    sticker?: string
   }
 > = {
   deal: {
@@ -27,6 +29,14 @@ const ACTIONS: Record<
     hint: "Track & manage delivery",
     href: "/dashboard/shipments?mode=ship",
     icon: Package,
+  },
+  transfer: {
+    title: "TRANSFER",
+    hint: "Crypto transfer via aWallet",
+    href: "https://awallet.tech",
+    icon: ArrowLeftRight,
+    external: true,
+    sticker: "",
   },
 }
 
@@ -55,69 +65,95 @@ export function LandingSplitHero() {
           </p>
         </div>
 
-        <div className="mx-auto mt-8 max-w-5xl sm:mt-12">
+        <div className="mx-auto mt-8 max-w-6xl sm:mt-12">
           <div
-            className="relative flex flex-row overflow-hidden rounded-2xl border border-border bg-card/40 backdrop-blur-xl sm:rounded-3xl md:flex-row"
+            className="relative flex flex-row overflow-hidden rounded-2xl border border-border bg-card/40 backdrop-blur-xl sm:rounded-3xl"
             onMouseLeave={() => setHovered(null)}
           >
-            {/* Left / Right cards */}
             {cards.map((key, idx) => {
               const action = ACTIONS[key]
               const isHovered = hovered === key
               const otherHovered = hovered !== null && !isHovered
               const Icon = action.icon
+              const cardClassName = cn(
+                "group relative flex min-h-[140px] min-w-0 flex-1 items-center justify-center overflow-hidden px-3 py-6 transition-all duration-700 sm:min-h-[220px] sm:px-5 sm:py-10 md:px-6",
+                idx < cards.length - 1 && "border-r border-border/60",
+                isHovered && "md:flex-[1.35] bg-primary/[0.04]",
+                key === "ship" && isHovered && "bg-success/[0.04]",
+                key === "transfer" && isHovered && "bg-[#1b74e4]/[0.05]",
+                otherHovered && "md:flex-[0.85] opacity-70 md:blur-[0.6px]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              )
+              const cardInner = (
+                <>
+                  {action.sticker ? (
+                    <span className="absolute right-3 top-3 z-20 inline-flex items-center rounded-full border border-[#1b74e4]/25 bg-[#1b74e4]/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#1b74e4] shadow-sm backdrop-blur-sm">
+                      {action.sticker}
+                    </span>
+                  ) : null}
+                  <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+                    <div className="absolute inset-0 bg-radial from-white/10 via-transparent to-transparent" />
+                  </div>
+
+                  <div className="relative z-10 flex flex-col items-center gap-5 text-center sm:gap-7">
+                    <div
+                      className={cn(
+                        "grid h-24 w-24 place-items-center rounded-3xl border border-border bg-card/70 shadow-sm backdrop-blur-xl transition-all duration-700 group-hover:-translate-y-2 group-hover:shadow-xl sm:h-28 sm:w-28",
+                        key === "transfer" && "border-[#1b74e4]/20",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-10 w-10 transition-transform duration-500 group-hover:scale-110 sm:h-11 sm:w-11 text-primary",
+                        )}
+                      />
+                    </div>
+
+                    <div>
+                      <h2 className="text-base font-semibold text-foreground transition-all duration-500 group-hover:-translate-y-1 sm:text-lg">
+                        {action.title}
+                      </h2>
+                      <p className="mt-2 text-xs text-muted-foreground opacity-100 transition-all duration-500 sm:text-sm md:opacity-0 md:group-hover:opacity-100">
+                        {action.hint}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )
+
+              if (action.external) {
+                return (
+                  <a
+                    key={key}
+                    href={action.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    onMouseEnter={() => setHovered(key)}
+                    className={cardClassName}
+                  >
+                    {cardInner}
+                  </a>
+                )
+              }
 
               return (
                 <Link
                   key={key}
                   href={action.href}
                   onMouseEnter={() => setHovered(key)}
-                  className={cn(
-                    "group relative flex min-h-[160px] min-w-0 flex-1 items-center justify-center overflow-hidden px-4 py-8 transition-all duration-700 sm:min-h-[240px] sm:px-8 sm:py-12",
-                    idx === 0 && "border-r border-border/60",
-                    isHovered && "md:flex-[1.35] bg-primary/[0.04]",
-                    key === "ship" && isHovered && "bg-success/[0.04]",
-                    otherHovered && "md:flex-[0.85] opacity-70 md:blur-[0.6px]",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                  )}
+                  className={cardClassName}
                 >
-                  <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-                    <div className="absolute inset-0 bg-radial from-white/10 via-transparent to-transparent" />
-                  </div>
-
-                  <div className="relative z-10 flex flex-col items-center gap-7 text-center">
-                    <div className="grid h-28 w-28 place-items-center rounded-3xl border border-border bg-card/70 shadow-sm backdrop-blur-xl transition-all duration-700 group-hover:-translate-y-2 group-hover:shadow-xl">
-                      <Icon className="h-11 w-11 text-primary transition-transform duration-500 group-hover:scale-110" />
-                    </div>
-
-                    <div>
-                      <h2 className="text-lg font-semibold text-foreground transition-all duration-500 group-hover:-translate-y-1">
-                        {action.title}
-                      </h2>
-                      <p className="mt-2 text-sm text-muted-foreground opacity-100 transition-all duration-500 md:opacity-0 md:group-hover:opacity-100">
-                        {action.hint}
-                      </p>
-                    </div>
-                  </div>
+                  {cardInner}
                 </Link>
               )
             })}
-
-            {/* Center merge line */}
-            <div
-              className={cn(
-                "pointer-events-none absolute left-1/2 top-10 hidden h-[calc(100%-5rem)] w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-border/70 to-transparent opacity-70 md:block transition-opacity duration-300",
-                hovered !== null && "opacity-0"
-              )}
-            />
           </div>
 
           <p className="mt-5 text-center text-xs text-muted-foreground">
-            Tip: hover a card to expand it. Works great on desktop; on mobile they stack.
+            Tip: hover a card to expand it. DEAL and SHIP open PayPack; TRANSFER opens aWallet.
           </p>
         </div>
       </div>
     </section>
   )
 }
-

@@ -23,13 +23,30 @@ const PP_RUN_COOLDOWN_MS = 1200;
 const PP_MAX_ATTEMPTS_PER_URL = 40;
 const PP_SHADOW_HOST_ID = "paypack-mp-shadow-host";
 const MESSAGE_ACTION_LABEL =
-  /send|message|contact seller|enviar|mensaje|отправ|сообщ|написать|seller/i;
+  /send|message|contact seller|enviar|mensaje|invia|messaggio|venditore|отправ|сообщ|написать|seller/i;
+const MESSAGE_SECTION_LABEL =
+  /написать\s+сообщение|write\s+a\s+message|send\s+a\s+message|message\s+the\s+seller|invia.*messaggio|messaggio.*venditore|contact\s+seller/i;
+let ppOverlayListenersAttached = false;
+let ppPositionRetryTimer = null;
+const PP_BTN_COLOR = "#0866ff";
+const PP_BTN_COLOR_HOVER = "#0755d8";
+const PP_BTN_COLOR_ACTIVE = "#064fc7";
 
 function resetUrlAttemptsIfNeeded() {
   const nowUrl = window.location.href;
   if (nowUrl !== ppLastUrl) {
+    const hadPrevious = !!ppLastUrl;
     ppLastUrl = nowUrl;
     ppUrlInjectAttempts = 0;
+    if (hadPrevious) {
+      hideListingOverlay();
+      const host = document.getElementById(PP_SHADOW_HOST_ID);
+      if (host) {
+        host.dataset.paypackReady = "0";
+        host.dataset.paypackAnchored = "0";
+      }
+      clearListingOverlayPositionRetries();
+    }
     ppLog("url changed, reset attempts", { nowUrl });
   }
 }
@@ -712,6 +729,22 @@ function createActionButton(paypackOrigin, compact, sourceEl) {
   return btn;
 }
 
+function createListingDetailButton(paypackOrigin, sourceEl) {
+  const resolvedOrigin = paypackOrigin || PayPackUrlBuild.DEFAULT_ORIGIN;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "paypack-mp-inline-btn paypack-mp-listing-detail-btn";
+  btn.title =
+    "Buy in PayPack with this listing prefilled (title, price, description, image).";
+  btn.textContent = "BUY IN PAYPACK";
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openPayPack(resolvedOrigin, sourceEl);
+  });
+  return btn;
+}
+
 function createNativeComposerButton(sendButton, paypackOrigin, sourceEl) {
   const resolvedOrigin = paypackOrigin || PayPackUrlBuild.DEFAULT_ORIGIN;
   const clone = sendButton.cloneNode(true);
@@ -848,6 +881,173 @@ function hideListingOverlay() {
   if (host) host.style.display = "none";
 }
 
+function expandComposerBlockRect(startEl) {
+  let el = startEl;
+  let best = startEl.getBoundingClientRect();
+  for (let depth = 0; depth < 10 && el; depth += 1) {
+    const rect = el.getBoundingClientRect();
+    if (
+      rect.width >= 240 &&
+      rect.left >= window.innerWidth * 0.32 &&
+      rect.height >= 48
+    ) {
+      best = rect;
+      if (rect.height >= 72 || depth >= 4) break;
+    }
+    el = el.parentElement;
+  }
+  return best;
+}
+
+function findMessageSectionRectByLabel() {
+  const candidates = document.querySelectorAll(
+    'span[dir="auto"], div[dir="auto"], span, h2, h3, label',
+  );
+  for (const el of candidates) {
+    if (!isVisibleElement(el)) continue;
+    const text = (el.textContent || "").trim();
+    if (!text || text.length > 120) continue;
+    if (!MESSAGE_SECTION_LABEL.test(text)) continue;
+    return expandComposerBlockRect(el);
+  }
+  return null;
+}
+
+function findBottomComposerRectFallback() {
+  let bestEl = null;
+  let bestTop = -1;
+  for (const tb of document.querySelectorAll(
+    'textarea, [contenteditable="true"], [role="textbox"]',
+  )) {
+    if (!isVisibleElement(tb)) continue;
+    const rect = tb.getBoundingClientRect();
+    if (rect.left < window.innerWidth * 0.38) continue;
+    if (rect.top > bestTop) {
+      bestTop = rect.top;
+      bestEl = tb;
+    }
+  }
+  return bestEl ? expandComposerBlockRect(bestEl) : null;
+}
+
+function isValidComposerAnchorRect(rect) {
+  if (!rect || rect.width < 180) return false;
+  if (rect.left < window.innerWidth * 0.3) return false;
+  const minTop = Math.max(100, window.innerHeight * 0.3);
+  if (rect.top < minTop) return false;
+  if (rect.bottom < minTop + 24) return false;
+  if (rect.bottom > window.innerHeight + 120) return false;
+  return true;
+}
+
+function collectListingComposerAnchorRects() {
+  const rects = [];
+  const add = (rect) => {
+    if (isValidComposerAnchorRect(rect)) rects.push(rect);
+  };
+
+  for (const root of getListingRoots()) {
+    const composer = resolveListingComposer(root);
+    if (composer?.host) add(expandComposerBlockRect(composer.host));
+  }
+  const byLabel = findMessageSectionRectByLabel();
+  if (byLabel) add(byLabel);
+  const fallback = findBottomComposerRectFallback();
+  if (fallback) add(fallback);
+  return rects;
+}
+
+function findListingComposerAnchorRect() {
+  const rects = collectListingComposerAnchorRects();
+  if (!rects.length) return null;
+  rects.sort((a, b) => b.top - a.top);
+  return rects[0];
+}
+
+function positionListingOverlay(host, anchorRect) {
+  if (!host || !anchorRect) return;
+  const gap = 8;
+  const btnHeight = 44;
+  const top = Math.max(8, anchorRect.top - btnHeight - gap);
+  const left = Math.max(8, anchorRect.left);
+  const width = Math.min(
+    anchorRect.width,
+    window.innerWidth - left - 8,
+  );
+
+  host.style.position = "fixed";
+  host.style.top = `${Math.round(top)}px`;
+  host.style.left = `${Math.round(left)}px`;
+  host.style.width = `${Math.round(width)}px`;
+  host.style.right = "auto";
+  host.style.bottom = "auto";
+  host.style.display = "block";
+  host.dataset.paypackAnchored = "1";
+}
+
+function positionListingOverlayFallback(host) {
+  if (!host) return false;
+  const rect = findBottomComposerRectFallback();
+  if (!rect || !isValidComposerAnchorRect(rect)) return false;
+  positionListingOverlay(host, rect);
+  return true;
+}
+
+function syncListingOverlayPosition() {
+  const host = document.getElementById(PP_SHADOW_HOST_ID);
+  if (!host) return false;
+  syncFacebookOverlayTheme(host);
+  const rect = findListingComposerAnchorRect();
+  if (rect) {
+    positionListingOverlay(host, rect);
+    host.dataset.paypackReady = "1";
+    return true;
+  }
+  if (positionListingOverlayFallback(host)) {
+    host.dataset.paypackReady = "1";
+    return true;
+  }
+  host.style.display = "none";
+  host.dataset.paypackReady = "0";
+  host.dataset.paypackAnchored = "0";
+  return false;
+}
+
+function clearListingOverlayPositionRetries() {
+  if (!ppPositionRetryTimer) return;
+  clearInterval(ppPositionRetryTimer);
+  ppPositionRetryTimer = null;
+}
+
+function scheduleListingOverlayPositionRetries() {
+  clearListingOverlayPositionRetries();
+  let attempts = 0;
+  ppPositionRetryTimer = setInterval(() => {
+    attempts += 1;
+    if (!shouldShowListingOverlay()) {
+      clearListingOverlayPositionRetries();
+      hideListingOverlay();
+      return;
+    }
+    syncListingOverlayPosition();
+    const host = document.getElementById(PP_SHADOW_HOST_ID);
+    if (host?.dataset.paypackReady === "1" || attempts >= 50) {
+      clearListingOverlayPositionRetries();
+    }
+  }, 250);
+}
+
+function attachListingOverlayListeners() {
+  if (ppOverlayListenersAttached) return;
+  ppOverlayListenersAttached = true;
+  const reposition = () => {
+    if (!shouldShowListingOverlay()) return;
+    syncListingOverlayPosition();
+  };
+  window.addEventListener("scroll", reposition, true);
+  window.addEventListener("resize", reposition);
+}
+
 function syncFacebookOverlayTheme(host) {
   if (!host) return;
   const dark = document.documentElement.classList.contains("__fb-dark-mode");
@@ -865,53 +1065,51 @@ function applyShadowListingOverlayStyles(shadow) {
     :host {
       all: initial;
       position: fixed;
-      right: 16px;
-      bottom: 16px;
       z-index: 2147483647;
-      pointer-events: auto;
-      display: block;
+      pointer-events: none;
+      display: none;
+      box-sizing: border-box;
       font-family: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
     }
     .wrap {
       display: flex;
       align-items: stretch;
+      width: 100%;
+      pointer-events: auto;
     }
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid #d0d3d7;
+      width: 100%;
+      box-sizing: border-box;
+      border: none;
       border-radius: 8px;
-      background: #f0f2f5;
-      color: #050505;
+      background: ${PP_BTN_COLOR};
+      color: #ffffff;
       cursor: pointer;
       font-family: inherit;
-      font-size: 14px;
-      font-weight: 600;
-      line-height: 18px;
-      min-height: 36px;
-      padding: 8px 12px;
-      box-shadow: none;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+      min-height: 44px;
+      padding: 10px 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
       -webkit-font-smoothing: antialiased;
-      transition: background-color 0.2s ease, border-color 0.2s ease;
+      transition: background-color 0.2s ease;
     }
-    .btn:hover {
-      background: #e4e6eb;
-      border-color: #c9ccd1;
-    }
-    .btn:active { background: #d8dadf; }
+    .btn:hover { background: ${PP_BTN_COLOR_HOVER}; }
+    .btn:active { background: ${PP_BTN_COLOR_ACTIVE}; }
     .btn:focus-visible {
-      outline: 2px solid rgba(8, 102, 255, 0.35);
+      outline: 2px solid rgba(8, 102, 255, 0.45);
       outline-offset: 2px;
     }
     :host([data-theme="dark"]) .btn {
-      background: rgba(58, 59, 60, 0.92);
-      color: #e4e6eb;
-      border-color: rgba(255, 255, 255, 0.12);
+      background: ${PP_BTN_COLOR};
+      color: #ffffff;
     }
     :host([data-theme="dark"]) .btn:hover {
-      background: rgba(72, 73, 75, 0.96);
-      border-color: rgba(255, 255, 255, 0.18);
+      background: ${PP_BTN_COLOR_HOVER};
     }
   `;
 }
@@ -930,7 +1128,7 @@ function ensureShadowListingOverlay(paypackOrigin) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "btn";
-    btn.textContent = "Buy in PayPack";
+    btn.textContent = "BUY IN PAYPACK";
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -948,7 +1146,9 @@ function ensureShadowListingOverlay(paypackOrigin) {
 
   syncFacebookOverlayTheme(host);
   host.dataset.paypackOrigin = resolvedOrigin;
-  host.style.display = "block";
+  attachListingOverlayListeners();
+  host.style.display = "none";
+  host.dataset.paypackReady = "0";
   return host;
 }
 
@@ -984,8 +1184,11 @@ function getActiveListingAnchor() {
 }
 
 function hasVisibleListingPayPackButton() {
-  const shadowHost = document.getElementById(PP_SHADOW_HOST_ID);
-  return !!(shadowHost && shadowHost.style.display !== "none");
+  const host = document.getElementById(PP_SHADOW_HOST_ID);
+  if (!host || host.style.display === "none") return false;
+  if (host.dataset.paypackReady !== "1") return false;
+  const rect = host.getBoundingClientRect();
+  return rect.width > 40 && rect.height > 20;
 }
 
 function removeListingPayPackButtons(scope) {
@@ -1005,7 +1208,7 @@ function createListingButtonWrap(paypackOrigin, sourceEl) {
   const wrap = document.createElement("div");
   wrap.className = "paypack-mp-inline-wrap paypack-mp-listing-actions";
   wrap.setAttribute("data-paypack-placement", "listing-page");
-  wrap.appendChild(createActionButton(paypackOrigin, false, sourceEl));
+  wrap.appendChild(createListingDetailButton(paypackOrigin, sourceEl));
   return wrap;
 }
 
@@ -1050,6 +1253,9 @@ function findListingActionAnchor(root) {
     '[aria-label*="Отправить" i]',
     '[aria-label*="Сообщение" i]',
     '[aria-label*="Написать" i]',
+    '[aria-label*="Invia" i]',
+    '[aria-label*="messaggio" i]',
+    '[aria-label*="venditore" i]',
   ];
   for (const sel of strictSelectors) {
     const nodes = root.querySelectorAll(sel);
@@ -1246,14 +1452,21 @@ function injectButtonIntoListingPage(settings) {
     return;
   }
 
-  const paypackOrigin =
-    (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
   for (const root of getListingRoots()) {
     removeListingPayPackButtons(root);
   }
+
+  if (settings?.showFab === false) {
+    hideListingOverlay();
+    return;
+  }
+
+  const paypackOrigin =
+    (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
   ensureShadowListingOverlay(paypackOrigin);
+  scheduleListingOverlayPositionRetries();
   ppUrlInjectAttempts = 0;
-  ppLog("injected: listing shadow button");
+  ppLog("injected: listing overlay above composer");
 }
 
 function injectButtonsIntoFeedBlocks(settings) {
@@ -1280,6 +1493,7 @@ function injectButtonsIntoFeedBlocks(settings) {
 }
 
 function applySettings(settings) {
+  resetUrlAttemptsIfNeeded();
   injectButtonsIntoFeedBlocks(settings);
   if (shouldShowListingOverlay()) {
     if (settings?.showFab !== false) {
@@ -1368,9 +1582,25 @@ function bootstrap() {
     }, 350);
   });
   obs.observe(document.documentElement, { childList: true, subtree: true });
-  hookSpaNavigation(() => scheduleApplySettings(defaults, "spa-nav", true));
+  hookSpaNavigation(() => {
+    resetUrlAttemptsIfNeeded();
+    ppLastRunAt = 0;
+    scheduleApplySettings(defaults, "spa-nav", true);
+  });
   startListingWatch(defaults);
+  startUrlWatch(defaults);
   ppLog("bootstrap:observer attached");
+}
+
+function startUrlWatch(defaults) {
+  window.setInterval(() => {
+    const prev = ppLastUrl;
+    resetUrlAttemptsIfNeeded();
+    if (ppLastUrl !== prev && shouldShowListingOverlay()) {
+      ppLastRunAt = 0;
+      scheduleApplySettings(defaults, "url-watch", true);
+    }
+  }, 400);
 }
 
 function startListingWatch(defaults) {
@@ -1378,11 +1608,15 @@ function startListingWatch(defaults) {
   ppListingWatchInterval = window.setInterval(() => {
     if (!shouldShowListingOverlay()) {
       hideListingOverlay();
+      clearListingOverlayPositionRetries();
       return;
     }
-    if (hasVisibleListingPayPackButton()) return;
-    scheduleApplySettings(defaults, "listing-watch", true);
-  }, 1500);
+    if (!hasVisibleListingPayPackButton()) {
+      scheduleApplySettings(defaults, "listing-watch", true);
+      return;
+    }
+    syncListingOverlayPosition();
+  }, 800);
 }
 
 if (document.readyState === "loading") {
