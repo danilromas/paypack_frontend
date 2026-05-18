@@ -104,7 +104,7 @@
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
-  background: #0866ff;
+  background: #0f7680;
   color: #ffffff;
   font-family: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
   font-size: 15px;
@@ -116,16 +116,16 @@
 }
 
 .paypack-mp-listing-detail-btn:hover {
-  background: #0755d8;
+  background: #0d6a72;
   border-color: transparent;
   color: #ffffff;
 }
 
 .paypack-mp-listing-detail-btn:active {
-  background: #064fc7;
+  background: #0b5e65;
 }
 
 .paypack-mp-listing-detail-btn:focus-visible {
-  outline: 2px solid rgba(8, 102, 255, 0.45);
+  outline: 2px solid rgba(15, 118, 128, 0.45);
   outline-offset: 2px;
 }

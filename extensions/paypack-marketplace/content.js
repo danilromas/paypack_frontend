@@ -28,9 +28,9 @@ const MESSAGE_SECTION_LABEL =
   /написать\s+сообщение|write\s+a\s+message|send\s+a\s+message|message\s+the\s+seller|invia.*messaggio|messaggio.*venditore|contact\s+seller/i;
 let ppOverlayListenersAttached = false;
 let ppPositionRetryTimer = null;
-const PP_BTN_COLOR = "#0866ff";
-const PP_BTN_COLOR_HOVER = "#0755d8";
-const PP_BTN_COLOR_ACTIVE = "#064fc7";
+const PP_BTN_COLOR = "#0f7680";
+const PP_BTN_COLOR_HOVER = "#0d6a72";
+const PP_BTN_COLOR_ACTIVE = "#0b5e65";
 
 function resetUrlAttemptsIfNeeded() {
   const nowUrl = window.location.href;
@@ -1101,7 +1101,7 @@ function applyShadowListingOverlayStyles(shadow) {
     .btn:hover { background: ${PP_BTN_COLOR_HOVER}; }
     .btn:active { background: ${PP_BTN_COLOR_ACTIVE}; }
     .btn:focus-visible {
-      outline: 2px solid rgba(8, 102, 255, 0.45);
+      outline: 2px solid rgba(15, 118, 128, 0.45);
       outline-offset: 2px;
     }
     :host([data-theme="dark"]) .btn {

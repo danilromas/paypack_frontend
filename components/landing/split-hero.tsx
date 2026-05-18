@@ -31,7 +31,7 @@ const ACTIONS: Record<
     icon: Package,
   },
   transfer: {
-    title: "TRANSFER",
+    title: "MoneyTransfer",
     hint: "Crypto transfer via aWallet",
     href: "https://awallet.tech",
     icon: ArrowLeftRight,
