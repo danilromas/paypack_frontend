@@ -31,7 +31,7 @@ const ACTIONS: Record<
     icon: Package,
   },
   transfer: {
-    title: "MoneyTransfer",
+    title: "Money\nTransfer",
     hint: "Crypto transfer via aWallet",
     href: "https://awallet.tech",
     icon: ArrowLeftRight,
@@ -110,7 +110,7 @@ export function LandingSplitHero() {
                     </div>
 
                     <div>
-                      <h2 className="text-base font-semibold text-foreground transition-all duration-500 group-hover:-translate-y-1 sm:text-lg">
+                      <h2 className="text-base font-semibold text-foreground transition-all duration-500 group-hover:-translate-y-1 sm:text-lg whitespace-pre-line leading-tight">
                         {action.title}
                       </h2>
                       <p className="mt-2 text-xs text-muted-foreground opacity-100 transition-all duration-500 sm:text-sm md:opacity-0 md:group-hover:opacity-100">
