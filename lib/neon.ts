@@ -79,6 +79,16 @@ export async function ensureDealsTable() {
     ADD COLUMN IF NOT EXISTS images_json TEXT NOT NULL DEFAULT ''
   `
 
+  await sql`
+    ALTER TABLE deals
+    ADD COLUMN IF NOT EXISTS source_url TEXT
+  `
+
+  await sql`
+    ALTER TABLE deals
+    ADD COLUMN IF NOT EXISTS source_platform TEXT
+  `
+
   dealsTableEnsured = true
 }
 

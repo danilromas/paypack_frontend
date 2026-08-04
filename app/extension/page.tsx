@@ -3,7 +3,15 @@ import path from "path"
 import { readFileSync } from "fs"
 import { LandingHeader } from "@/components/landing/header"
 import { LandingFooter } from "@/components/landing/footer"
-import { Download, Puzzle, Settings2, MousePointerClick, Copy } from "lucide-react"
+import {
+  Download,
+  Puzzle,
+  Settings2,
+  MousePointerClick,
+  Copy,
+  Table2,
+  LayoutDashboard,
+} from "lucide-react"
 
 function getExtensionVersion() {
   try {
@@ -15,14 +23,14 @@ function getExtensionVersion() {
     )
     return JSON.parse(readFileSync(manifestPath, "utf8")).version as string
   } catch {
-    return "0.4.0"
+    return "1.0.0"
   }
 }
 
 export const metadata = {
   title: "Browser extension | PayPack",
   description:
-    "Install the PayPack Marketplace Chrome extension and import Facebook Marketplace listings into your dashboard.",
+    "Install the PayPack Marketplace Chrome extension — history table, settings, and one-click Facebook Marketplace import.",
 }
 
 export default function ExtensionPage() {
@@ -72,43 +80,55 @@ export default function ExtensionPage() {
                 folder.
               </li>
               <li>
-                Click the extension icon → the default site is{" "}
-                <code className="text-foreground">https://paypack.uno</code>; change it in the popup
-                if you use another origin.
+                Open the popup — set your PayPack URL in{" "}
+                <strong className="text-foreground">Settings</strong> (default{" "}
+                <code className="text-foreground">https://paypack.uno</code>).
               </li>
               <li>
-                Open a Marketplace listing — use <em>Buy in PayPack</em> or{" "}
-                <em>Copy import link</em>. See <code className="text-foreground">INSTALL.txt</code>{" "}
-                inside the ZIP for a short recap.
+                Open a Marketplace listing — use <em>BUY IN PAYPACK</em> above the seller message
+                box, or import from the popup Overview tab.
               </li>
             </ol>
           </section>
 
           <section>
             <h2 className="text-base font-semibold text-foreground">
-              What it does (v{extensionVersion})
+              What&apos;s new in v{extensionVersion}
             </h2>
             <ul className="mt-3 space-y-3 text-sm text-muted-foreground">
               <li className="flex gap-3">
-                <MousePointerClick className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <LayoutDashboard className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span>
-                  <strong className="text-foreground">Dashboard import</strong> — reads title,
-                  price, and description from the page and opens deal creation with those fields
-                  prefilled.
+                  <strong className="text-foreground">Overview</strong> — status pill, today/total
+                  counters, open dashboard, import current listing, copy import link.
                 </span>
               </li>
               <li className="flex gap-3">
-                <Copy className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <Table2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span>
-                  <strong className="text-foreground">Copy import URL</strong> — share or paste the
-                  link manually; the last import is stored and shown in the extension popup.
+                  <strong className="text-foreground">History table</strong> — last imports with
+                  search, open again, copy link, delete, and clear all.
                 </span>
               </li>
               <li className="flex gap-3">
                 <Settings2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span>
-                  <strong className="text-foreground">Popup settings</strong> — set your PayPack
-                  origin and toggle the floating button on Facebook without editing code.
+                  <strong className="text-foreground">Settings</strong> — PayPack origin, detail/feed
+                  toggles, button label &amp; color (#0f7680 default), EN/RU UI, debug mode.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <MousePointerClick className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>
+                  <strong className="text-foreground">Stable overlay</strong> — fixed button above
+                  the seller composer (no Facebook DOM injection); settings apply live via storage.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <Copy className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>
+                  <strong className="text-foreground">Dashboard import</strong> — still prefills
+                  title, price, description, and image into deal creation.
                 </span>
               </li>
             </ul>

@@ -2,7 +2,20 @@
  * PayPack Marketplace — floating actions + dashboard import.
  * Site URL and FAB visibility: extension icon → popup.
  */
-const PP_DEBUG = false;
+let PP_DEBUG = false;
+let ppRuntimeSettings =
+  typeof PayPackStorage !== "undefined"
+    ? PayPackStorage.normalizeSettings(PayPackStorage.SYNC_DEFAULTS)
+    : {
+        paypackOrigin: "https://paypack.uno",
+        showFab: true,
+        showFeedButtons: true,
+        buttonLabel: "BUY IN PAYPACK",
+        buttonColor: "#0f7680",
+        debugMode: false,
+        uiLang: "en",
+      };
+
 function ppLog(...args) {
   if (!PP_DEBUG) return;
   console.log("[PayPackExt]", ...args);
@@ -11,6 +24,22 @@ function ppLog(...args) {
 function ppWarn(...args) {
   if (!PP_DEBUG) return;
   console.log("[PayPackExt]", ...args);
+}
+
+function getButtonLabel() {
+  return (
+    (ppRuntimeSettings && ppRuntimeSettings.buttonLabel) ||
+    "BUY IN PAYPACK"
+  );
+}
+
+function getButtonColor() {
+  const color =
+    (ppRuntimeSettings && ppRuntimeSettings.buttonColor) || "#0f7680";
+  if (typeof PayPackStorage !== "undefined") {
+    return PayPackStorage.normalizeHexColor(color, "#0f7680");
+  }
+  return color;
 }
 
 let ppInjectScheduled = false;
@@ -28,10 +57,6 @@ const MESSAGE_SECTION_LABEL =
   /написать\s+сообщение|write\s+a\s+message|send\s+a\s+message|message\s+the\s+seller|invia.*messaggio|messaggio.*venditore|contact\s+seller/i;
 let ppOverlayListenersAttached = false;
 let ppPositionRetryTimer = null;
-const PP_BTN_COLOR = "#0f7680";
-const PP_BTN_COLOR_HOVER = "#0d6a72";
-const PP_BTN_COLOR_ACTIVE = "#0b5e65";
-
 function resetUrlAttemptsIfNeeded() {
   const nowUrl = window.location.href;
   if (nowUrl !== ppLastUrl) {
@@ -661,7 +686,7 @@ function buildImportUrl(paypackOrigin, sourceEl) {
   return PayPackUrlBuild.buildDashboardImportUrl(paypackOrigin, scrapeListing(sourceEl));
 }
 
-function rememberLastImport(paypackOrigin, importUrl, sourceEl) {
+function rememberImport(paypackOrigin, importUrl, sourceEl, status) {
   const snap = scrapeListing(sourceEl);
   const payload = {
     at: Date.now(),
@@ -670,8 +695,14 @@ function rememberLastImport(paypackOrigin, importUrl, sourceEl) {
     title: snap.title,
     link: snap.link,
     price: snap.price,
+    image: snap.image,
+    status: status || "opened",
   };
   try {
+    if (typeof PayPackStorage !== "undefined") {
+      PayPackStorage.addHistoryEntry(payload);
+      return;
+    }
     chrome.storage.local.set({
       lastImport: JSON.stringify(payload),
     });
@@ -682,16 +713,16 @@ function rememberLastImport(paypackOrigin, importUrl, sourceEl) {
 
 function openPayPack(paypackOrigin, sourceEl) {
   const url = buildImportUrl(paypackOrigin, sourceEl);
-  rememberLastImport(paypackOrigin, url, sourceEl);
+  rememberImport(paypackOrigin, url, sourceEl, "opened");
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
 async function copyImportLink(paypackOrigin, sourceEl) {
   const url = buildImportUrl(paypackOrigin, sourceEl);
-  rememberLastImport(paypackOrigin, url, sourceEl);
+  let ok = false;
   try {
     await navigator.clipboard.writeText(url);
-    return true;
+    ok = true;
   } catch {
     try {
       const ta = document.createElement("textarea");
@@ -702,11 +733,13 @@ async function copyImportLink(paypackOrigin, sourceEl) {
       ta.select();
       document.execCommand("copy");
       ta.remove();
-      return true;
+      ok = true;
     } catch {
-      return false;
+      ok = false;
     }
   }
+  rememberImport(paypackOrigin, url, sourceEl, ok ? "copied" : "failed");
+  return ok;
 }
 
 function createActionButton(paypackOrigin, compact, sourceEl) {
@@ -719,7 +752,10 @@ function createActionButton(paypackOrigin, compact, sourceEl) {
     : "paypack-mp-inline-btn";
   btn.title =
     "Buy in PayPack with this listing prefilled (title, price, description, image).";
-  btn.textContent = compact ? "Buy in PayPack" : "Buy in PayPack";
+  btn.textContent = compact ? getButtonLabel() : getButtonLabel();
+  const color = getButtonColor();
+  btn.style.background = color;
+  btn.style.borderColor = color;
 
   btn.addEventListener("click", (e) => {
     e.preventDefault();
@@ -736,7 +772,10 @@ function createListingDetailButton(paypackOrigin, sourceEl) {
   btn.className = "paypack-mp-inline-btn paypack-mp-listing-detail-btn";
   btn.title =
     "Buy in PayPack with this listing prefilled (title, price, description, image).";
-  btn.textContent = "BUY IN PAYPACK";
+  btn.textContent = getButtonLabel();
+  const color = getButtonColor();
+  btn.style.background = color;
+  btn.style.borderColor = color;
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1061,6 +1100,15 @@ function applyShadowListingOverlayStyles(shadow) {
     style = document.createElement("style");
     shadow.prepend(style);
   }
+  const color = getButtonColor();
+  const hover =
+    typeof PayPackStorage !== "undefined"
+      ? PayPackStorage.darkenHex(color, 12)
+      : color;
+  const active =
+    typeof PayPackStorage !== "undefined"
+      ? PayPackStorage.darkenHex(color, 22)
+      : color;
   style.textContent = `
     :host {
       all: initial;
@@ -1085,7 +1133,7 @@ function applyShadowListingOverlayStyles(shadow) {
       box-sizing: border-box;
       border: none;
       border-radius: 8px;
-      background: ${PP_BTN_COLOR};
+      background: ${color};
       color: #ffffff;
       cursor: pointer;
       font-family: inherit;
@@ -1098,18 +1146,18 @@ function applyShadowListingOverlayStyles(shadow) {
       -webkit-font-smoothing: antialiased;
       transition: background-color 0.2s ease;
     }
-    .btn:hover { background: ${PP_BTN_COLOR_HOVER}; }
-    .btn:active { background: ${PP_BTN_COLOR_ACTIVE}; }
+    .btn:hover { background: ${hover}; }
+    .btn:active { background: ${active}; }
     .btn:focus-visible {
-      outline: 2px solid rgba(15, 118, 128, 0.45);
+      outline: 2px solid ${color}73;
       outline-offset: 2px;
     }
     :host([data-theme="dark"]) .btn {
-      background: ${PP_BTN_COLOR};
+      background: ${color};
       color: #ffffff;
     }
     :host([data-theme="dark"]) .btn:hover {
-      background: ${PP_BTN_COLOR_HOVER};
+      background: ${hover};
     }
   `;
 }
@@ -1128,7 +1176,7 @@ function ensureShadowListingOverlay(paypackOrigin) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "btn";
-    btn.textContent = "BUY IN PAYPACK";
+    btn.textContent = getButtonLabel();
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1142,6 +1190,8 @@ function ensureShadowListingOverlay(paypackOrigin) {
   } else {
     applyShadowListingOverlayStyles(host.shadowRoot);
     host.shadowRoot?.querySelector(".badge")?.remove();
+    const btn = host.shadowRoot?.querySelector(".btn");
+    if (btn) btn.textContent = getButtonLabel();
   }
 
   syncFacebookOverlayTheme(host);
@@ -1445,6 +1495,202 @@ function resolveListingComposer(preferredRoot) {
   return null;
 }
 
+const PP_TOAST_HOST_ID = "paypack-mp-toast-host";
+const PP_SELLER_MSG_PARAM = "pp_msg";
+const PP_SELLER_DEAL_PARAM = "pp_deal";
+const PP_SELLER_MSG_MAX_ATTEMPTS = 32; // ~8s at 250ms
+let ppToastHideTimer = null;
+let ppSellerMessageTimer = null;
+let ppSellerMessageAttempts = 0;
+
+function applyToastStyles(shadow) {
+  let style = shadow.querySelector("style");
+  if (!style) {
+    style = document.createElement("style");
+    shadow.prepend(style);
+  }
+  style.textContent = `
+    :host {
+      all: initial;
+      position: fixed;
+      z-index: 2147483647;
+      right: 16px;
+      bottom: 16px;
+      pointer-events: none;
+      font-family: "Segoe UI Historic", "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+    .toast {
+      display: none;
+      max-width: 320px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #1c1e21;
+      color: #fff;
+      font-size: 13px;
+      line-height: 1.4;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+    .toast.show { display: block; }
+    .toast.pp-error { background: #c0392b; }
+    .toast.pp-success { background: #22a559; }
+  `;
+}
+
+function ensurePayPackToastHost() {
+  let host = document.getElementById(PP_TOAST_HOST_ID);
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = PP_TOAST_HOST_ID;
+  const shadow = host.attachShadow({ mode: "open" });
+  applyToastStyles(shadow);
+  const el = document.createElement("div");
+  el.className = "toast";
+  shadow.appendChild(el);
+  document.documentElement.appendChild(host);
+  return host;
+}
+
+function showPayPackToast(text, tone) {
+  const host = ensurePayPackToastHost();
+  const el = host.shadowRoot?.querySelector(".toast");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `toast show${tone ? ` ${tone}` : ""}`;
+  if (ppToastHideTimer) clearTimeout(ppToastHideTimer);
+  ppToastHideTimer = setTimeout(() => {
+    el.classList.remove("show");
+  }, 4500);
+}
+
+function getPendingSellerMessageParams() {
+  const params = new URLSearchParams(window.location.search);
+  const message = params.get(PP_SELLER_MSG_PARAM);
+  const dealId = params.get(PP_SELLER_DEAL_PARAM);
+  if (!message || !dealId) return null;
+  return { message, dealId };
+}
+
+function clearPendingSellerMessageFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(PP_SELLER_MSG_PARAM);
+    url.searchParams.delete(PP_SELLER_DEAL_PARAM);
+    history.replaceState(history.state, "", url.toString());
+  } catch {
+    // ignore
+  }
+}
+
+function findComposerTextbox(host) {
+  return (
+    host.querySelector('[contenteditable="true"]') ||
+    host.querySelector('[role="textbox"]') ||
+    host.querySelector("textarea")
+  );
+}
+
+/** Работает и с contenteditable (FB), и с textarea — фолбэк через нативный сеттер + событие. */
+function insertTextIntoComposer(textbox, text) {
+  textbox.focus();
+  if (textbox.isContentEditable || textbox.getAttribute("contenteditable") === "true") {
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      const range = document.createRange();
+      range.selectNodeContents(textbox);
+      range.collapse(false);
+      sel.addRange(range);
+    }
+    const inserted =
+      typeof document.execCommand === "function" &&
+      document.execCommand("insertText", false, text);
+    if (!inserted) {
+      textbox.textContent = text;
+      textbox.dispatchEvent(
+        new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }),
+      );
+    }
+  } else {
+    const proto = Object.getPrototypeOf(textbox);
+    const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+    if (setter) {
+      setter.call(textbox, text);
+    } else {
+      textbox.value = text;
+    }
+    textbox.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  textbox.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function isSendButtonDisabled(btn) {
+  if (!btn) return true;
+  if (btn.disabled) return true;
+  return btn.getAttribute("aria-disabled") === "true";
+}
+
+function stopPendingSellerMessagePolling() {
+  if (ppSellerMessageTimer) {
+    clearInterval(ppSellerMessageTimer);
+    ppSellerMessageTimer = null;
+  }
+}
+
+function attemptSendPendingSellerMessage(pending) {
+  ppSellerMessageAttempts += 1;
+
+  let composer = null;
+  for (const root of getListingRoots()) {
+    const found = resolveListingComposer(root);
+    if (found?.host && found?.sendButton) {
+      composer = found;
+      break;
+    }
+  }
+
+  const textbox = composer && findComposerTextbox(composer.host);
+  if (!composer || !textbox) {
+    if (ppSellerMessageAttempts >= PP_SELLER_MSG_MAX_ATTEMPTS) {
+      stopPendingSellerMessagePolling();
+      showPayPackToast(
+        "PayPack couldn't find the seller message box — please send it manually.",
+        "pp-error",
+      );
+    }
+    return;
+  }
+
+  stopPendingSellerMessagePolling();
+  insertTextIntoComposer(textbox, pending.message);
+  sessionStorage.setItem(`pp_msg_sent_${pending.dealId}`, "1");
+  clearPendingSellerMessageFromUrl();
+
+  setTimeout(() => {
+    if (!isSendButtonDisabled(composer.sendButton)) {
+      composer.sendButton.click();
+      showPayPackToast("Message sent to the seller via PayPack.", "pp-success");
+    } else {
+      showPayPackToast("Message typed in — click Send to finish.", "");
+    }
+  }, 300);
+}
+
+function trySendPendingSellerMessage() {
+  const pending = getPendingSellerMessageParams();
+  if (!pending) return;
+  if (sessionStorage.getItem(`pp_msg_sent_${pending.dealId}`) === "1") return;
+  if (ppSellerMessageTimer) return;
+
+  ppSellerMessageAttempts = 0;
+  attemptSendPendingSellerMessage(pending);
+  if (!ppSellerMessageTimer && getPendingSellerMessageParams()) {
+    ppSellerMessageTimer = setInterval(
+      () => attemptSendPendingSellerMessage(pending),
+      250,
+    );
+  }
+}
+
 function injectButtonIntoListingPage(settings) {
   resetUrlAttemptsIfNeeded();
   if (!shouldShowListingOverlay()) {
@@ -1472,6 +1718,14 @@ function injectButtonIntoListingPage(settings) {
 function injectButtonsIntoFeedBlocks(settings) {
   if (shouldShowListingOverlay()) return;
 
+  for (const el of document.querySelectorAll(
+    '.paypack-mp-inline-wrap[data-paypack-placement="feed-card"]',
+  )) {
+    el.remove();
+  }
+
+  if (settings?.showFeedButtons === false) return;
+
   const paypackOrigin =
     (settings && settings.paypackOrigin) || PayPackUrlBuild.DEFAULT_ORIGIN;
 
@@ -1493,11 +1747,17 @@ function injectButtonsIntoFeedBlocks(settings) {
 }
 
 function applySettings(settings) {
+  ppRuntimeSettings =
+    typeof PayPackStorage !== "undefined"
+      ? PayPackStorage.normalizeSettings(settings)
+      : Object.assign({}, ppRuntimeSettings, settings || {});
+  PP_DEBUG = !!ppRuntimeSettings.debugMode;
   resetUrlAttemptsIfNeeded();
-  injectButtonsIntoFeedBlocks(settings);
+  trySendPendingSellerMessage();
+  injectButtonsIntoFeedBlocks(ppRuntimeSettings);
   if (shouldShowListingOverlay()) {
-    if (settings?.showFab !== false) {
-      injectButtonIntoListingPage(settings);
+    if (ppRuntimeSettings.showFab !== false) {
+      injectButtonIntoListingPage(ppRuntimeSettings);
     } else {
       hideListingOverlay();
       for (const root of getListingRoots()) {
@@ -1553,10 +1813,32 @@ function bootstrap() {
     href: window.location.href,
     readyState: document.readyState,
   });
-  const defaults = {
-    paypackOrigin: PayPackUrlBuild.DEFAULT_ORIGIN,
-    showFab: true,
-  };
+  trySendPendingSellerMessage();
+  const defaults =
+    typeof PayPackStorage !== "undefined"
+      ? PayPackStorage.SYNC_DEFAULTS
+      : {
+          paypackOrigin: PayPackUrlBuild.DEFAULT_ORIGIN,
+          showFab: true,
+          showFeedButtons: true,
+          buttonLabel: "BUY IN PAYPACK",
+          buttonColor: "#0f7680",
+          debugMode: false,
+          uiLang: "en",
+        };
+
+  if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (!msg || msg.type !== "pp_scrape_listing") return false;
+      try {
+        const listing = scrapeListing(getActiveListingAnchor());
+        sendResponse({ ok: true, listing });
+      } catch (err) {
+        sendResponse({ ok: false, error: String(err) });
+      }
+      return true;
+    });
+  }
 
   if (typeof chrome !== "undefined" && chrome.storage?.sync) {
     chrome.storage.sync.get(defaults, (sync) => {
@@ -1565,9 +1847,18 @@ function bootstrap() {
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync") return;
-      if (!changes.paypackOrigin && !changes.showFab) return;
+      const keys = [
+        "paypackOrigin",
+        "showFab",
+        "showFeedButtons",
+        "buttonLabel",
+        "buttonColor",
+        "debugMode",
+        "uiLang",
+      ];
+      if (!keys.some((k) => changes[k])) return;
       ppLog("storage.onChanged", { area, changes });
-      scheduleApplySettings(defaults, "storage.onChanged");
+      scheduleApplySettings(defaults, "storage.onChanged", true);
     });
   } else {
     ppWarn("chrome.storage.sync unavailable, using defaults");

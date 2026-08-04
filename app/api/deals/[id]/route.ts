@@ -19,6 +19,8 @@ interface DealRow {
   role: "buyer" | "seller"
   counterparty: string
   counterparty_avatar: string | null
+  source_url: string | null
+  source_platform: string | null
   created_at: string
   updated_at: string
 }
@@ -39,6 +41,9 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
     counterparty: typeof body.counterparty === "string" ? body.counterparty : "",
     counterpartyAvatar:
       typeof body.counterpartyAvatar === "string" ? body.counterpartyAvatar : null,
+    sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : null,
+    sourcePlatform:
+      typeof body.sourcePlatform === "string" ? body.sourcePlatform : null,
   }
 }
 
@@ -97,6 +102,8 @@ export async function PUT(
         role = ${payload.role},
         counterparty = ${payload.counterparty},
         counterparty_avatar = ${payload.counterpartyAvatar ?? null},
+        source_url = ${payload.sourceUrl ?? null},
+        source_platform = ${payload.sourcePlatform ?? null},
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

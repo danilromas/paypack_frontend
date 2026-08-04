@@ -19,6 +19,8 @@ interface DealRow {
   role: "buyer" | "seller"
   counterparty: string
   counterparty_avatar: string | null
+  source_url: string | null
+  source_platform: string | null
   created_at: string
   updated_at: string
 }
@@ -39,6 +41,9 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
     counterparty: typeof body.counterparty === "string" ? body.counterparty : "",
     counterpartyAvatar:
       typeof body.counterpartyAvatar === "string" ? body.counterpartyAvatar : null,
+    sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : null,
+    sourcePlatform:
+      typeof body.sourcePlatform === "string" ? body.sourcePlatform : null,
   }
 }
 
@@ -73,7 +78,7 @@ export async function POST(req: Request) {
     const inserted = await sql<DealRow[]>`
       INSERT INTO deals (
         title, description, image_url, price, shipping_price, currency,
-        status, role, counterparty, counterparty_avatar
+        status, role, counterparty, counterparty_avatar, source_url, source_platform
       )
       VALUES (
         ${payload.title.trim()},
@@ -85,7 +90,9 @@ export async function POST(req: Request) {
         ${payload.status},
         ${payload.role},
         ${payload.counterparty},
-        ${payload.counterpartyAvatar ?? null}
+        ${payload.counterpartyAvatar ?? null},
+        ${payload.sourceUrl ?? null},
+        ${payload.sourcePlatform ?? null}
       )
       RETURNING *
     `

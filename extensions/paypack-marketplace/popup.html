@@ -7,42 +7,128 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <main class="wrap">
+    <main class="shell">
       <header class="head">
-        <span class="logo">PP</span>
-        <div>
-          <h1>PayPack</h1>
-          <p class="sub">Marketplace helper</p>
+        <div class="brand">
+          <span class="logo">PP</span>
+          <div>
+            <h1>PayPack<span class="dot">.uno</span></h1>
+            <p class="sub">Marketplace helper · v<span id="extVersion">1.0.0</span></p>
+          </div>
         </div>
+        <span id="statusPill" class="pill muted">Checking…</span>
       </header>
 
-      <label class="lbl" for="origin">PayPack site URL</label>
-      <input
-        id="origin"
-        type="url"
-        autocomplete="url"
-        placeholder="https://paypack.uno"
-        spellcheck="false"
-      />
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="overview" role="tab">Overview</button>
+        <button type="button" class="tab" data-tab="history" role="tab">History</button>
+        <button type="button" class="tab" data-tab="settings" role="tab">Settings</button>
+        <button type="button" class="tab" data-tab="help" role="tab">Help</button>
+      </nav>
 
-      <label class="row chk">
-        <input id="showFab" type="checkbox" />
-        <span>Show "Buy in PayPack" button on listing page</span>
-      </label>
+      <section id="panel-overview" class="panel active" role="tabpanel">
+        <div class="stat-row">
+          <div class="stat">
+            <span class="stat-label">Today</span>
+            <strong id="statToday">0</strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Saved</span>
+            <strong id="statTotal">0</strong>
+          </div>
+          <div class="stat wide">
+            <span class="stat-label">PayPack</span>
+            <strong id="statOrigin" class="truncate">paypack.uno</strong>
+          </div>
+        </div>
 
-      <button id="save" type="button" class="btn primary">Save</button>
-      <p id="toast" class="toast" hidden>Saved</p>
-
-      <section class="card">
-        <h2>Last import</h2>
-        <p id="lastEmpty" class="muted">No imports yet from this browser.</p>
-        <pre id="last" class="last" hidden></pre>
+        <div class="actions">
+          <button type="button" class="btn primary" id="btnOpenDashboard">Open dashboard</button>
+          <button type="button" class="btn secondary" id="btnImportCurrent">Import current listing</button>
+          <button type="button" class="btn ghost" id="btnCopyCurrent">Copy import link</button>
+        </div>
+        <p id="overviewHint" class="hint">Open a Facebook Marketplace listing to import.</p>
+        <p id="overviewToast" class="toast" hidden></p>
       </section>
 
-      <a id="help" class="link" href="#" target="_blank" rel="noopener noreferrer"
-        >Installation & extension page</a
-      >
+      <section id="panel-history" class="panel" role="tabpanel" hidden>
+        <div class="toolbar">
+          <input id="historySearch" type="search" placeholder="Search title…" autocomplete="off" />
+          <button type="button" class="btn tiny danger" id="btnClearHistory">Clear</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table" aria-label="Import history">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Title</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+          <p id="historyEmpty" class="empty">No imports yet from this browser.</p>
+        </div>
+      </section>
+
+      <section id="panel-settings" class="panel" role="tabpanel" hidden>
+        <label class="lbl" for="origin">PayPack site URL</label>
+        <div class="row-inline">
+          <input id="origin" type="url" autocomplete="url" placeholder="https://paypack.uno" spellcheck="false" />
+          <button type="button" class="btn tiny" id="btnValidateOrigin">Open</button>
+        </div>
+
+        <label class="row chk">
+          <input id="showFab" type="checkbox" />
+          <span>Show button on listing detail</span>
+        </label>
+        <label class="row chk">
+          <input id="showFeedButtons" type="checkbox" />
+          <span>Show buttons on feed cards</span>
+        </label>
+
+        <label class="lbl" for="buttonLabel">Button label</label>
+        <input id="buttonLabel" type="text" maxlength="40" />
+
+        <label class="lbl" for="buttonColor">Button color</label>
+        <div class="row-inline">
+          <input id="buttonColor" type="color" />
+          <input id="buttonColorText" type="text" maxlength="7" spellcheck="false" />
+          <button type="button" class="btn tiny" id="btnResetColor">Reset</button>
+        </div>
+
+        <label class="lbl" for="uiLang">Popup language</label>
+        <select id="uiLang">
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+        </select>
+
+        <label class="row chk">
+          <input id="debugMode" type="checkbox" />
+          <span>Debug mode (console logs)</span>
+        </label>
+
+        <button type="button" class="btn primary" id="btnSaveSettings">Save settings</button>
+        <p id="settingsToast" class="toast" hidden>Saved</p>
+      </section>
+
+      <section id="panel-help" class="panel" role="tabpanel" hidden>
+        <ol class="help-list">
+          <li>Load the unzipped folder via chrome://extensions → Developer mode → Load unpacked.</li>
+          <li>Set your PayPack URL in Settings (default https://paypack.uno).</li>
+          <li>Open a Marketplace listing and click the overlay button above the seller message box.</li>
+          <li>Imports are saved in History — reopen or copy the link anytime.</li>
+        </ol>
+        <a id="helpLink" class="link" href="#" target="_blank" rel="noopener noreferrer"
+          >Open installation page</a
+        >
+        <p class="muted foot">PayPack Marketplace · Manifest V3</p>
+      </section>
     </main>
+    <script src="storage.js"></script>
+    <script src="url-build.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
