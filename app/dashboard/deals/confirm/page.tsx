@@ -85,6 +85,10 @@ function DealConfirmPageContent() {
           role: deal.role,
           counterparty: deal.counterparty,
           counterpartyAvatar: deal.counterpartyAvatar ?? null,
+          sourceUrl: deal.sourceUrl ?? null,
+          sourcePlatform: deal.sourcePlatform ?? null,
+          paymentMethod: deal.paymentMethod ?? null,
+          paymentCryptoCoin: deal.paymentCryptoCoin ?? null,
         }),
       })
       if (!putRes.ok) {

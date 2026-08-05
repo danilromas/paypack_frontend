@@ -11,6 +11,10 @@ export interface DealPayload {
   role: "buyer" | "seller"
   counterparty: string
   counterpartyAvatar?: string | null
+  sourceUrl?: string | null
+  sourcePlatform?: string | null
+  paymentMethod?: string | null
+  paymentCryptoCoin?: string | null
 }
 
 export const DEAL_STATUS_VALUES: DealStatus[] = [
@@ -50,6 +54,10 @@ export function toDealFromRow(row: {
   role: "buyer" | "seller"
   counterparty: string
   counterparty_avatar: string | null
+  source_url?: string | null
+  source_platform?: string | null
+  payment_method?: string | null
+  payment_crypto_coin?: string | null
   created_at: string
   updated_at: string
 }): Deal {
@@ -65,6 +73,10 @@ export function toDealFromRow(row: {
     role: row.role,
     counterparty: row.counterparty,
     counterpartyAvatar: row.counterparty_avatar ?? undefined,
+    sourceUrl: row.source_url ?? undefined,
+    sourcePlatform: row.source_platform ?? undefined,
+    paymentMethod: row.payment_method ?? undefined,
+    paymentCryptoCoin: row.payment_crypto_coin ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

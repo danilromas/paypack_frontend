@@ -79,6 +79,36 @@ export async function ensureDealsTable() {
     ADD COLUMN IF NOT EXISTS images_json TEXT NOT NULL DEFAULT ''
   `
 
+  await sql`
+    ALTER TABLE deals
+    ADD COLUMN IF NOT EXISTS source_url TEXT
+  `
+
+  await sql`
+    ALTER TABLE deals
+    ADD COLUMN IF NOT EXISTS source_platform TEXT
+  `
+
+  await sql`
+    ALTER TABLE deals
+    ADD COLUMN IF NOT EXISTS payment_method TEXT
+  `
+
+  await sql`
+    ALTER TABLE deals
+    ADD COLUMN IF NOT EXISTS payment_crypto_coin TEXT
+  `
+
+  await sql`
+    ALTER TABLE deals
+    ALTER COLUMN price TYPE NUMERIC(12, 2)
+  `
+
+  await sql`
+    ALTER TABLE deals
+    ALTER COLUMN shipping_price TYPE NUMERIC(12, 2)
+  `
+
   dealsTableEnsured = true
 }
 

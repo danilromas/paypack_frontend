@@ -1,4 +1,4 @@
-PayPack Marketplace — Chrome extension (developer mode)
+PayPack Marketplace — Chrome extension v1.0
 
 1) Download paypack-marketplace-extension.zip from your PayPack site:
    /api/extension/download/
@@ -9,8 +9,15 @@ PayPack Marketplace — Chrome extension (developer mode)
 
 4) "Load unpacked" → select that folder.
 
-5) Click the extension icon → your PayPack site URL defaults to https://paypack.uno (change it there if you use another deployment).
+5) Click the extension icon:
+   - Overview — status, quick import / copy link, counters
+   - History — table of past imports (open / copy / delete)
+   - Settings — PayPack URL, button label/color, feed & detail toggles
+   - Help — short install notes + link to /extension/
 
-6) Open a Facebook Marketplace listing — use "Buy in PayPack" on the listing page (or copy import link from the extension popup).
+6) Open a Facebook Marketplace listing — use the teal overlay button
+   "BUY IN PAYPACK" above the seller message box (not inside Facebook DOM).
 
-For updates: remove the old extension, unzip the new zip, Load unpacked again.
+Default site URL: https://paypack.uno (change in Settings if needed).
+
+For updates: remove the old extension (or Reload), unzip the new zip, Load unpacked again.

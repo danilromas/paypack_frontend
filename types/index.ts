@@ -12,6 +12,10 @@ export interface Deal {
   role: "buyer" | "seller"
   counterparty: string
   counterpartyAvatar?: string
+  sourceUrl?: string
+  sourcePlatform?: string
+  paymentMethod?: string
+  paymentCryptoCoin?: string
   createdAt: string
   updatedAt: string
   images?: string[]
