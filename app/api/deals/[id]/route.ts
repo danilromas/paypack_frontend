@@ -21,6 +21,8 @@ interface DealRow {
   counterparty_avatar: string | null
   source_url: string | null
   source_platform: string | null
+  payment_method: string | null
+  payment_crypto_coin: string | null
   created_at: string
   updated_at: string
 }
@@ -44,6 +46,9 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
     sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : null,
     sourcePlatform:
       typeof body.sourcePlatform === "string" ? body.sourcePlatform : null,
+    paymentMethod: typeof body.paymentMethod === "string" ? body.paymentMethod : null,
+    paymentCryptoCoin:
+      typeof body.paymentCryptoCoin === "string" ? body.paymentCryptoCoin : null,
   }
 }
 
@@ -95,8 +100,8 @@ export async function PUT(
         title = ${payload.title.trim()},
         description = ${payload.description},
         image_url = ${payload.imageUrl ?? null},
-        price = ${Math.round(payload.price)},
-        shipping_price = ${Math.round(payload.shippingPrice)},
+        price = ${Math.round(payload.price * 100) / 100},
+        shipping_price = ${Math.round(payload.shippingPrice * 100) / 100},
         currency = ${payload.currency},
         status = ${payload.status},
         role = ${payload.role},
@@ -104,6 +109,8 @@ export async function PUT(
         counterparty_avatar = ${payload.counterpartyAvatar ?? null},
         source_url = ${payload.sourceUrl ?? null},
         source_platform = ${payload.sourcePlatform ?? null},
+        payment_method = ${payload.paymentMethod ?? null},
+        payment_crypto_coin = ${payload.paymentCryptoCoin ?? null},
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

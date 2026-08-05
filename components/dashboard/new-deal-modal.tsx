@@ -11,6 +11,8 @@ import {
   Share2,
   CheckCircle2,
   MessageCircle,
+  Coins,
+  AlertTriangle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAppStore } from "@/store/app-store";
@@ -21,6 +23,15 @@ import {
   buildDefaultSellerMessage,
   buildSellerMessageUrl,
 } from "@/lib/marketplace";
+import {
+  PAYMENT_METHODS,
+  CRYPTO_COINS,
+  buildDemoCryptoAddress,
+  type PaymentMethod,
+  type CryptoCoin,
+} from "@/lib/payments";
+
+const CURRENCIES = ["EUR", "USD", "GBP"];
 
 type WizardPhase = "role" | "link" | "details" | "summary";
 
@@ -62,7 +73,11 @@ export function NewDealModal({
   const [itemImageUrl, setItemImageUrl] = useState("")
   const [price, setPrice] = useState(0)
   const [shippingPrice, setShippingPrice] = useState(0)
+  const [currency, setCurrency] = useState("EUR")
   const [sellerName, setSellerName] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
+  const [cryptoCoin, setCryptoCoin] = useState<CryptoCoin>("BTC")
+  const [cryptoAddressCopied, setCryptoAddressCopied] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -134,6 +149,23 @@ export function NewDealModal({
     }
   }
 
+  const cryptoCoinLabel = CRYPTO_COINS.find((c) => c.value === cryptoCoin)?.label ?? cryptoCoin
+  const cryptoAddress = useMemo(
+    () => (createdDealId ? buildDemoCryptoAddress(cryptoCoin, createdDealId) : ""),
+    [cryptoCoin, createdDealId],
+  )
+
+  async function handleCopyCryptoAddress() {
+    if (!cryptoAddress) return
+    try {
+      await navigator.clipboard.writeText(cryptoAddress)
+      setCryptoAddressCopied(true)
+      setTimeout(() => setCryptoAddressCopied(false), 1500)
+    } catch {
+      setCryptoAddressCopied(false)
+    }
+  }
+
   useEffect(() => {
     if (!importPrefill) return
     const hasData =
@@ -150,7 +182,7 @@ export function NewDealModal({
       Number.isFinite(importPrefill.price) &&
       importPrefill.price > 0
     ) {
-      setPrice(Math.round(importPrefill.price))
+      setPrice(Math.round(importPrefill.price * 100) / 100)
     }
     if (importPrefill.itemDetailDesc) setItemDetailDesc(importPrefill.itemDetailDesc)
     if (importPrefill.imageUrl) setItemImageUrl(importPrefill.imageUrl)
@@ -172,13 +204,15 @@ export function NewDealModal({
       imageUrl: itemImageUrl.trim() || null,
       price,
       shippingPrice,
-      currency: "EUR",
+      currency,
       status: "pending" as const,
       role,
       counterparty:
         role === "buyer" ? sellerName.trim() || "Awaiting counterparty" : "Awaiting counterparty",
       sourceUrl: trimmedLink || null,
       sourcePlatform: detectMarketplacePlatform(trimmedLink),
+      paymentMethod: role === "buyer" ? paymentMethod : null,
+      paymentCryptoCoin: role === "buyer" && paymentMethod === "crypto" ? cryptoCoin : null,
     }
     setSubmitting(true)
     setSubmitError(null)
@@ -557,6 +591,21 @@ export function NewDealModal({
                   </div>
                 )}
 
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">Currency</label>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  >
+                    {CURRENCIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-xs text-muted-foreground">Price</label>
@@ -564,13 +613,13 @@ export function NewDealModal({
                       <input
                         type="number"
                         min={0}
-                        step={1}
+                        step={0.01}
                         value={price || ""}
                         onChange={(e) => setPrice(Number(e.target.value) || 0)}
                         placeholder="0"
                         className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                       />
-                      <span className="text-xs text-muted-foreground">EUR</span>
+                      <span className="text-xs text-muted-foreground">{currency}</span>
                     </div>
                   </div>
                   <div>
@@ -579,13 +628,13 @@ export function NewDealModal({
                       <input
                         type="number"
                         min={0}
-                        step={1}
+                        step={0.01}
                         value={shippingPrice || ""}
                         onChange={(e) => setShippingPrice(Number(e.target.value) || 0)}
                         placeholder="0"
                         className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                       />
-                      <span className="text-xs text-muted-foreground">EUR</span>
+                      <span className="text-xs text-muted-foreground">{currency}</span>
                     </div>
                   </div>
                 </div>
@@ -625,31 +674,73 @@ export function NewDealModal({
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Price:</span>
-                <span className="font-medium text-foreground">{price} EUR</span>
+                <span className="font-medium text-foreground">{price} {currency}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping:</span>
-                <span className="font-medium text-foreground">{shippingPrice} EUR</span>
+                <span className="font-medium text-foreground">{shippingPrice} {currency}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Fee (3%):</span>
-                <span className="font-medium text-foreground">{fee} EUR</span>
+                <span className="font-medium text-foreground">{fee} {currency}</span>
               </div>
               <div className="border-t border-border pt-3">
                 <div className="flex justify-between font-semibold">
                   <span className="text-foreground">
                     {role === "seller" ? "Total (buyer pays):" : "Total (you pay):"}
                   </span>
-                  <span className="text-primary">{total} EUR</span>
+                  <span className="text-primary">{total} {currency}</span>
                 </div>
                 {role === "seller" && (
                   <div className="mt-1 flex justify-between text-xs text-muted-foreground">
                     <span>You receive:</span>
-                    <span className="font-medium text-foreground">{sellerReceives} EUR</span>
+                    <span className="font-medium text-foreground">{sellerReceives} {currency}</span>
                   </div>
                 )}
               </div>
             </div>
+
+            {role === "buyer" && (
+              <div className="mb-6 text-left">
+                <label className="mb-2 block text-xs font-medium text-muted-foreground">
+                  How will you pay?
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_METHODS.map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      onClick={() => setPaymentMethod(m.value)}
+                      className={cn(
+                        "rounded-xl border-2 px-3 py-2 text-xs font-medium transition-all",
+                        paymentMethod === m.value
+                          ? "border-primary bg-primary/5 text-foreground"
+                          : "border-border bg-card text-muted-foreground hover:border-primary/30",
+                      )}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                {paymentMethod === "crypto" && (
+                  <div className="mt-2">
+                    <label className="mb-1 block text-xs text-muted-foreground">Coin</label>
+                    <select
+                      value={cryptoCoin}
+                      onChange={(e) => setCryptoCoin(e.target.value as CryptoCoin)}
+                      className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    >
+                      {CRYPTO_COINS.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
             {submitError && (
               <p className="mb-3 text-left text-sm text-destructive">{submitError}</p>
             )}
@@ -757,6 +848,42 @@ export function NewDealModal({
                     Share
                   </button>
                 </div>
+
+                {role === "buyer" && paymentMethod === "crypto" && createdDealId && (
+                  <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-3 text-left">
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                      <Coins className="h-3.5 w-3.5 text-primary" />
+                      Pay with {cryptoCoinLabel}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Send the agreed amount (~{total} {currency}) using {cryptoCoinLabel} to the address below.
+                    </p>
+                    <div className="mx-auto mt-3 w-fit rounded-2xl bg-background p-3 shadow-inner">
+                      <div className="rounded-xl bg-white p-2">
+                        <QRCodeSVG value={cryptoAddress} size={140} includeMargin level="M" />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                      <span className="flex-1 truncate font-mono text-xs text-foreground">
+                        {cryptoAddress}
+                      </span>
+                      <button
+                        onClick={handleCopyCryptoAddress}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {cryptoAddressCopied && (
+                      <p className="mt-1 text-[10px] text-primary">Copied</p>
+                    )}
+                    <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>Demo address for MVP preview — not monitored. Do not send real funds.</span>
+                    </div>
+                  </div>
+                )}
+
                 <a
                   href={confirmUrl || "#"}
                   target="_blank"

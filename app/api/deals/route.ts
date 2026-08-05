@@ -21,6 +21,8 @@ interface DealRow {
   counterparty_avatar: string | null
   source_url: string | null
   source_platform: string | null
+  payment_method: string | null
+  payment_crypto_coin: string | null
   created_at: string
   updated_at: string
 }
@@ -44,6 +46,9 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
     sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : null,
     sourcePlatform:
       typeof body.sourcePlatform === "string" ? body.sourcePlatform : null,
+    paymentMethod: typeof body.paymentMethod === "string" ? body.paymentMethod : null,
+    paymentCryptoCoin:
+      typeof body.paymentCryptoCoin === "string" ? body.paymentCryptoCoin : null,
   }
 }
 
@@ -78,21 +83,24 @@ export async function POST(req: Request) {
     const inserted = await sql<DealRow[]>`
       INSERT INTO deals (
         title, description, image_url, price, shipping_price, currency,
-        status, role, counterparty, counterparty_avatar, source_url, source_platform
+        status, role, counterparty, counterparty_avatar, source_url, source_platform,
+        payment_method, payment_crypto_coin
       )
       VALUES (
         ${payload.title.trim()},
         ${payload.description},
         ${payload.imageUrl ?? null},
-        ${Math.round(payload.price)},
-        ${Math.round(payload.shippingPrice)},
+        ${Math.round(payload.price * 100) / 100},
+        ${Math.round(payload.shippingPrice * 100) / 100},
         ${payload.currency},
         ${payload.status},
         ${payload.role},
         ${payload.counterparty},
         ${payload.counterpartyAvatar ?? null},
         ${payload.sourceUrl ?? null},
-        ${payload.sourcePlatform ?? null}
+        ${payload.sourcePlatform ?? null},
+        ${payload.paymentMethod ?? null},
+        ${payload.paymentCryptoCoin ?? null}
       )
       RETURNING *
     `

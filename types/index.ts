@@ -14,6 +14,8 @@ export interface Deal {
   counterpartyAvatar?: string
   sourceUrl?: string
   sourcePlatform?: string
+  paymentMethod?: string
+  paymentCryptoCoin?: string
   createdAt: string
   updatedAt: string
   images?: string[]
