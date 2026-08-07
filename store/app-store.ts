@@ -1,7 +1,16 @@
 import { create } from "zustand"
 import type { AppMode, Deal, ChatThread } from "@/types"
 
+export interface AuthUser {
+  id: string
+  name: string
+  email: string
+  role: string
+}
+
 interface AppState {
+  user: AuthUser | null
+  setUser: (user: AuthUser | null) => void
   mode: AppMode
   setMode: (mode: AppMode) => void
   walletBalance: number
@@ -19,6 +28,8 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  user: null,
+  setUser: (user) => set({ user }),
   mode: "deal",
   setMode: (mode) => set({ mode }),
   walletBalance: 500,

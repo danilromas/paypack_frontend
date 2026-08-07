@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { useAppStore } from "@/store/app-store"
 
 export default function DashboardLayout({
   children,
@@ -11,6 +13,14 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const isShipments = pathname.startsWith("/dashboard/shipments")
+  const setUser = useAppStore((s) => s.setUser)
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => setUser(user))
+      .catch(() => setUser(null))
+  }, [setUser])
 
   return (
     <div

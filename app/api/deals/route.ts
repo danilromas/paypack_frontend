@@ -1,31 +1,10 @@
 import { NextResponse } from "next/server"
-import { ensureDealsTable, getSql } from "@/lib/neon"
-import {
-  toDealFromRow,
-  validateDealPayload,
-  type DealPayload,
-} from "@/lib/deals"
+import { desc, eq } from "drizzle-orm"
+import { db } from "@/lib/db"
+import { deals } from "@/db/schema"
+import { toDeal, validateDealPayload, type DealPayload } from "@/lib/deals"
+import { getCurrentUser } from "@/lib/auth/session"
 import type { DealStatus } from "@/types"
-
-interface DealRow {
-  id: string
-  title: string
-  description: string
-  image_url: string | null
-  price: number
-  shipping_price: number
-  currency: string
-  status: DealStatus
-  role: "buyer" | "seller"
-  counterparty: string
-  counterparty_avatar: string | null
-  source_url: string | null
-  source_platform: string | null
-  payment_method: string | null
-  payment_crypto_coin: string | null
-  created_at: string
-  updated_at: string
-}
 
 function normalizePayload(body: Record<string, unknown>): DealPayload {
   return {
@@ -53,26 +32,32 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
 }
 
 export async function GET() {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+
   try {
-    await ensureDealsTable()
-    const sql = getSql()
-    const rows = await sql<DealRow[]>`
-      SELECT * FROM deals
-      ORDER BY created_at DESC
-    `
-    return NextResponse.json(rows.map(toDealFromRow))
+    const rows = await db
+      .select()
+      .from(deals)
+      .where(eq(deals.userId, user.id))
+      .orderBy(desc(deals.createdAt))
+
+    return NextResponse.json(rows.map(toDeal))
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch deals", details: String(error) },
-      { status: 500 },
-    )
+    console.error("GET /api/deals failed", error)
+    return NextResponse.json({ error: "Failed to fetch deals" }, { status: 500 })
   }
 }
 
 export async function POST(req: Request) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+
   try {
-    await ensureDealsTable()
-    const sql = getSql()
     const raw = (await req.json()) as Record<string, unknown>
     const payload = normalizePayload(raw)
     const validationError = validateDealPayload(payload)
@@ -80,36 +65,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    const inserted = await sql<DealRow[]>`
-      INSERT INTO deals (
-        title, description, image_url, price, shipping_price, currency,
-        status, role, counterparty, counterparty_avatar, source_url, source_platform,
-        payment_method, payment_crypto_coin
-      )
-      VALUES (
-        ${payload.title.trim()},
-        ${payload.description},
-        ${payload.imageUrl ?? null},
-        ${Math.round(payload.price * 100) / 100},
-        ${Math.round(payload.shippingPrice * 100) / 100},
-        ${payload.currency},
-        ${payload.status},
-        ${payload.role},
-        ${payload.counterparty},
-        ${payload.counterpartyAvatar ?? null},
-        ${payload.sourceUrl ?? null},
-        ${payload.sourcePlatform ?? null},
-        ${payload.paymentMethod ?? null},
-        ${payload.paymentCryptoCoin ?? null}
-      )
-      RETURNING *
-    `
+    const inserted = await db
+      .insert(deals)
+      .values({
+        userId: user.id,
+        title: payload.title.trim(),
+        description: payload.description,
+        imageUrl: payload.imageUrl ?? null,
+        price: (Math.round(payload.price * 100) / 100).toFixed(2),
+        shippingPrice: (Math.round(payload.shippingPrice * 100) / 100).toFixed(2),
+        currency: payload.currency,
+        status: payload.status,
+        role: payload.role,
+        counterparty: payload.counterparty,
+        counterpartyAvatar: payload.counterpartyAvatar ?? null,
+        sourceUrl: payload.sourceUrl ?? null,
+        sourcePlatform: payload.sourcePlatform ?? null,
+        paymentMethod: payload.paymentMethod ?? null,
+        paymentCryptoCoin: payload.paymentCryptoCoin ?? null,
+      })
+      .returning()
 
-    return NextResponse.json(toDealFromRow(inserted[0]), { status: 201 })
+    return NextResponse.json(toDeal(inserted[0]), { status: 201 })
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to create deal", details: String(error) },
-      { status: 500 },
-    )
+    console.error("POST /api/deals failed", error)
+    return NextResponse.json({ error: "Failed to create deal" }, { status: 500 })
   }
 }

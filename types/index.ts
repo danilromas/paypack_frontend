@@ -21,20 +21,6 @@ export interface Deal {
   images?: string[]
 }
 
-export type ShipmentStatus = "pending" | "in-transit" | "arrived" | "returned"
-
-export interface Shipment {
-  id: string
-  sender: { name: string; location: string; avatar?: string }
-  receiver: { name: string; location: string }
-  service: string
-  dimensions: string
-  weight: string
-  status: ShipmentStatus
-  trackingNumber?: string
-  dealId?: string
-}
-
 export interface ChatMessage {
   id: string
   content: string

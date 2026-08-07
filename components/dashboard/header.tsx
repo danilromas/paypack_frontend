@@ -29,7 +29,15 @@ import Link from "next/link"
 
 export function DashboardHeader() {
   const router = useRouter()
-  const { mode, walletBalance } = useAppStore()
+  const { mode, walletBalance, user } = useAppStore()
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "?"
 
   return (
     <header
@@ -261,15 +269,15 @@ export function DashboardHeader() {
           <span className="flex items-center gap-3 rounded-full border border-transparent px-1 py-1 text-inherit transition-colors hover:opacity-90">
             <Avatar className="h-10 w-10">
               <AvatarFallback className="bg-white/20 text-inherit text-sm font-bold">
-                JD
+                {initials}
               </AvatarFallback>
             </Avatar>
             <span className="hidden flex-col text-left text-xs sm:flex [color:inherit]">
               <span className="font-semibold">
-                John Doe
+                {user?.name ?? "..."}
               </span>
               <span className="text-[10px] opacity-80">
-                Premium user
+                {user?.email ?? ""}
               </span>
             </span>
           </span>

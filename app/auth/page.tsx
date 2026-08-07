@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { AuthPanel } from "@/components/auth/auth-panel"
 import Link from "next/link"
 
@@ -17,7 +18,9 @@ export default function AuthPage() {
 
       <main className="mx-auto grid max-w-7xl place-items-center px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <div className="w-full max-w-md rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-6">
-          <AuthPanel />
+          <Suspense fallback={null}>
+            <AuthPanel />
+          </Suspense>
         </div>
       </main>
     </div>

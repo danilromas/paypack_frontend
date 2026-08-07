@@ -1,31 +1,10 @@
 import { NextResponse } from "next/server"
-import { ensureDealsTable, getSql } from "@/lib/neon"
-import {
-  toDealFromRow,
-  validateDealPayload,
-  type DealPayload,
-} from "@/lib/deals"
+import { and, eq } from "drizzle-orm"
+import { db } from "@/lib/db"
+import { deals } from "@/db/schema"
+import { toDeal, validateDealPayload, type DealPayload } from "@/lib/deals"
+import { getCurrentUser } from "@/lib/auth/session"
 import type { DealStatus } from "@/types"
-
-interface DealRow {
-  id: string
-  title: string
-  description: string
-  image_url: string | null
-  price: number
-  shipping_price: number
-  currency: string
-  status: DealStatus
-  role: "buyer" | "seller"
-  counterparty: string
-  counterparty_avatar: string | null
-  source_url: string | null
-  source_platform: string | null
-  payment_method: string | null
-  payment_crypto_coin: string | null
-  created_at: string
-  updated_at: string
-}
 
 function normalizePayload(body: Record<string, unknown>): DealPayload {
   return {
@@ -56,26 +35,27 @@ export async function GET(
   _req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+
   try {
-    await ensureDealsTable()
-    const sql = getSql()
     const { id } = await context.params
-    const rows = await sql<DealRow[]>`
-      SELECT * FROM deals
-      WHERE id = ${id}
-      LIMIT 1
-    `
+    const rows = await db
+      .select()
+      .from(deals)
+      .where(and(eq(deals.id, id), eq(deals.userId, user.id)))
+      .limit(1)
 
     if (!rows[0]) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })
     }
 
-    return NextResponse.json(toDealFromRow(rows[0]))
+    return NextResponse.json(toDeal(rows[0]))
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch deal", details: String(error) },
-      { status: 500 },
-    )
+    console.error("GET /api/deals/[id] failed", error)
+    return NextResponse.json({ error: "Failed to fetch deal" }, { status: 500 })
   }
 }
 
@@ -83,9 +63,12 @@ export async function PUT(
   req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+
   try {
-    await ensureDealsTable()
-    const sql = getSql()
     const { id } = await context.params
     const raw = (await req.json()) as Record<string, unknown>
     const payload = normalizePayload(raw)
@@ -94,38 +77,36 @@ export async function PUT(
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    const rows = await sql<DealRow[]>`
-      UPDATE deals
-      SET
-        title = ${payload.title.trim()},
-        description = ${payload.description},
-        image_url = ${payload.imageUrl ?? null},
-        price = ${Math.round(payload.price * 100) / 100},
-        shipping_price = ${Math.round(payload.shippingPrice * 100) / 100},
-        currency = ${payload.currency},
-        status = ${payload.status},
-        role = ${payload.role},
-        counterparty = ${payload.counterparty},
-        counterparty_avatar = ${payload.counterpartyAvatar ?? null},
-        source_url = ${payload.sourceUrl ?? null},
-        source_platform = ${payload.sourcePlatform ?? null},
-        payment_method = ${payload.paymentMethod ?? null},
-        payment_crypto_coin = ${payload.paymentCryptoCoin ?? null},
-        updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `
+    const rows = await db
+      .update(deals)
+      .set({
+        title: payload.title.trim(),
+        description: payload.description,
+        imageUrl: payload.imageUrl ?? null,
+        price: (Math.round(payload.price * 100) / 100).toFixed(2),
+        shippingPrice: (Math.round(payload.shippingPrice * 100) / 100).toFixed(2),
+        currency: payload.currency,
+        status: payload.status,
+        role: payload.role,
+        counterparty: payload.counterparty,
+        counterpartyAvatar: payload.counterpartyAvatar ?? null,
+        sourceUrl: payload.sourceUrl ?? null,
+        sourcePlatform: payload.sourcePlatform ?? null,
+        paymentMethod: payload.paymentMethod ?? null,
+        paymentCryptoCoin: payload.paymentCryptoCoin ?? null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(deals.id, id), eq(deals.userId, user.id)))
+      .returning()
 
     if (!rows[0]) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })
     }
 
-    return NextResponse.json(toDealFromRow(rows[0]))
+    return NextResponse.json(toDeal(rows[0]))
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to update deal", details: String(error) },
-      { status: 500 },
-    )
+    console.error("PUT /api/deals/[id] failed", error)
+    return NextResponse.json({ error: "Failed to update deal" }, { status: 500 })
   }
 }
 
@@ -133,15 +114,17 @@ export async function DELETE(
   _req: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const user = await getCurrentUser()
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+
   try {
-    await ensureDealsTable()
-    const sql = getSql()
     const { id } = await context.params
-    const rows = await sql<{ id: string }[]>`
-      DELETE FROM deals
-      WHERE id = ${id}
-      RETURNING id
-    `
+    const rows = await db
+      .delete(deals)
+      .where(and(eq(deals.id, id), eq(deals.userId, user.id)))
+      .returning({ id: deals.id })
 
     if (!rows[0]) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })
@@ -149,9 +132,7 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to delete deal", details: String(error) },
-      { status: 500 },
-    )
+    console.error("DELETE /api/deals/[id] failed", error)
+    return NextResponse.json({ error: "Failed to delete deal" }, { status: 500 })
   }
 }

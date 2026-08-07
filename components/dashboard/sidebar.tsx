@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -32,6 +32,12 @@ const lowerNavItems = [
 
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/");
+  }
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-sidebar text-sidebar-foreground md:flex">
@@ -108,13 +114,14 @@ export function DashboardSidebar() {
 
       {/* Logout */}
       <div className="border-t border-sidebar-border p-4">
-        <Link
-          href="/"
-          className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-sidebar-muted transition-all hover:bg-sidebar-accent/50 hover:text-destructive"
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-sidebar-muted transition-all hover:bg-sidebar-accent/50 hover:text-destructive"
         >
           <LogOut className="h-5 w-5" />
           Log Out
-        </Link>
+        </button>
       </div>
     </aside>
   );
