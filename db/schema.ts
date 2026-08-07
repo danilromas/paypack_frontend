@@ -65,6 +65,25 @@ export const deals = pgTable("deals", {
   index("deals_user_id_idx").on(table.userId),
 ])
 
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").notNull().default("completed"),
+  relatedDealId: uuid("related_deal_id").references(() => deals.id),
+  description: text("description").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("wallet_tx_type_check", sql`${table.type} in ('topup', 'withdrawal', 'payout')`),
+  check(
+    "wallet_tx_status_check",
+    sql`${table.status} in ('pending', 'processing', 'completed', 'failed')`,
+  ),
+  index("wallet_tx_user_id_idx").on(table.userId),
+  index("wallet_tx_created_at_idx").on(table.createdAt.desc()),
+])
+
 export const shipments = pgTable("shipments", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id),

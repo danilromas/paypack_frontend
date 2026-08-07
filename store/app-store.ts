@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import type { AppMode, Deal, ChatThread } from "@/types"
+import type { WalletSummary } from "@/lib/wallet"
 
 export interface AuthUser {
   id: string
@@ -13,10 +14,13 @@ interface AppState {
   setUser: (user: AuthUser | null) => void
   mode: AppMode
   setMode: (mode: AppMode) => void
-  walletBalance: number
+  wallet: WalletSummary | null
+  setWallet: (wallet: WalletSummary | null) => void
+  refreshWallet: () => Promise<void>
   deals: Deal[]
   setDeals: (deals: Deal[]) => void
   addDeal: (deal: Deal) => void
+  updateDeal: (deal: Deal) => void
   selectedDealId: string | null
   setSelectedDealId: (id: string | null) => void
   activeChatId: string | null
@@ -32,7 +36,12 @@ export const useAppStore = create<AppState>((set) => ({
   setUser: (user) => set({ user }),
   mode: "deal",
   setMode: (mode) => set({ mode }),
-  walletBalance: 500,
+  wallet: null,
+  setWallet: (wallet) => set({ wallet }),
+  refreshWallet: async () => {
+    const res = await fetch("/api/wallet")
+    set({ wallet: res.ok ? await res.json() : null })
+  },
   deals: [],
   setDeals: (deals) =>
     set((state) => {
@@ -46,6 +55,10 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       deals: [deal, ...state.deals],
       selectedDealId: deal.id,
+    })),
+  updateDeal: (deal) =>
+    set((state) => ({
+      deals: state.deals.map((d) => (d.id === deal.id ? deal : d)),
     })),
   selectedDealId: null,
   setSelectedDealId: (id) => set({ selectedDealId: id }),

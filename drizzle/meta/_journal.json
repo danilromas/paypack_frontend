@@ -8,6 +8,13 @@
       "when": 1786108831584,
       "tag": "0000_black_angel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786133919614,
+      "tag": "0001_wild_husk",
+      "breakpoints": true
     }
   ]
 }

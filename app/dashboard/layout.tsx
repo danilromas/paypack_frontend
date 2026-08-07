@@ -14,13 +14,15 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const isShipments = pathname.startsWith("/dashboard/shipments")
   const setUser = useAppStore((s) => s.setUser)
+  const refreshWallet = useAppStore((s) => s.refreshWallet)
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((user) => setUser(user))
       .catch(() => setUser(null))
-  }, [setUser])
+    refreshWallet().catch(() => {})
+  }, [setUser, refreshWallet])
 
   return (
     <div

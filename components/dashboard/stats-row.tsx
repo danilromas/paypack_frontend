@@ -12,7 +12,7 @@ interface StatsRowProps {
 }
 
 export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
-  const { walletBalance, deals } = useAppStore();
+  const { deals } = useAppStore();
   const activeDealsCount = deals.filter((d) =>
     ["pending", "escrow", "shipped", "in-transit"].includes(d.status),
   ).length;

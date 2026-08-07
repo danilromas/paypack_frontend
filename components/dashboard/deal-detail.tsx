@@ -1,6 +1,7 @@
 "use client"
 
-import { FileText, User } from "lucide-react"
+import { useState } from "react"
+import { FileText, Loader2, User } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { cn, formatDealDateTime } from "@/lib/utils"
 import {
@@ -18,9 +19,44 @@ import { Badge } from "@/components/ui/badge"
 const progressSteps = ["Created", "Funds Locked", "Shipped", "In Transit", "Received"]
 
 export function DealDetail() {
-  const { selectedDealId, deals } = useAppStore()
+  const { selectedDealId, deals, updateDeal, refreshWallet } = useAppStore()
   const deal =
     deals.find((d) => d.id === selectedDealId) ?? deals[0]
+  const [confirming, setConfirming] = useState(false)
+
+  async function handleConfirmReceipt() {
+    if (!deal) return
+    setConfirming(true)
+    try {
+      const res = await fetch(`/api/deals/${deal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: deal.title,
+          description: deal.description,
+          imageUrl: deal.imageUrl ?? null,
+          price: deal.price,
+          shippingPrice: deal.shippingPrice,
+          currency: deal.currency,
+          status: "completed",
+          role: deal.role,
+          counterparty: deal.counterparty,
+          counterpartyAvatar: deal.counterpartyAvatar ?? null,
+          sourceUrl: deal.sourceUrl ?? null,
+          sourcePlatform: deal.sourcePlatform ?? null,
+          paymentMethod: deal.paymentMethod ?? null,
+          paymentCryptoCoin: deal.paymentCryptoCoin ?? null,
+        }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        updateDeal(updated)
+        await refreshWallet()
+      }
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   if (!deal) {
     return (
@@ -210,9 +246,11 @@ export function DealDetail() {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Button
             variant="outline"
-            className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-success/30 hover:bg-success/10 hover:text-success"
+            disabled={confirming || ["completed", "cancelled", "disputed"].includes(deal.status)}
+            onClick={handleConfirmReceipt}
+            className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-success/30 hover:bg-success/10 hover:text-success disabled:opacity-50"
           >
-            Confirm Receipt
+            {confirming ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm Receipt"}
           </Button>
           <Button
             variant="outline"

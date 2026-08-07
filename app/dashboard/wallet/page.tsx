@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Wallet, ArrowUpRight, ArrowDownRight, CreditCard, Receipt } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Wallet, ArrowUpRight, ArrowDownRight, CreditCard } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { useAppStore } from "@/store/app-store"
 import { Badge } from "@/components/ui/badge"
@@ -24,80 +24,29 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { cn } from "@/lib/utils"
+import { cn, formatDealDateTime } from "@/lib/utils"
+import type { WalletTransactionDTO, WalletTxType } from "@/lib/wallet"
 
-type OpType = "topup" | "withdrawal" | "escrow_hold" | "payout"
-type OpDirection = "in" | "out"
-
-type WalletOperation = {
-  id: string
-  type: OpType
-  direction: OpDirection
-  amountEur: number
-  status: "completed" | "pending" | "processing"
-  createdAt: string
-  details: string
-}
-
-const initialOps: WalletOperation[] = [
-  {
-    id: "OP-9001",
-    type: "escrow_hold",
-    direction: "out",
-    amountEur: 520,
-    status: "completed",
-    createdAt: "2026-03-05 14:22",
-    details: "Escrow hold for Deal #25311491",
-  },
-  {
-    id: "OP-9002",
-    type: "payout",
-    direction: "in",
-    amountEur: 320,
-    status: "completed",
-    createdAt: "2026-03-04 18:03",
-    details: "Payout released for Deal #88732014",
-  },
-  {
-    id: "OP-9003",
-    type: "withdrawal",
-    direction: "out",
-    amountEur: 200,
-    status: "pending",
-    createdAt: "2026-03-04 11:30",
-    details: "Withdrawal to bank • IBAN ending 2041",
-  },
-  {
-    id: "OP-9004",
-    type: "topup",
-    direction: "in",
-    amountEur: 250,
-    status: "completed",
-    createdAt: "2026-03-02 09:15",
-    details: "Top up via card",
-  },
-]
-
-function typeMeta(type: OpType) {
+function typeMeta(type: WalletTxType) {
   switch (type) {
     case "topup":
       return { label: "Top up", icon: CreditCard, badge: "bg-primary/10 text-primary" }
     case "withdrawal":
       return { label: "Withdrawal", icon: ArrowUpRight, badge: "bg-destructive/10 text-destructive" }
-    case "escrow_hold":
-      return { label: "Escrow hold", icon: Receipt, badge: "bg-warning/10 text-warning" }
     case "payout":
     default:
       return { label: "Payout", icon: ArrowDownRight, badge: "bg-success/10 text-success" }
   }
 }
 
-function statusMeta(status: WalletOperation["status"]) {
+function statusMeta(status: WalletTransactionDTO["status"]) {
   switch (status) {
     case "completed":
       return { text: "COMPLETED", className: "bg-success/10 text-success" }
     case "processing":
       return { text: "PROCESSING", className: "bg-primary/10 text-primary" }
+    case "failed":
+      return { text: "FAILED", className: "bg-destructive/10 text-destructive" }
     case "pending":
     default:
       return { text: "PENDING", className: "bg-warning/10 text-warning" }
@@ -105,15 +54,23 @@ function statusMeta(status: WalletOperation["status"]) {
 }
 
 export default function WalletPage() {
-  const { walletBalance } = useAppStore()
-  const [ops, setOps] = useState<WalletOperation[]>(initialOps)
+  const { wallet, refreshWallet } = useAppStore()
   const [tab, setTab] = useState<"operations" | "withdraw" | "topup">("operations")
-  const [filter, setFilter] = useState<OpType | "all">("all")
+  const [filter, setFilter] = useState<WalletTxType | "all">("all")
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [withdrawAmount, setWithdrawAmount] = useState("50")
+  const [topupAmount, setTopupAmount] = useState("75")
+  const [pending, setPending] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const available = walletBalance
-  const inEscrow = 2050
-  const pendingPayout = 540
+  useEffect(() => {
+    refreshWallet().catch(() => {})
+  }, [refreshWallet])
+
+  const ops = wallet?.operations ?? []
+  const available = wallet?.balance ?? 0
+  const inEscrow = wallet?.inEscrow ?? 0
+  const pendingPayout = wallet?.pendingPayout ?? 0
 
   const active = useMemo(() => (activeId ? ops.find((o) => o.id === activeId) ?? null : null), [
     activeId,
@@ -124,18 +81,28 @@ export default function WalletPage() {
     return ops.filter((o) => (filter === "all" ? true : o.type === filter))
   }, [ops, filter])
 
-  const onAction = (kind: "withdraw" | "topup", amount: number) => {
-    const isWithdraw = kind === "withdraw"
-    const op: WalletOperation = {
-      id: `OP-${Math.floor(10000 + Math.random() * 90000)}`,
-      type: isWithdraw ? "withdrawal" : "topup",
-      direction: isWithdraw ? "out" : "in",
-      amountEur: amount,
-      status: "processing",
-      createdAt: new Date().toISOString().slice(0, 16).replace("T", " "),
-      details: isWithdraw ? "Withdrawal request (demo)" : "Top up request (demo)",
+  async function runAction(kind: "withdraw" | "topup", amount: number) {
+    setActionError(null)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setActionError("Enter a valid amount")
+      return
     }
-    setOps((prev) => [op, ...prev])
+    setPending(true)
+    try {
+      const res = await fetch(`/api/wallet/${kind}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setActionError(data.error ?? "Something went wrong")
+        return
+      }
+      await refreshWallet()
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -147,14 +114,15 @@ export default function WalletPage() {
             <div>
               <h1 className="text-2xl font-bold sm:text-3xl">Wallet</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Available balance, escrow holds, payouts and operations.
+                Available balance, escrow holds, payouts and operations. Internal ledger only — no
+                real payment provider is connected.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <div className="flex items-center gap-2 rounded-2xl border border-border bg-card/60 px-4 py-3">
                 <Wallet className="h-4 w-4 text-primary" />
                 <div className="text-sm text-muted-foreground">Available</div>
-                <div className="text-base font-semibold text-foreground">{available}$</div>
+                <div className="text-base font-semibold text-foreground">{available.toFixed(2)}€</div>
               </div>
             </div>
           </div>
@@ -164,26 +132,26 @@ export default function WalletPage() {
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Available
               </div>
-              <div className="mt-2 text-3xl font-bold">{available}$</div>
+              <div className="mt-2 text-3xl font-bold">{available.toFixed(2)}€</div>
               <div className="mt-1 text-sm text-muted-foreground">Ready to use for deals.</div>
             </Card>
             <Card className="rounded-2xl border-border bg-card/60 p-5 shadow-sm">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 In escrow
               </div>
-              <div className="mt-2 text-3xl font-bold">{inEscrow}€</div>
-              <div className="mt-1 text-sm text-muted-foreground">Held until confirmation.</div>
+              <div className="mt-2 text-3xl font-bold">{inEscrow.toFixed(2)}€</div>
+              <div className="mt-1 text-sm text-muted-foreground">Committed to deals you're buying.</div>
             </Card>
             <Card className="rounded-2xl border-border bg-card/60 p-5 shadow-sm">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Pending payout
               </div>
-              <div className="mt-2 text-3xl font-bold">{pendingPayout}€</div>
-              <div className="mt-1 text-sm text-muted-foreground">Releases when conditions meet.</div>
+              <div className="mt-2 text-3xl font-bold">{pendingPayout.toFixed(2)}€</div>
+              <div className="mt-1 text-sm text-muted-foreground">Releases when your sales complete.</div>
             </Card>
           </div>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <TabsList className="w-full sm:w-fit">
                 <TabsTrigger value="operations" className="rounded-xl">Operations</TabsTrigger>
@@ -196,13 +164,12 @@ export default function WalletPage() {
                   <span className="text-sm font-medium text-muted-foreground">Filter</span>
                   <select
                     value={filter}
-                    onChange={(e) => setFilter(e.target.value as any)}
+                    onChange={(e) => setFilter(e.target.value as typeof filter)}
                     className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                   >
                     <option value="all">All</option>
                     <option value="topup">Top up</option>
                     <option value="withdrawal">Withdrawal</option>
-                    <option value="escrow_hold">Escrow hold</option>
                     <option value="payout">Payout</option>
                   </select>
                 </div>
@@ -210,92 +177,102 @@ export default function WalletPage() {
             </div>
 
             <TabsContent value="operations" className="mt-4">
-              {/* Mobile cards */}
-              <div className="space-y-3 md:hidden">
-                {filteredOps.map((o) => {
-                  const meta = typeMeta(o.type)
-                  const st = statusMeta(o.status)
-                  return (
-                    <Card key={o.id} className="rounded-2xl border-border bg-card/60 p-4 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                              <meta.icon className="h-4 w-4" />
-                            </div>
-                            <div className="truncate text-sm font-semibold">{meta.label}</div>
-                          </div>
-                          <div className="mt-2 text-xs text-muted-foreground">{o.details}</div>
-                        </div>
-                        <Badge variant="secondary" className={cn("rounded-full px-2 py-1", st.className)}>
-                          {st.text}
-                        </Badge>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
-                        <div className="text-xs text-muted-foreground">{o.createdAt}</div>
-                        <div className="text-sm font-semibold text-foreground">
-                          {o.direction === "in" ? "+" : "-"}
-                          {o.amountEur}€
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex justify-end">
-                        <Button size="sm" className="rounded-xl bg-primary" onClick={() => setActiveId(o.id)}>
-                          Details
-                        </Button>
-                      </div>
-                    </Card>
-                  )
-                })}
-              </div>
-
-              {/* Desktop table */}
-              <div className="hidden md:block">
-                <div className="overflow-hidden rounded-2xl border border-border bg-card/60">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Operation</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right">Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredOps.map((o) => {
-                        const meta = typeMeta(o.type)
-                        const st = statusMeta(o.status)
-                        return (
-                          <TableRow key={o.id}>
-                            <TableCell className="min-w-[320px]">
-                              <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              {filteredOps.length === 0 ? (
+                <Card className="rounded-2xl border-border bg-card/60 p-8 text-center text-sm text-muted-foreground shadow-sm">
+                  No operations yet.
+                </Card>
+              ) : (
+                <>
+                  {/* Mobile cards */}
+                  <div className="space-y-3 md:hidden">
+                    {filteredOps.map((o) => {
+                      const meta = typeMeta(o.type)
+                      const st = statusMeta(o.status)
+                      return (
+                        <Card key={o.id} className="rounded-2xl border-border bg-card/60 p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                   <meta.icon className="h-4 w-4" />
                                 </div>
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold">{meta.label}</div>
-                                  <div className="truncate text-xs text-muted-foreground">{o.details}</div>
-                                </div>
+                                <div className="truncate text-sm font-semibold">{meta.label}</div>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={cn("rounded-full px-2 py-1", st.className)}>
-                                {st.text}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {o.direction === "in" ? "+" : "-"}
-                              {o.amountEur}€
-                            </TableCell>
-                            <TableCell className="text-right text-muted-foreground">{o.createdAt}</TableCell>
+                              <div className="mt-2 text-xs text-muted-foreground">{o.description}</div>
+                            </div>
+                            <Badge variant="secondary" className={cn("rounded-full px-2 py-1", st.className)}>
+                              {st.text}
+                            </Badge>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+                            <div className="text-xs text-muted-foreground">{formatDealDateTime(o.createdAt)}</div>
+                            <div className="text-sm font-semibold text-foreground">
+                              {o.amount >= 0 ? "+" : ""}
+                              {o.amount.toFixed(2)}€
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex justify-end">
+                            <Button size="sm" className="rounded-xl bg-primary" onClick={() => setActiveId(o.id)}>
+                              Details
+                            </Button>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                  </div>
+
+                  {/* Desktop table */}
+                  <div className="hidden md:block">
+                    <div className="overflow-hidden rounded-2xl border border-border bg-card/60">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Operation</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Date</TableHead>
                           </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredOps.map((o) => {
+                            const meta = typeMeta(o.type)
+                            const st = statusMeta(o.status)
+                            return (
+                              <TableRow key={o.id} className="cursor-pointer" onClick={() => setActiveId(o.id)}>
+                                <TableCell className="min-w-[320px]">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                      <meta.icon className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="truncate text-sm font-semibold">{meta.label}</div>
+                                      <div className="truncate text-xs text-muted-foreground">{o.description}</div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className={cn("rounded-full px-2 py-1", st.className)}>
+                                    {st.text}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {o.amount >= 0 ? "+" : ""}
+                                  {o.amount.toFixed(2)}€
+                                </TableCell>
+                                <TableCell className="text-right text-muted-foreground">
+                                  {formatDealDateTime(o.createdAt)}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="withdraw" className="mt-4">
@@ -303,7 +280,7 @@ export default function WalletPage() {
                 <Card className="rounded-2xl border-border bg-card/60 p-5 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <ArrowUpRight className="h-4 w-4 text-destructive" />
-                    Withdraw to bank (demo)
+                    Withdraw (internal ledger)
                   </div>
                   <div className="mt-4 space-y-3">
                     <div className="space-y-1">
@@ -311,20 +288,21 @@ export default function WalletPage() {
                       <input
                         type="number"
                         min={1}
-                        defaultValue={50}
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
                         className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <div className="text-xs font-medium text-muted-foreground">Destination</div>
-                      <input
-                        type="text"
-                        defaultValue="IBAN ending 2041"
-                        className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      />
-                    </div>
+                    {actionError && <p className="text-xs text-destructive">{actionError}</p>}
+                    <Button
+                      className="w-full rounded-xl bg-primary"
+                      disabled={pending}
+                      onClick={() => runAction("withdraw", Number(withdrawAmount))}
+                    >
+                      Withdraw {withdrawAmount || 0}€
+                    </Button>
                     <div className="rounded-2xl bg-destructive/10 p-3 text-xs text-destructive">
-                      Demo: this will add a “processing” operation to the list.
+                      Demo: internal ledger only, no real bank transfer happens.
                     </div>
                   </div>
                 </Card>
@@ -335,20 +313,22 @@ export default function WalletPage() {
                   <div className="space-y-2">
                     <Button
                       className="w-full rounded-xl bg-primary"
-                      onClick={() => onAction("withdraw", 50)}
+                      disabled={pending}
+                      onClick={() => runAction("withdraw", 50)}
                     >
                       Withdraw 50€
                     </Button>
                     <Button
                       variant="outline"
                       className="w-full rounded-xl"
-                      onClick={() => onAction("withdraw", 120)}
+                      disabled={pending}
+                      onClick={() => runAction("withdraw", 120)}
                     >
                       Withdraw 120€
                     </Button>
                   </div>
                   <div className="mt-4 text-xs text-muted-foreground">
-                    Available funds: {available}$. (Demo UI only)
+                    Available funds: {available.toFixed(2)}€.
                   </div>
                 </Card>
               </div>
@@ -359,20 +339,30 @@ export default function WalletPage() {
                 <Card className="rounded-2xl border-border bg-card/60 p-5 shadow-sm">
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <CreditCard className="h-4 w-4 text-primary" />
-                    Top up funds (demo)
+                    Top up (internal ledger)
                   </div>
                   <div className="mt-4 space-y-3">
                     <div className="rounded-2xl bg-primary/10 p-3 text-xs text-primary">
-                      Demo: this will add a “processing” operation.
+                      Demo: internal ledger only, no real payment provider is charged.
                     </div>
                     <div className="space-y-1">
-                      <div className="text-xs font-medium text-muted-foreground">Card details</div>
+                      <div className="text-xs font-medium text-muted-foreground">Amount (EUR)</div>
                       <input
-                        type="text"
-                        defaultValue="**** **** **** 4242"
+                        type="number"
+                        min={1}
+                        value={topupAmount}
+                        onChange={(e) => setTopupAmount(e.target.value)}
                         className="w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
+                    {actionError && <p className="text-xs text-destructive">{actionError}</p>}
+                    <Button
+                      className="w-full rounded-xl bg-primary"
+                      disabled={pending}
+                      onClick={() => runAction("topup", Number(topupAmount))}
+                    >
+                      Top up {topupAmount || 0}€
+                    </Button>
                   </div>
                 </Card>
 
@@ -380,13 +370,14 @@ export default function WalletPage() {
                   <div className="text-sm font-semibold">Quick actions</div>
                   <Separator className="my-3" />
                   <div className="space-y-2">
-                    <Button className="w-full rounded-xl bg-primary" onClick={() => onAction("topup", 75)}>
+                    <Button className="w-full rounded-xl bg-primary" disabled={pending} onClick={() => runAction("topup", 75)}>
                       Top up 75€
                     </Button>
                     <Button
                       variant="outline"
                       className="w-full rounded-xl"
-                      onClick={() => onAction("topup", 250)}
+                      disabled={pending}
+                      onClick={() => runAction("topup", 250)}
                     >
                       Top up 250€
                     </Button>
@@ -407,18 +398,18 @@ export default function WalletPage() {
             <>
               <DialogHeader className="space-y-2">
                 <DialogTitle className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate">{active.id}</span>
-                  <Badge variant="secondary">{typeMeta(active.type).label}</Badge>
+                  <span className="min-w-0 truncate">{typeMeta(active.type).label}</span>
+                  <Badge variant="secondary">{active.status}</Badge>
                 </DialogTitle>
-                <DialogDescription>{active.details}</DialogDescription>
+                <DialogDescription>{active.description}</DialogDescription>
               </DialogHeader>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-border bg-card/60 p-4">
                   <div className="text-xs font-medium text-muted-foreground">Amount</div>
                   <div className="mt-2 text-lg font-semibold">
-                    {active.direction === "in" ? "+" : "-"}
-                    {active.amountEur}€
+                    {active.amount >= 0 ? "+" : ""}
+                    {active.amount.toFixed(2)}€
                   </div>
                 </div>
                 <div className="rounded-2xl border border-border bg-card/60 p-4">
@@ -433,7 +424,7 @@ export default function WalletPage() {
 
               <div className="mt-4 rounded-2xl border border-border bg-card/60 p-4">
                 <div className="text-xs font-medium text-muted-foreground">Created</div>
-                <div className="mt-2 text-sm text-foreground">{active.createdAt}</div>
+                <div className="mt-2 text-sm text-foreground">{formatDealDateTime(active.createdAt)}</div>
               </div>
 
               <div className="mt-5 flex justify-end">
@@ -448,4 +439,3 @@ export default function WalletPage() {
     </>
   )
 }
-
