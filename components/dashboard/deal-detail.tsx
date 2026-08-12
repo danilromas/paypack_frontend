@@ -28,6 +28,10 @@ export function DealDetail() {
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [disputeOpen, setDisputeOpen] = useState(false)
+  const [disputeReason, setDisputeReason] = useState("")
+  const [disputing, setDisputing] = useState(false)
+  const [disputeError, setDisputeError] = useState<string | null>(null)
 
   const thread = deal ? chatThreads.find((t) => t.dealId === deal.id) ?? null : null
 
@@ -84,6 +88,29 @@ export function DealDetail() {
       }
     } finally {
       setConfirming(false)
+    }
+  }
+
+  async function handleOpenDispute() {
+    if (!deal || !disputeReason.trim()) return
+    setDisputing(true)
+    setDisputeError(null)
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/dispute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: disputeReason.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setDisputeError(data.error ?? "Failed to open dispute")
+        return
+      }
+      updateDeal({ ...deal, status: "disputed" })
+      setDisputeOpen(false)
+      setDisputeReason("")
+    } finally {
+      setDisputing(false)
     }
   }
 
@@ -292,12 +319,49 @@ export function DealDetail() {
           >
             {confirming ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm Receipt"}
           </Button>
-          <Button
-            variant="outline"
-            className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+          <Dialog
+            open={disputeOpen}
+            onOpenChange={(o) => {
+              setDisputeOpen(o)
+              if (!o) setDisputeError(null)
+            }}
           >
-            Open Dispute
-          </Button>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={["disputed", "cancelled"].includes(deal.status)}
+                className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+              >
+                Open Dispute
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader className="space-y-1">
+                <DialogTitle className="text-base">Open a dispute</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Explain what went wrong with &quot;{deal.title}&quot;. An admin will review it.
+                </DialogDescription>
+              </DialogHeader>
+              <textarea
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="e.g. Item not received, item not as described..."
+                rows={4}
+                className="w-full resize-none rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              {disputeError ? <p className="text-xs text-destructive">{disputeError}</p> : null}
+              <div className="flex justify-end">
+                <Button
+                  variant="destructive"
+                  className="rounded-xl"
+                  disabled={disputing || !disputeReason.trim()}
+                  onClick={handleOpenDispute}
+                >
+                  {disputing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Open dispute"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog>
             <DialogTrigger asChild>
               <Button

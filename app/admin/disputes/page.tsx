@@ -1,13 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,63 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
-import { Search, AlertTriangle, CheckCircle2, Scale, FileText } from "lucide-react"
-
-type DisputeStatus = "open" | "needs-info" | "resolved"
-
-type Dispute = {
-  id: string
-  ref: string
-  type: string
-  status: DisputeStatus
-  openedAt: string
-  amountEur: number
-  evidence: string[]
-  timeline: { at: string; text: string }[]
-}
-
-const initialDisputes: Dispute[] = [
-  {
-    id: "DSP-10021",
-    ref: "Deal #25311491",
-    type: "Item not received",
-    status: "open",
-    openedAt: "2026-03-05",
-    amountEur: 520,
-    evidence: ["Tracking log", "Courier receipt", "Counterparty messages"],
-    timeline: [
-      { at: "2026-03-05 10:14", text: "Dispute opened by buyer" },
-      { at: "2026-03-05 10:20", text: "System locked escrow" },
-      { at: "2026-03-05 11:05", text: "Counterparty requested more time" },
-    ],
-  },
-  {
-    id: "DSP-10018",
-    ref: "Deal #88732014",
-    type: "Cancel request",
-    status: "needs-info",
-    openedAt: "2026-03-04",
-    amountEur: 210,
-    evidence: ["Cancellation agreement", "Shipment status screenshots"],
-    timeline: [
-      { at: "2026-03-04 08:02", text: "Dispute opened by seller" },
-      { at: "2026-03-04 08:15", text: "Admin requested additional evidence" },
-    ],
-  },
-  {
-    id: "DSP-10010",
-    ref: "Shipment PP-EXP-4421",
-    type: "Tracking mismatch",
-    status: "resolved",
-    openedAt: "2026-03-02",
-    amountEur: 98,
-    evidence: ["Tracking history", "Photos of package labels"],
-    timeline: [
-      { at: "2026-03-02 14:41", text: "Admin approved partial refund" },
-      { at: "2026-03-02 15:10", text: "Escrow payout completed" },
-    ],
-  },
-]
+import { Search, AlertTriangle, Scale, FileText, Loader2 } from "lucide-react"
+import { formatDealDateTime } from "@/lib/utils"
+import type { DisputeDTO, DisputeStatus } from "@/lib/disputes"
 
 function statusBadge(status: DisputeStatus) {
   switch (status) {
@@ -93,30 +38,52 @@ function statusBadge(status: DisputeStatus) {
 export default function AdminDisputesPage() {
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<DisputeStatus | "all">("all")
-  const [disputes, setDisputes] = useState<Dispute[]>(initialDisputes)
+  const [disputes, setDisputes] = useState<DisputeDTO[]>([])
+  const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [deciding, setDeciding] = useState(false)
 
-  const active = useMemo(
-    () => disputes.find((d) => d.id === activeId) ?? null,
-    [disputes, activeId],
-  )
+  async function load() {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/admin/disputes", { cache: "no-store" })
+      setDisputes(res.ok ? await res.json() : [])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  const active = useMemo(() => disputes.find((d) => d.id === activeId) ?? null, [disputes, activeId])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return disputes.filter((d) => {
-      const matchesQuery =
-        !q || d.id.toLowerCase().includes(q) || d.ref.toLowerCase().includes(q)
+      const matchesQuery = !q || d.id.toLowerCase().includes(q) || d.dealTitle.toLowerCase().includes(q)
       const matchesStatus = status === "all" ? true : d.status === status
       return matchesQuery && matchesStatus
     })
   }, [disputes, query, status])
 
-  const onResolve = (nextStatus: DisputeStatus) => {
+  async function decide(action: "needs-info" | "resolved") {
     if (!active) return
-    setDisputes((prev) =>
-      prev.map((d) => (d.id === active.id ? { ...d, status: nextStatus } : d)),
-    )
-    setActiveId(null)
+    setDeciding(true)
+    try {
+      const res = await fetch(`/api/admin/disputes/${active.id}/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+      if (res.ok) {
+        setActiveId(null)
+        await load()
+      }
+    } finally {
+      setDeciding(false)
+    }
   }
 
   return (
@@ -135,18 +102,16 @@ export default function AdminDisputesPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by id or reference..."
+              placeholder="Search by id or deal title..."
               className="w-full rounded-2xl border border-border bg-card px-12 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">
-            Status
-          </span>
+          <span className="text-sm font-medium text-muted-foreground">Status</span>
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
+            onChange={(e) => setStatus(e.target.value as typeof status)}
             className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="all">All</option>
@@ -157,98 +122,96 @@ export default function AdminDisputesPage() {
         </div>
       </div>
 
-      {/* Mobile list */}
-      <div className="space-y-3 md:hidden">
-        {filtered.map((d) => {
-          const b = statusBadge(d.status)
-          return (
-            <Card
-              key={d.id}
-              className="rounded-2xl border-border bg-card/60 p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="text-sm font-semibold text-foreground">
-                    {d.ref}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {d.type}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Opened: {d.openedAt}
-                  </div>
-                </div>
-                <Badge variant="secondary" className={b.className}>
-                  {b.text}
-                </Badge>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="text-sm font-medium">
-                  {d.amountEur} EUR
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => setActiveId(d.id)}
-                  className="rounded-xl bg-primary"
-                >
-                  Open
-                </Button>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* Desktop table */}
-      <div className="hidden md:block">
-        <Card className="rounded-2xl border-border bg-card/60 p-0 shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Case</TableHead>
-                <TableHead>Reference</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((d) => {
-                const b = statusBadge(d.status)
-                return (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.id}</TableCell>
-                    <TableCell>{d.ref}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {d.type}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={b.className}>
-                        {b.text}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {d.amountEur} EUR
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="rounded-xl"
-                        onClick={() => setActiveId(d.id)}
-                      >
-                        Open
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading…
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card className="rounded-2xl border-border bg-card/60 p-8 text-center text-sm text-muted-foreground shadow-sm">
+          No disputes match this filter.
         </Card>
-      </div>
+      ) : (
+        <>
+          {/* Mobile list */}
+          <div className="space-y-3 md:hidden">
+            {filtered.map((d) => {
+              const b = statusBadge(d.status)
+              return (
+                <Card key={d.id} className="rounded-2xl border-border bg-card/60 p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-sm font-semibold text-foreground">{d.dealTitle}</div>
+                      <div className="text-xs text-muted-foreground">Opened by {d.openedByName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Opened: {formatDealDateTime(d.createdAt)}
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className={b.className}>
+                      {b.text}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium">
+                      {d.amount.toFixed(2)} {d.currency}
+                    </div>
+                    <Button size="sm" onClick={() => setActiveId(d.id)} className="rounded-xl bg-primary">
+                      Open
+                    </Button>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block">
+            <Card className="rounded-2xl border-border bg-card/60 p-0 shadow-sm">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Deal</TableHead>
+                    <TableHead>Opened by</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((d) => {
+                    const b = statusBadge(d.status)
+                    return (
+                      <TableRow key={d.id}>
+                        <TableCell className="max-w-[240px] truncate font-medium">{d.dealTitle}</TableCell>
+                        <TableCell className="text-muted-foreground">{d.openedByName}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={b.className}>
+                            {b.text}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {d.amount.toFixed(2)} {d.currency}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-xl"
+                            onClick={() => setActiveId(d.id)}
+                          >
+                            Open
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+        </>
+      )}
 
       <Dialog open={activeId !== null} onOpenChange={(o) => !o && setActiveId(null)}>
         <DialogContent className="max-w-2xl">
@@ -256,13 +219,11 @@ export default function AdminDisputesPage() {
             <>
               <DialogHeader className="space-y-2">
                 <DialogTitle className="flex items-center justify-between gap-3">
-                  <span>{active.id}</span>
-                  <Badge variant="secondary">
-                    {statusBadge(active.status).text}
-                  </Badge>
+                  <span>{active.dealTitle}</span>
+                  <Badge variant="secondary">{statusBadge(active.status).text}</Badge>
                 </DialogTitle>
                 <DialogDescription>
-                  {active.ref} • {active.type}
+                  Opened by {active.openedByName} • {active.amount.toFixed(2)} {active.currency}
                 </DialogDescription>
               </DialogHeader>
 
@@ -273,12 +234,15 @@ export default function AdminDisputesPage() {
                     Timeline
                   </div>
                   <div className="mt-3 space-y-2 text-sm">
-                    {active.timeline.map((t) => (
-                      <div key={t.at} className="flex gap-3">
+                    {active.events.map((e) => (
+                      <div key={e.id} className="flex gap-3">
                         <span className="w-32 shrink-0 text-xs text-muted-foreground">
-                          {t.at}
+                          {formatDealDateTime(e.createdAt)}
                         </span>
-                        <span>{t.text}</span>
+                        <span>
+                          {e.text}
+                          {e.actorName ? <span className="text-muted-foreground"> — {e.actorName}</span> : null}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -287,16 +251,12 @@ export default function AdminDisputesPage() {
                 <div className="rounded-2xl border border-border bg-card/60 p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <FileText className="h-4 w-4 text-primary" />
-                    Evidence
+                    Reason
                   </div>
-                  <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    {active.evidence.map((e) => (
-                      <li key={e} className="flex items-start gap-2">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" />
-                        {e}
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                    {active.reason}
+                  </p>
                 </div>
               </div>
 
@@ -304,21 +264,21 @@ export default function AdminDisputesPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
                     <div className="text-sm font-medium">Decision</div>
-                    <div className="text-xs text-muted-foreground">
-                      Update dispute status (demo).
-                    </div>
+                    <div className="text-xs text-muted-foreground">Update dispute status.</div>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                     <Button
                       variant="outline"
                       className="rounded-xl"
-                      onClick={() => onResolve("needs-info")}
+                      disabled={deciding || active.status !== "open"}
+                      onClick={() => decide("needs-info")}
                     >
                       Request more info
                     </Button>
                     <Button
                       className="rounded-xl bg-primary"
-                      onClick={() => onResolve("resolved")}
+                      disabled={deciding || active.status === "resolved"}
+                      onClick={() => decide("resolved")}
                     >
                       Approve & resolve
                     </Button>
@@ -327,13 +287,10 @@ export default function AdminDisputesPage() {
               </div>
             </>
           ) : (
-            <div className="py-6 text-sm text-muted-foreground">
-              Select a dispute.
-            </div>
+            <div className="py-6 text-sm text-muted-foreground">Select a dispute.</div>
           )}
         </DialogContent>
       </Dialog>
     </div>
   )
 }
-

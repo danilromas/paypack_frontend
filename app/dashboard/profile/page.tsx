@@ -5,9 +5,18 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { DashboardHeader } from "@/components/dashboard/header"
-import { Camera, Trash2 } from "lucide-react"
+import { Camera, ShieldCheck, Trash2 } from "lucide-react"
 import { profileUpdateSchema } from "@/lib/auth/schemas"
 import { useAppStore } from "@/store/app-store"
+import { cn } from "@/lib/utils"
+import type { KycStatus } from "@/lib/kyc"
+
+const kycBadgeClass: Record<KycStatus, string> = {
+  unverified: "bg-secondary text-secondary-foreground",
+  pending: "bg-warning/10 text-warning",
+  approved: "bg-success/10 text-success",
+  rejected: "bg-destructive/10 text-destructive",
+}
 
 type FormValues = z.infer<typeof profileUpdateSchema>
 
@@ -26,6 +35,35 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(true)
   const [saved, setSaved] = useState(false)
+  const [kycStatus, setKycStatus] = useState<KycStatus>("unverified")
+  const [docUrl, setDocUrl] = useState("")
+  const [submittingKyc, setSubmittingKyc] = useState(false)
+
+  async function loadKyc() {
+    const res = await fetch("/api/kyc/me")
+    if (res.ok) {
+      const data = await res.json()
+      setKycStatus(data.status)
+    }
+  }
+
+  async function submitKyc() {
+    setSubmittingKyc(true)
+    try {
+      const documents = docUrl.trim() ? [{ docType: "id", fileUrl: docUrl.trim() }] : []
+      const res = await fetch("/api/kyc/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documents }),
+      })
+      if (res.ok) {
+        setDocUrl("")
+        await loadKyc()
+      }
+    } finally {
+      setSubmittingKyc(false)
+    }
+  }
 
   const {
     register,
@@ -44,6 +82,7 @@ export default function ProfilePage() {
         reset({ name: me.name, phone: me.phone ?? "", bio: me.bio ?? "" })
       })
       .finally(() => setLoading(false))
+    loadKyc()
   }, [reset])
 
   async function onSubmit(values: FormValues) {
@@ -140,6 +179,46 @@ export default function ProfilePage() {
               {isSubmitting ? "Saving..." : saved ? "Saved" : "Save Changes"}
             </button>
           </form>
+
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Verification
+                </h4>
+              </div>
+              <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold uppercase", kycBadgeClass[kycStatus])}>
+                {kycStatus}
+              </span>
+            </div>
+            {kycStatus === "approved" ? (
+              <p className="text-xs text-muted-foreground">Your account is verified.</p>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {kycStatus === "pending"
+                    ? "Your verification is in review."
+                    : "Submit a link to a supporting document (optional) and request verification."}
+                </p>
+                <input
+                  type="url"
+                  value={docUrl}
+                  onChange={(e) => setDocUrl(e.target.value)}
+                  placeholder="Link to ID document (optional)"
+                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <button
+                  type="button"
+                  onClick={submitKyc}
+                  disabled={submittingKyc}
+                  className="w-full rounded-lg border border-primary/30 bg-primary/10 py-2 text-sm font-medium text-primary transition-all hover:bg-primary/20 disabled:opacity-50"
+                >
+                  {submittingKyc ? "Submitting..." : "Request verification"}
+                </button>
+              </>
+            )}
+          </div>
 
           <div className="rounded-xl border border-destructive/30 bg-card p-4">
             <h4 className="mb-2 text-xs font-medium text-destructive">Danger Zone</h4>

@@ -135,6 +135,68 @@ export const notifications = pgTable("notifications", {
   index("notifications_user_created_idx").on(table.userId, table.createdAt.desc()),
 ])
 
+export const disputes = pgTable("disputes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dealId: uuid("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  openedByUserId: uuid("opened_by_user_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("open"),
+  reason: text("reason").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+}, (table) => [
+  check("disputes_status_check", sql`${table.status} in ('open', 'needs-info', 'resolved')`),
+  index("disputes_deal_id_idx").on(table.dealId),
+  index("disputes_created_at_idx").on(table.createdAt.desc()),
+])
+
+export const disputeEvents = pgTable("dispute_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  disputeId: uuid("dispute_id").notNull().references(() => disputes.id, { onDelete: "cascade" }),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("dispute_events_dispute_id_idx").on(table.disputeId, table.createdAt),
+])
+
+export const kycVerifications = pgTable("kyc_verifications", {
+  userId: uuid("user_id").primaryKey().references(() => users.id),
+  status: text("status").notNull().default("unverified"),
+  riskLevel: text("risk_level").notNull().default("low"),
+  reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("kyc_status_check", sql`${table.status} in ('unverified', 'pending', 'approved', 'rejected')`),
+  check("kyc_risk_check", sql`${table.riskLevel} in ('low', 'medium', 'high')`),
+])
+
+export const kycDocuments = pgTable("kyc_documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  docType: text("doc_type").notNull(),
+  fileUrl: text("file_url").notNull(),
+  reviewStatus: text("review_status").notNull().default("uploaded"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("kyc_documents_type_check", sql`${table.docType} in ('id', 'proof_of_address', 'selfie')`),
+  check(
+    "kyc_documents_review_check",
+    sql`${table.reviewStatus} in ('uploaded', 'needs_review', 'verified', 'rejected')`,
+  ),
+  index("kyc_documents_user_id_idx").on(table.userId),
+])
+
+export const riskFlags = pgTable("risk_flags", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  label: text("label").notNull(),
+  source: text("source").notNull().default("system"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("risk_flags_user_id_idx").on(table.userId),
+])
+
 export const shipments = pgTable("shipments", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id),
