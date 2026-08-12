@@ -5,6 +5,7 @@ import {
   integer,
   numeric,
   timestamp,
+  boolean,
   check,
   index,
   uniqueIndex,
@@ -21,6 +22,8 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   role: text("role").notNull().default("user"),
   sessionVersion: integer("session_version").notNull().default(0),
+  loginAlertsEnabled: boolean("login_alerts_enabled").notNull().default(true),
+  requireWithdrawalConfirmation: boolean("require_withdrawal_confirmation").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -196,6 +199,49 @@ export const riskFlags = pgTable("risk_flags", {
 }, (table) => [
   index("risk_flags_user_id_idx").on(table.userId),
 ])
+
+export const paymentMethods = pgTable("payment_methods", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  kind: text("kind").notNull(),
+  brand: text("brand"),
+  last4: text("last4"),
+  holderName: text("holder_name"),
+  expiry: text("expiry"),
+  bankName: text("bank_name"),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("payment_methods_kind_check", sql`${table.kind} in ('card', 'bank')`),
+  index("payment_methods_user_id_idx").on(table.userId),
+])
+
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  label: text("label").notNull(),
+  keyHash: text("key_hash").notNull(),
+  keyPreview: text("key_preview").notNull(),
+  environment: text("environment").notNull(),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (table) => [
+  check("api_keys_environment_check", sql`${table.environment} in ('live', 'test')`),
+  check("api_keys_status_check", sql`${table.status} in ('active', 'revoked')`),
+  index("api_keys_user_id_idx").on(table.userId),
+])
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  userId: uuid("user_id").primaryKey().references(() => users.id),
+  emailDealUpdates: boolean("email_deal_updates").notNull().default(true),
+  emailPaymentReceived: boolean("email_payment_received").notNull().default(true),
+  emailMarketing: boolean("email_marketing").notNull().default(false),
+  pushNewMessages: boolean("push_new_messages").notNull().default(true),
+  pushShippingUpdates: boolean("push_shipping_updates").notNull().default(true),
+  pushSecurityAlerts: boolean("push_security_alerts").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+})
 
 export const shipments = pgTable("shipments", {
   id: uuid("id").primaryKey().defaultRandom(),
