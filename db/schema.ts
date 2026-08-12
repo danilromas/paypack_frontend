@@ -121,6 +121,20 @@ export const chatMessages = pgTable("chat_messages", {
   index("chat_messages_thread_created_idx").on(table.threadId, table.createdAt),
 ])
 
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  relatedHref: text("related_href"),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("notifications_type_check", sql`${table.type} in ('deal', 'shipment', 'security', 'wallet', 'chat')`),
+  index("notifications_user_created_idx").on(table.userId, table.createdAt.desc()),
+])
+
 export const shipments = pgTable("shipments", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id),

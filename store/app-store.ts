@@ -2,6 +2,7 @@ import { create } from "zustand"
 import type { AppMode, Deal } from "@/types"
 import type { WalletSummary } from "@/lib/wallet"
 import type { ChatThreadSummaryDTO } from "@/lib/chat"
+import type { NotificationDTO } from "@/lib/notifications"
 
 export interface AuthUser {
   id: string
@@ -26,6 +27,10 @@ interface AppState {
   setSelectedDealId: (id: string | null) => void
   chatThreads: ChatThreadSummaryDTO[]
   refreshChats: () => Promise<void>
+  notifications: NotificationDTO[]
+  refreshNotifications: () => Promise<void>
+  markNotificationRead: (id: string) => Promise<void>
+  markAllNotificationsRead: () => Promise<void>
   newDealModalOpen: boolean
   setNewDealModalOpen: (open: boolean) => void
   newDealStep: number
@@ -67,6 +72,28 @@ export const useAppStore = create<AppState>((set) => ({
   refreshChats: async () => {
     const res = await fetch("/api/chats")
     set({ chatThreads: res.ok ? await res.json() : [] })
+  },
+  notifications: [],
+  refreshNotifications: async () => {
+    const res = await fetch("/api/notifications")
+    set({ notifications: res.ok ? await res.json() : [] })
+  },
+  markNotificationRead: async (id) => {
+    const res = await fetch(`/api/notifications/${id}/read`, { method: "POST" })
+    if (res.ok) {
+      const updated = await res.json()
+      set((state) => ({
+        notifications: state.notifications.map((n) => (n.id === id ? updated : n)),
+      }))
+    }
+  },
+  markAllNotificationsRead: async () => {
+    const res = await fetch("/api/notifications/read-all", { method: "POST" })
+    if (res.ok) {
+      set((state) => ({
+        notifications: state.notifications.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() })),
+      }))
+    }
   },
   newDealModalOpen: false,
   setNewDealModalOpen: (open) => set({ newDealModalOpen: open }),

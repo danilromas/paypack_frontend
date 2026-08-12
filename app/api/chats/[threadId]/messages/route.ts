@@ -9,6 +9,7 @@ import {
   toChatMessageDTO,
   validateMessageContent,
 } from "@/lib/chat"
+import { notifyOtherParticipants } from "@/lib/notifications"
 
 export async function GET(req: Request, context: { params: Promise<{ threadId: string }> }) {
   const user = await getCurrentUser()
@@ -61,6 +62,13 @@ export async function POST(req: Request, context: { params: Promise<{ threadId: 
       .insert(chatMessages)
       .values({ threadId, senderUserId: user.id, content })
       .returning()
+
+    await notifyOtherParticipants(db, dealId, user.id, {
+      type: "chat",
+      title: `New message from ${user.name}`,
+      description: content.length > 140 ? `${content.slice(0, 140)}…` : content,
+      relatedHref: `/dashboard/chats/?thread=${threadId}`,
+    })
 
     return NextResponse.json(toChatMessageDTO(inserted[0], user.id), { status: 201 })
   } catch (error) {

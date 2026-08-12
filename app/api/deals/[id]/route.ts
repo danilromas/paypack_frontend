@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { deals, walletTransactions } from "@/db/schema"
 import { toDeal, validateDealPayload, type DealPayload } from "@/lib/deals"
 import { getCurrentUser } from "@/lib/auth/session"
+import { notifyOtherParticipants, notifyUser } from "@/lib/notifications"
 import type { DealStatus } from "@/types"
 
 function normalizePayload(body: Record<string, unknown>): DealPayload {
@@ -109,9 +110,12 @@ export async function PUT(
         .returning()
 
       const deal = rows[0]
+      if (!deal) return null
+
+      const statusChanged = existing.status !== deal.status
 
       // Seller's sale just completed — release the held amount into their wallet.
-      if (deal && existing.status !== "completed" && deal.status === "completed" && deal.role === "seller") {
+      if (statusChanged && deal.status === "completed" && deal.role === "seller") {
         await tx.insert(walletTransactions).values({
           userId: user.id,
           type: "payout",
@@ -120,9 +124,24 @@ export async function PUT(
           relatedDealId: deal.id,
           description: `Payout for completed deal — ${deal.title}`,
         })
+        await notifyUser(tx, {
+          userId: user.id,
+          type: "wallet",
+          title: "Payout received",
+          description: `+${(Number(deal.price) + Number(deal.shippingPrice)).toFixed(2)} ${deal.currency} for "${deal.title}"`,
+          relatedHref: "/dashboard/wallet/",
+        })
       }
 
-      return deal ?? null
+      if (statusChanged) {
+        await notifyOtherParticipants(tx, deal.id, user.id, {
+          type: "deal",
+          title: `Deal "${deal.title}" is now ${deal.status}`,
+          relatedHref: "/dashboard/",
+        })
+      }
+
+      return deal
     })
 
     if (!updated) {
