@@ -7,6 +7,7 @@ import {
   timestamp,
   check,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
@@ -82,6 +83,42 @@ export const walletTransactions = pgTable("wallet_transactions", {
   ),
   index("wallet_tx_user_id_idx").on(table.userId),
   index("wallet_tx_created_at_idx").on(table.createdAt.desc()),
+])
+
+export const dealParticipants = pgTable("deal_participants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dealId: uuid("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id),
+  role: text("role").notNull(),
+  invitedEmail: text("invited_email"),
+  joinedAt: timestamp("joined_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("deal_participants_role_check", sql`${table.role} in ('buyer', 'seller')`),
+  uniqueIndex("deal_participants_deal_user_idx")
+    .on(table.dealId, table.userId)
+    .where(sql`${table.userId} is not null`),
+  uniqueIndex("deal_participants_deal_email_idx")
+    .on(table.dealId, table.invitedEmail)
+    .where(sql`${table.invitedEmail} is not null`),
+  index("deal_participants_user_id_idx").on(table.userId),
+])
+
+export const chatThreads = pgTable("chat_threads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dealId: uuid("deal_id").notNull().unique().references(() => deals.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const chatMessages = pgTable("chat_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  threadId: uuid("thread_id").notNull().references(() => chatThreads.id, { onDelete: "cascade" }),
+  senderUserId: uuid("sender_user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("chat_messages_thread_created_idx").on(table.threadId, table.createdAt),
 ])
 
 export const shipments = pgTable("shipments", {

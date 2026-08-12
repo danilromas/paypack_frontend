@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { FileText, Loader2, User } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { FileText, Loader2, MessageCircle, User } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
-import { cn, formatDealDateTime } from "@/lib/utils"
+import { cn, formatDealDateTime, formatDealRelativeTime } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -19,10 +20,38 @@ import { Badge } from "@/components/ui/badge"
 const progressSteps = ["Created", "Funds Locked", "Shipped", "In Transit", "Received"]
 
 export function DealDetail() {
-  const { selectedDealId, deals, updateDeal, refreshWallet } = useAppStore()
+  const router = useRouter()
+  const { selectedDealId, deals, updateDeal, refreshWallet, chatThreads, refreshChats } = useAppStore()
   const deal =
     deals.find((d) => d.id === selectedDealId) ?? deals[0]
   const [confirming, setConfirming] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+
+  const thread = deal ? chatThreads.find((t) => t.dealId === deal.id) ?? null : null
+
+  async function handleInvite() {
+    if (!deal || !inviteEmail.trim()) return
+    setInviting(true)
+    setInviteError(null)
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/invite`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setInviteError(data.error ?? "Failed to send invite")
+        return
+      }
+      await refreshChats()
+      router.push(`/dashboard/chats/?thread=${data.threadId}`)
+    } finally {
+      setInviting(false)
+    }
+  }
 
   async function handleConfirmReceipt() {
     if (!deal) return
@@ -206,41 +235,52 @@ export function DealDetail() {
           ))}
         </div>
 
-        {/* Chat Preview */}
-        <div className="mb-6 max-h-48 space-y-3 overflow-y-auto">
-          <div className="flex gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-              <User className="h-4 w-4" />
-            </div>
-            <div className="rounded-2xl rounded-tl-none border border-border bg-secondary px-4 py-2">
-              <p className="text-sm text-muted-foreground">
-                Me: Please ship the phone soon.
+        {/* Chat */}
+        {thread ? (
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 p-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">
+                {thread.otherName ?? thread.otherInvitedEmail ?? "Invited"}
+              </div>
+              <p className="truncate text-xs text-muted-foreground">
+                {thread.lastMessage ?? (thread.otherJoined ? "No messages yet" : "Waiting to join PayPack")}
               </p>
+              {thread.lastMessageAt ? (
+                <p className="text-[10px] text-muted-foreground">{formatDealRelativeTime(thread.lastMessageAt)}</p>
+              ) : null}
             </div>
+            <Button
+              size="sm"
+              className="shrink-0 rounded-xl bg-primary"
+              onClick={() => router.push(`/dashboard/chats/?thread=${thread.threadId}`)}
+            >
+              <MessageCircle className="mr-1.5 h-4 w-4" />
+              Open Chat
+              {thread.unreadCount > 0 ? (
+                <span className="ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
+                  {thread.unreadCount}
+                </span>
+              ) : null}
+            </Button>
           </div>
-          <div className="flex gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              M
+        ) : (
+          <div className="mb-6 rounded-2xl border border-border bg-card/60 p-4">
+            <div className="mb-2 text-sm font-semibold text-foreground">Invite counterparty to chat</div>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="counterparty@email.com"
+                className="flex-1 rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <Button size="sm" className="rounded-xl bg-primary" disabled={inviting || !inviteEmail.trim()} onClick={handleInvite}>
+                {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Invite"}
+              </Button>
             </div>
-            <div className="rounded-2xl rounded-tl-none border border-primary/20 bg-primary/5 px-4 py-2">
-              <p className="text-sm text-foreground">
-                {deal.counterparty.split(" ")[0]}: Ok.
-              </p>
-            </div>
+            {inviteError ? <p className="mt-2 text-xs text-destructive">{inviteError}</p> : null}
           </div>
-        </div>
-
-        {/* Chat Input */}
-        <div className="mb-6 flex gap-2">
-          <input
-            type="text"
-            placeholder="Enter your message here..."
-            className="flex-1 rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-          <button className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all hover:opacity-90">
-            Open Chat
-          </button>
-        </div>
+        )}
 
         {/* Action Buttons + deal details modal */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">

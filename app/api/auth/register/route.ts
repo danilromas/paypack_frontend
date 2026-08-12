@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
-import { eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { users } from "@/db/schema"
+import { users, dealParticipants } from "@/db/schema"
 import { registerSchema } from "@/lib/auth/schemas"
 import { hashPassword, signSession, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth/session"
 
@@ -25,6 +25,16 @@ export async function POST(req: Request) {
       .values({ name, email, passwordHash })
       .returning()
     const user = inserted[0]
+
+    // Claim any pending deal invites sent to this email before they had an account.
+    try {
+      await db
+        .update(dealParticipants)
+        .set({ userId: user.id, joinedAt: new Date() })
+        .where(and(eq(dealParticipants.invitedEmail, user.email), isNull(dealParticipants.userId)))
+    } catch (claimError) {
+      console.error("Failed to claim pending invites for new user", claimError)
+    }
 
     const token = await signSession({
       sub: user.id,

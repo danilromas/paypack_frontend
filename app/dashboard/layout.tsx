@@ -15,6 +15,7 @@ export default function DashboardLayout({
   const isShipments = pathname.startsWith("/dashboard/shipments")
   const setUser = useAppStore((s) => s.setUser)
   const refreshWallet = useAppStore((s) => s.refreshWallet)
+  const refreshChats = useAppStore((s) => s.refreshChats)
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -22,7 +23,13 @@ export default function DashboardLayout({
       .then((user) => setUser(user))
       .catch(() => setUser(null))
     refreshWallet().catch(() => {})
-  }, [setUser, refreshWallet])
+    refreshChats().catch(() => {})
+
+    // Keeps the unread badge in the sidebar/header roughly fresh while browsing
+    // pages other than /dashboard/chats, which polls much faster on its own.
+    const interval = setInterval(() => refreshChats().catch(() => {}), 15000)
+    return () => clearInterval(interval)
+  }, [setUser, refreshWallet, refreshChats])
 
   return (
     <div

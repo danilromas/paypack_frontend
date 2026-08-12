@@ -15,10 +15,10 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/store/app-store";
 
-const navItems = [
+const staticNavItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: 3 },
   { href: "/dashboard/support", icon: HelpCircle, label: "Support" },
   { href: "/dashboard/notifications", icon: Bell, label: "Notifications", badge: 3 },
   { href: "/dashboard/wallet", icon: Wallet, label: "Wallet" },
@@ -33,6 +33,14 @@ const lowerNavItems = [
 export function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const chatThreads = useAppStore((s) => s.chatThreads);
+  const unreadChats = chatThreads.reduce((sum, t) => sum + t.unreadCount, 0);
+
+  const navItems = [
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: unreadChats || undefined },
+    ...staticNavItems,
+  ];
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

@@ -21,26 +21,6 @@ export interface Deal {
   images?: string[]
 }
 
-export interface ChatMessage {
-  id: string
-  content: string
-  sender: "user" | "other" | "system"
-  timestamp: string
-  read?: boolean
-  images?: string[]
-}
-
-export interface ChatThread {
-  id: string
-  name: string
-  avatar?: string
-  lastMessage: string
-  lastMessageTime: string
-  unreadCount: number
-  online: boolean
-  dealId?: string
-}
-
 export interface SupportTicket {
   id: string
   subject: string

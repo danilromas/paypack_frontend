@@ -1,6 +1,7 @@
 import { create } from "zustand"
-import type { AppMode, Deal, ChatThread } from "@/types"
+import type { AppMode, Deal } from "@/types"
 import type { WalletSummary } from "@/lib/wallet"
+import type { ChatThreadSummaryDTO } from "@/lib/chat"
 
 export interface AuthUser {
   id: string
@@ -23,8 +24,8 @@ interface AppState {
   updateDeal: (deal: Deal) => void
   selectedDealId: string | null
   setSelectedDealId: (id: string | null) => void
-  activeChatId: string | null
-  setActiveChatId: (id: string | null) => void
+  chatThreads: ChatThreadSummaryDTO[]
+  refreshChats: () => Promise<void>
   newDealModalOpen: boolean
   setNewDealModalOpen: (open: boolean) => void
   newDealStep: number
@@ -62,49 +63,13 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   selectedDealId: null,
   setSelectedDealId: (id) => set({ selectedDealId: id }),
-  activeChatId: "1",
-  setActiveChatId: (id) => set({ activeChatId: id }),
+  chatThreads: [],
+  refreshChats: async () => {
+    const res = await fetch("/api/chats")
+    set({ chatThreads: res.ok ? await res.json() : [] })
+  },
   newDealModalOpen: false,
   setNewDealModalOpen: (open) => set({ newDealModalOpen: open }),
   newDealStep: 1,
   setNewDealStep: (step) => set({ newDealStep: step }),
 }))
-
-export const mockChats: ChatThread[] = [
-  {
-    id: "1",
-    name: "Michael",
-    lastMessage: "Ok, I'll ship it...",
-    lastMessageTime: "2m",
-    unreadCount: 2,
-    online: true,
-    dealId: "1",
-  },
-  {
-    id: "2",
-    name: "Sarah",
-    lastMessage: "Deal confirmed!",
-    lastMessageTime: "Now",
-    unreadCount: 0,
-    online: true,
-    dealId: "2",
-  },
-  {
-    id: "3",
-    name: "Alex",
-    lastMessage: "More photos?",
-    lastMessageTime: "1h",
-    unreadCount: 0,
-    online: false,
-    dealId: "3",
-  },
-  {
-    id: "4",
-    name: "Emma",
-    lastMessage: "Thanks!",
-    lastMessageTime: "2d",
-    unreadCount: 0,
-    online: false,
-    dealId: "4",
-  },
-]
