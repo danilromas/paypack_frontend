@@ -1,4 +1,5 @@
 import type { Deal, DealStatus } from "@/types"
+import type { deals } from "@/db/schema"
 
 export interface DealPayload {
   title: string
@@ -32,8 +33,8 @@ export function validateDealPayload(payload: Partial<DealPayload>): string | nul
   if (!payload.title || typeof payload.title !== "string" || !payload.title.trim()) return "Invalid title"
   if (payload.description !== undefined && typeof payload.description !== "string") return "Invalid description"
   if (payload.imageUrl !== undefined && payload.imageUrl !== null && typeof payload.imageUrl !== "string") return "Invalid imageUrl"
-  if (typeof payload.price !== "number" || Number.isNaN(payload.price)) return "Invalid price"
-  if (typeof payload.shippingPrice !== "number" || Number.isNaN(payload.shippingPrice)) return "Invalid shippingPrice"
+  if (typeof payload.price !== "number" || Number.isNaN(payload.price) || payload.price < 0) return "Invalid price"
+  if (typeof payload.shippingPrice !== "number" || Number.isNaN(payload.shippingPrice) || payload.shippingPrice < 0) return "Invalid shippingPrice"
   if (!payload.currency || typeof payload.currency !== "string") return "Invalid currency"
   if (!payload.status || !DEAL_STATUS_VALUES.includes(payload.status as DealStatus)) return "Invalid status"
   if (payload.role !== "buyer" && payload.role !== "seller") return "Invalid role"
@@ -42,42 +43,26 @@ export function validateDealPayload(payload: Partial<DealPayload>): string | nul
   return null
 }
 
-export function toDealFromRow(row: {
-  id: string
-  title: string
-  description: string
-  image_url?: string | null
-  price: number | string
-  shipping_price: number | string
-  currency: string
-  status: DealStatus
-  role: "buyer" | "seller"
-  counterparty: string
-  counterparty_avatar: string | null
-  source_url?: string | null
-  source_platform?: string | null
-  payment_method?: string | null
-  payment_crypto_coin?: string | null
-  created_at: string
-  updated_at: string
-}): Deal {
+type DealRow = typeof deals.$inferSelect
+
+export function toDeal(row: DealRow): Deal {
   return {
     id: row.id,
     title: row.title,
     description: row.description,
-    imageUrl: row.image_url ?? undefined,
+    imageUrl: row.imageUrl ?? undefined,
     price: Number(row.price),
-    shippingPrice: Number(row.shipping_price),
+    shippingPrice: Number(row.shippingPrice),
     currency: row.currency,
-    status: row.status,
-    role: row.role,
+    status: row.status as DealStatus,
+    role: row.role as "buyer" | "seller",
     counterparty: row.counterparty,
-    counterpartyAvatar: row.counterparty_avatar ?? undefined,
-    sourceUrl: row.source_url ?? undefined,
-    sourcePlatform: row.source_platform ?? undefined,
-    paymentMethod: row.payment_method ?? undefined,
-    paymentCryptoCoin: row.payment_crypto_coin ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    counterpartyAvatar: row.counterpartyAvatar ?? undefined,
+    sourceUrl: row.sourceUrl ?? undefined,
+    sourcePlatform: row.sourcePlatform ?? undefined,
+    paymentMethod: row.paymentMethod ?? undefined,
+    paymentCryptoCoin: row.paymentCryptoCoin ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   }
 }

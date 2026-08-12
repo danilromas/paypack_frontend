@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
+import { useAppStore } from "@/store/app-store"
 
 export default function DashboardLayout({
   children,
@@ -11,6 +13,28 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const isShipments = pathname.startsWith("/dashboard/shipments")
+  const setUser = useAppStore((s) => s.setUser)
+  const refreshWallet = useAppStore((s) => s.refreshWallet)
+  const refreshChats = useAppStore((s) => s.refreshChats)
+  const refreshNotifications = useAppStore((s) => s.refreshNotifications)
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => setUser(user))
+      .catch(() => setUser(null))
+    refreshWallet().catch(() => {})
+    refreshChats().catch(() => {})
+    refreshNotifications().catch(() => {})
+
+    // Keeps the unread badges in the sidebar/header roughly fresh while browsing
+    // pages other than /dashboard/chats, which polls much faster on its own.
+    const interval = setInterval(() => {
+      refreshChats().catch(() => {})
+      refreshNotifications().catch(() => {})
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [setUser, refreshWallet, refreshChats, refreshNotifications])
 
   return (
     <div

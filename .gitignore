@@ -11,3 +11,5 @@ node_modules/
 marketplace/
 .env*
 market/
+.claude/
+tsconfig.tsbuildinfo
