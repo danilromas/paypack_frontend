@@ -8,7 +8,7 @@
   padding: 8px 14px;
 
   border-radius: 8px;
-  border: 1px solid #22a559;
+  border: 1px solid #0f7680;
 
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
@@ -17,31 +17,32 @@
   letter-spacing: 0.01em;
 
   color: #ffffff;
-  background: #22a559;
+  background: #0f7680;
 
   cursor: pointer;
   user-select: none;
   -webkit-font-smoothing: antialiased;
 
-  transition: 
-    background 0.2s ease,
+  transition:
+    filter 0.2s ease,
     box-shadow 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
+    color 0.2s ease;
 }
 
+/* `background`/`border-color` above are a resting-state fallback — the actual color is set inline
+   from the user's chosen button color (content.js:getButtonColor()). `filter` scales whatever that
+   color is, so hover/active stay correct for any custom color instead of a hardcoded shade. */
 .paypack-mp-inline-btn:hover {
-  background: #1d8f4d;
-  border-color: #1d8f4d;
+  filter: brightness(0.92);
   color: #ffffff;
 }
 
 .paypack-mp-inline-btn:active {
-  background: #187642;
+  filter: brightness(0.85);
 }
 
 .paypack-mp-inline-btn:focus-visible {
-  outline: 2px solid rgba(34, 165, 89, 0.45);
+  outline: 2px solid rgba(15, 118, 128, 0.45);
   outline-offset: 2px;
 }
 
@@ -116,13 +117,13 @@
 }
 
 .paypack-mp-listing-detail-btn:hover {
-  background: #0d6a72;
+  filter: brightness(0.92);
   border-color: transparent;
   color: #ffffff;
 }
 
 .paypack-mp-listing-detail-btn:active {
-  background: #0b5e65;
+  filter: brightness(0.85);
 }
 
 .paypack-mp-listing-detail-btn:focus-visible {

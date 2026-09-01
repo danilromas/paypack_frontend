@@ -1,13 +1,20 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { ShipmentsTable } from "@/components/dashboard/shipments-table"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
 import { Search, Package } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useAppStore } from "@/store/app-store"
-import type { Shipment, ShipmentPayload } from "@/lib/shipments"
+import type { Shipment, ShipmentCreatePayload, ShipmentEditPayload, ShipmentStatus } from "@/lib/shipments"
+import { SERVICE_TIERS } from "@/lib/shipping-rates"
+
+const STATUS_LABELS: Record<ShipmentStatus, string> = {
+  pending: "Pending",
+  "in-transit": "In transit",
+  arrived: "Arrived",
+}
 
 function ShipmentsPageContent() {
   const searchParams = useSearchParams()
@@ -16,6 +23,9 @@ function ShipmentsPageContent() {
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<ShipmentStatus | "all">("all")
+  const [serviceFilter, setServiceFilter] = useState<string>("all")
+  const [search, setSearch] = useState("")
 
   useEffect(() => {
     const mode = searchParams.get("mode")
@@ -46,7 +56,7 @@ function ShipmentsPageContent() {
     loadShipments()
   }, [])
 
-  const createShipment = async (payload: ShipmentPayload) => {
+  const createShipment = async (payload: ShipmentCreatePayload) => {
     const response = await fetch("/api/shipments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -56,7 +66,7 @@ function ShipmentsPageContent() {
     await loadShipments()
   }
 
-  const updateShipment = async (id: string, payload: ShipmentPayload) => {
+  const updateShipment = async (id: string, payload: ShipmentEditPayload) => {
     const response = await fetch(`/api/shipments/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -73,6 +83,33 @@ function ShipmentsPageContent() {
     if (!response.ok) throw new Error("Failed to delete shipment")
     await loadShipments()
   }
+
+  const advanceShipment = async (id: string) => {
+    const response = await fetch(`/api/shipments/${id}/advance`, { method: "POST" })
+    if (!response.ok) throw new Error("Failed to advance shipment")
+    await loadShipments()
+  }
+
+  const filteredShipments = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return shipments.filter((s) => {
+      if (statusFilter !== "all" && s.status !== statusFilter) return false
+      if (serviceFilter !== "all" && s.serviceTier !== serviceFilter) return false
+      if (query) {
+        const haystack = [
+          s.senderName,
+          s.senderLocation,
+          s.receiverName,
+          s.receiverLocation,
+          s.trackingNumber,
+        ]
+          .join(" ")
+          .toLowerCase()
+        if (!haystack.includes(query)) return false
+      }
+      return true
+    })
+  }, [shipments, statusFilter, serviceFilter, search])
 
   return (
     <>
@@ -101,24 +138,45 @@ function ShipmentsPageContent() {
 
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:p-4">
           <div className="flex flex-wrap gap-2 sm:flex-1 sm:flex-initial">
-            {["Sender", "Receiver", "Service", "Status"].map((label) => (
-              <div
-                key={label}
-                className="flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 sm:px-4"
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 sm:px-4">
+              <span className="text-xs text-muted-foreground">Service</span>
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                className="min-w-0 bg-transparent text-sm font-medium text-foreground outline-none"
               >
-                <span className="text-xs text-muted-foreground">{label}</span>
-                <select className="min-w-0 bg-transparent text-sm font-medium text-foreground outline-none">
-                  <option>All</option>
-                </select>
-              </div>
-            ))}
+                <option value="all">All</option>
+                {SERVICE_TIERS.map((tier) => (
+                  <option key={tier.id} value={tier.id}>
+                    {tier.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2 sm:px-4">
+              <span className="text-xs text-muted-foreground">Status</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as ShipmentStatus | "all")}
+                className="min-w-0 bg-transparent text-sm font-medium text-foreground outline-none"
+              >
+                <option value="all">All</option>
+                {(Object.keys(STATUS_LABELS) as ShipmentStatus[]).map((status) => (
+                  <option key={status} value={status}>
+                    {STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="hidden shrink-0 sm:block sm:flex-1" />
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search shipments..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search sender, receiver, tracking #..."
               className="w-full min-w-0 rounded-xl border border-border bg-secondary py-2 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 sm:w-64"
             />
           </div>
@@ -131,35 +189,12 @@ function ShipmentsPageContent() {
         )}
 
         <ShipmentsTable
-          shipments={shipments}
+          shipments={filteredShipments}
           isLoading={loading}
           onUpdate={updateShipment}
           onDelete={deleteShipment}
+          onAdvance={advanceShipment}
         />
-
-        {/* Pagination */}
-        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-center text-sm text-muted-foreground sm:text-left">
-            Showing 1-3 of 24 shipments
-          </span>
-          <div className="flex flex-wrap justify-center gap-2 sm:justify-end">
-            <button className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">
-              Previous
-            </button>
-            <button className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow">
-              1
-            </button>
-            <button className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">
-              2
-            </button>
-            <button className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">
-              3
-            </button>
-            <button className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-secondary">
-              Next
-            </button>
-          </div>
-        </div>
       </div>
 
       {wizardOpen && (

@@ -90,7 +90,7 @@ export function AdminDashboard() {
     const disputed = deals.filter((x) => x.status === "disputed").length
     const pendingDeals = deals.filter((x) => x.status === "pending").length
     const activePipeline = deals.filter((x) =>
-      ["escrow", "shipped", "in-transit", "delivered"].includes(x.status),
+      ["escrow", "shipped"].includes(x.status),
     ).length
     const escrowHeld = deals
       .filter((x) => x.status === "escrow")
@@ -521,16 +521,28 @@ export function AdminDashboard() {
                 </dd>
               </div>
               <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Tracking #</dt>
+                <dd className="font-mono text-xs">{shipmentModal.trackingNumber}</dd>
+              </div>
+              <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Service</dt>
-                <dd>{shipmentModal.service}</dd>
+                <dd className="capitalize">{shipmentModal.serviceTier}</dd>
               </div>
               <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Dimensions</dt>
-                <dd>{shipmentModal.dimensions}</dd>
+                <dd>
+                  {shipmentModal.lengthCm}×{shipmentModal.widthCm}×{shipmentModal.heightCm} cm
+                </dd>
               </div>
               <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Weight</dt>
-                <dd>{shipmentModal.weight}</dd>
+                <dd>{shipmentModal.weightKg} kg</dd>
+              </div>
+              <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
+                <dt className="text-muted-foreground">Est. cost</dt>
+                <dd>
+                  {shipmentModal.estimatedCost.toFixed(2)} {shipmentModal.estimatedCurrency}
+                </dd>
               </div>
               <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Status</dt>

@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { deals, walletTransactions } from "@/db/schema"
-import { toDeal, validateDealPayload, type DealPayload } from "@/lib/deals"
+import { deals } from "@/db/schema"
+import { validateDealEditPayload, type DealEditPayload } from "@/lib/deals"
 import { getCurrentUser } from "@/lib/auth/session"
-import { notifyOtherParticipants, notifyUser } from "@/lib/notifications"
-import type { DealStatus } from "@/types"
+import { getDealForViewer } from "@/lib/deals-access"
 
-function normalizePayload(body: Record<string, unknown>): DealPayload {
+function normalizePayload(body: Record<string, unknown>): DealEditPayload {
   return {
     title: typeof body.title === "string" ? body.title : "",
     description: typeof body.description === "string" ? body.description : "",
@@ -18,17 +17,6 @@ function normalizePayload(body: Record<string, unknown>): DealPayload {
         ? body.shippingPrice
         : Number(body.shippingPrice),
     currency: typeof body.currency === "string" ? body.currency : "EUR",
-    status: body.status as DealStatus,
-    role: body.role as DealPayload["role"],
-    counterparty: typeof body.counterparty === "string" ? body.counterparty : "",
-    counterpartyAvatar:
-      typeof body.counterpartyAvatar === "string" ? body.counterpartyAvatar : null,
-    sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : null,
-    sourcePlatform:
-      typeof body.sourcePlatform === "string" ? body.sourcePlatform : null,
-    paymentMethod: typeof body.paymentMethod === "string" ? body.paymentMethod : null,
-    paymentCryptoCoin:
-      typeof body.paymentCryptoCoin === "string" ? body.paymentCryptoCoin : null,
   }
 }
 
@@ -43,23 +31,23 @@ export async function GET(
 
   try {
     const { id } = await context.params
-    const rows = await db
-      .select()
-      .from(deals)
-      .where(and(eq(deals.id, id), eq(deals.userId, user.id)))
-      .limit(1)
-
-    if (!rows[0]) {
+    const deal = await getDealForViewer(id, user.id)
+    if (!deal) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })
     }
-
-    return NextResponse.json(toDeal(rows[0]))
+    return NextResponse.json(deal)
   } catch (error) {
     console.error("GET /api/deals/[id] failed", error)
     return NextResponse.json({ error: "Failed to fetch deal" }, { status: 500 })
   }
 }
 
+/**
+ * Edits deal *details* only — title/description/price/images. Cannot touch `status`: every state
+ * transition goes through its own role-gated action endpoint (accept/ship/confirm-receipt/cancel/dispute)
+ * instead, so "who's allowed to do this" lives in exactly one place per action. Only the creator can edit,
+ * and only before the counterparty has accepted (paying into escrow locks the terms).
+ */
 export async function PUT(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -73,82 +61,34 @@ export async function PUT(
     const { id } = await context.params
     const raw = (await req.json()) as Record<string, unknown>
     const payload = normalizePayload(raw)
-    const validationError = validateDealPayload(payload)
+    const validationError = validateDealEditPayload(payload)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    const updated = await db.transaction(async (tx) => {
-      const existingRows = await tx
-        .select({ status: deals.status })
-        .from(deals)
-        .where(and(eq(deals.id, id), eq(deals.userId, user.id)))
-        .limit(1)
-      const existing = existingRows[0]
-      if (!existing) return null
+    const rows = await db
+      .update(deals)
+      .set({
+        title: payload.title.trim(),
+        description: payload.description,
+        imageUrl: payload.imageUrl ?? null,
+        price: (Math.round(payload.price * 100) / 100).toFixed(2),
+        shippingPrice: (Math.round(payload.shippingPrice * 100) / 100).toFixed(2),
+        currency: payload.currency,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(deals.id, id), eq(deals.userId, user.id), eq(deals.status, "pending")))
+      .returning({ id: deals.id })
 
-      const rows = await tx
-        .update(deals)
-        .set({
-          title: payload.title.trim(),
-          description: payload.description,
-          imageUrl: payload.imageUrl ?? null,
-          price: (Math.round(payload.price * 100) / 100).toFixed(2),
-          shippingPrice: (Math.round(payload.shippingPrice * 100) / 100).toFixed(2),
-          currency: payload.currency,
-          status: payload.status,
-          role: payload.role,
-          counterparty: payload.counterparty,
-          counterpartyAvatar: payload.counterpartyAvatar ?? null,
-          sourceUrl: payload.sourceUrl ?? null,
-          sourcePlatform: payload.sourcePlatform ?? null,
-          paymentMethod: payload.paymentMethod ?? null,
-          paymentCryptoCoin: payload.paymentCryptoCoin ?? null,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(deals.id, id), eq(deals.userId, user.id)))
-        .returning()
-
-      const deal = rows[0]
-      if (!deal) return null
-
-      const statusChanged = existing.status !== deal.status
-
-      // Seller's sale just completed — release the held amount into their wallet.
-      if (statusChanged && deal.status === "completed" && deal.role === "seller") {
-        await tx.insert(walletTransactions).values({
-          userId: user.id,
-          type: "payout",
-          amount: (Number(deal.price) + Number(deal.shippingPrice)).toFixed(2),
-          status: "completed",
-          relatedDealId: deal.id,
-          description: `Payout for completed deal — ${deal.title}`,
-        })
-        await notifyUser(tx, {
-          userId: user.id,
-          type: "wallet",
-          title: "Payout received",
-          description: `+${(Number(deal.price) + Number(deal.shippingPrice)).toFixed(2)} ${deal.currency} for "${deal.title}"`,
-          relatedHref: "/dashboard/wallet/",
-        })
-      }
-
-      if (statusChanged) {
-        await notifyOtherParticipants(tx, deal.id, user.id, {
-          type: "deal",
-          title: `Deal "${deal.title}" is now ${deal.status}`,
-          relatedHref: "/dashboard/",
-        })
-      }
-
-      return deal
-    })
-
-    if (!updated) {
-      return NextResponse.json({ error: "Deal not found" }, { status: 404 })
+    if (!rows[0]) {
+      return NextResponse.json(
+        { error: "Deal not found, not yours, or no longer editable" },
+        { status: 404 },
+      )
     }
 
-    return NextResponse.json(toDeal(updated))
+    const updated = await getDealForViewer(id, user.id)
+    return NextResponse.json(updated)
   } catch (error) {
     console.error("PUT /api/deals/[id] failed", error)
     return NextResponse.json({ error: "Failed to update deal" }, { status: 500 })
@@ -168,11 +108,14 @@ export async function DELETE(
     const { id } = await context.params
     const rows = await db
       .delete(deals)
-      .where(and(eq(deals.id, id), eq(deals.userId, user.id)))
+      .where(and(eq(deals.id, id), eq(deals.userId, user.id), eq(deals.status, "pending")))
       .returning({ id: deals.id })
 
     if (!rows[0]) {
-      return NextResponse.json({ error: "Deal not found" }, { status: 404 })
+      return NextResponse.json(
+        { error: "Deal not found, not yours, or no longer deletable" },
+        { status: 404 },
+      )
     }
 
     return NextResponse.json({ ok: true })

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server"
 import { desc, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { shipments } from "@/db/schema"
-import { toShipment, validateShipmentPayload, type ShipmentPayload } from "@/lib/shipments"
+import { toShipment, validateShipmentCreatePayload, type ShipmentCreatePayload } from "@/lib/shipments"
 import { getCurrentUser } from "@/lib/auth/session"
+import { estimateShippingCost, generateTrackingNumber, getServiceTier } from "@/lib/shipping-rates"
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -32,11 +33,22 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = (await req.json()) as Partial<ShipmentPayload>
-    const validationError = validateShipmentPayload(body)
+    const body = (await req.json()) as Partial<ShipmentCreatePayload>
+    const validationError = validateShipmentCreatePayload(body)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
+
+    const tier = getServiceTier(body.serviceTier!)!
+    const estimatedCost = estimateShippingCost(
+      {
+        weightKg: body.weightKg!,
+        lengthCm: body.lengthCm!,
+        widthCm: body.widthCm!,
+        heightCm: body.heightCm!,
+      },
+      tier,
+    )
 
     const inserted = await db
       .insert(shipments)
@@ -47,10 +59,15 @@ export async function POST(req: Request) {
         senderLocation: body.senderLocation!,
         receiverName: body.receiverName!,
         receiverLocation: body.receiverLocation!,
-        service: body.service!,
-        dimensions: body.dimensions!,
-        weight: body.weight!,
-        status: body.status!,
+        serviceTier: body.serviceTier!,
+        weightKg: body.weightKg!.toFixed(2),
+        lengthCm: body.lengthCm!.toFixed(1),
+        widthCm: body.widthCm!.toFixed(1),
+        heightCm: body.heightCm!.toFixed(1),
+        estimatedCost: estimatedCost.toFixed(2),
+        trackingNumber: generateTrackingNumber(),
+        // Every shipment starts pending — status only ever moves forward via /advance.
+        status: "pending",
       })
       .returning()
 

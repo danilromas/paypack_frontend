@@ -8,7 +8,8 @@ import {
   Shield,
   CheckCircle,
   Clock,
-  MoreVertical,
+  AlertTriangle,
+  Ban,
 } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "@/store/app-store";
@@ -26,10 +27,10 @@ import { Badge } from "@/components/ui/badge";
 const statusSortOrder: DealStatus[] = [
   "pending",
   "escrow",
-  "in-transit",
   "shipped",
   "completed",
   "disputed",
+  "cancelled",
 ];
 
 function getStatusConfig(status: DealStatus) {
@@ -46,23 +47,29 @@ function getStatusConfig(status: DealStatus) {
         label: "In Escrow",
         className: "bg-warning/40 text-warning-foreground border border-warning/20",
       };
+    case "shipped":
+      return {
+        icon: Clock,
+        label: "Shipped",
+        className: "bg-primary/10 text-primary border border-primary/20",
+      };
     case "completed":
       return {
         icon: CheckCircle,
         label: "Completed",
         className: "bg-success/10 text-success border border-success/20",
       };
-    case "shipped":
-    case "in-transit":
+    case "disputed":
       return {
-        icon: Clock,
-        label: "In Transit",
-        className: "bg-primary/10 text-primary border border-primary/20",
+        icon: AlertTriangle,
+        label: "Disputed",
+        className: "bg-destructive/10 text-destructive border border-destructive/20",
       };
+    case "cancelled":
     default:
       return {
-        icon: Clock,
-        label: status,
+        icon: Ban,
+        label: "Cancelled",
         className: "bg-muted text-muted-foreground border border-border",
       };
   }
@@ -113,7 +120,7 @@ export function DealsList({
     // Фильтр по статусу
     if (activeFilter !== "All") {
       const statusMap: Record<string, DealStatus[]> = {
-        Active: ["pending", "escrow", "shipped", "in-transit"],
+        Active: ["pending", "escrow", "shipped"],
         Pending: ["pending"],
         "In Escrow": ["escrow"],
         Disputed: ["disputed"],
@@ -215,15 +222,6 @@ export function DealsList({
                     <StatusIcon className="h-3 w-3" />
                     {statusConfig.label}
                   </span>
-                  <button
-                    className="rounded p-1 text-muted-foreground hover:text-foreground"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Добавьте здесь обработчик для меню
-                    }}
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
             );
@@ -272,12 +270,17 @@ export function DealsList({
                 </dd>
               </div>
               <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Role</dt>
-                <dd className="capitalize">{detailDeal.role}</dd>
+                <dt className="text-muted-foreground">Your role</dt>
+                <dd className="capitalize">{detailDeal.myRole}</dd>
               </div>
               <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Counterparty</dt>
-                <dd>{detailDeal.counterparty}</dd>
+                <dd>
+                  {detailDeal.counterpartyName ?? detailDeal.counterparty}
+                  {!detailDeal.counterpartyJoined && (
+                    <span className="ml-2 text-xs text-muted-foreground">(not joined yet)</span>
+                  )}
+                </dd>
               </div>
               <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Created</dt>

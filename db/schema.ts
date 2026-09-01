@@ -62,7 +62,7 @@ export const deals = pgTable("deals", {
 }, (table) => [
   check(
     "deals_status_check",
-    sql`${table.status} in ('pending', 'escrow', 'shipped', 'in-transit', 'delivered', 'completed', 'disputed', 'cancelled')`,
+    sql`${table.status} in ('pending', 'escrow', 'shipped', 'completed', 'disputed', 'cancelled')`,
   ),
   check("deals_role_check", sql`${table.role} in ('buyer', 'seller')`),
   index("deals_created_at_idx").on(table.createdAt.desc()),
@@ -79,7 +79,7 @@ export const walletTransactions = pgTable("wallet_transactions", {
   description: text("description").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  check("wallet_tx_type_check", sql`${table.type} in ('topup', 'withdrawal', 'payout')`),
+  check("wallet_tx_type_check", sql`${table.type} in ('topup', 'withdrawal', 'payout', 'escrow_hold', 'refund')`),
   check(
     "wallet_tx_status_check",
     sql`${table.status} in ('pending', 'processing', 'completed', 'failed')`,
@@ -251,12 +251,18 @@ export const shipments = pgTable("shipments", {
   senderLocation: text("sender_location").notNull(),
   receiverName: text("receiver_name").notNull(),
   receiverLocation: text("receiver_location").notNull(),
-  service: text("service").notNull(),
-  dimensions: text("dimensions").notNull(),
-  weight: text("weight").notNull(),
+  serviceTier: text("service_tier").notNull(),
+  weightKg: numeric("weight_kg", { precision: 6, scale: 2 }).notNull(),
+  lengthCm: numeric("length_cm", { precision: 6, scale: 1 }).notNull(),
+  widthCm: numeric("width_cm", { precision: 6, scale: 1 }).notNull(),
+  heightCm: numeric("height_cm", { precision: 6, scale: 1 }).notNull(),
+  estimatedCost: numeric("estimated_cost", { precision: 10, scale: 2 }).notNull(),
+  estimatedCurrency: text("estimated_currency").notNull().default("EUR"),
+  trackingNumber: text("tracking_number").notNull(),
   status: text("status").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("shipments_status_check", sql`${table.status} in ('arrived', 'in-transit', 'pending')`),
+  check("shipments_tier_check", sql`${table.serviceTier} in ('economy', 'standard', 'express')`),
   index("shipments_user_id_idx").on(table.userId),
 ])

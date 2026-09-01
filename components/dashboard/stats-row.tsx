@@ -14,7 +14,7 @@ interface StatsRowProps {
 export function StatsRow({ onFilterChange, onSearchChange }: StatsRowProps) {
   const { deals } = useAppStore();
   const activeDealsCount = deals.filter((d) =>
-    ["pending", "escrow", "shipped", "in-transit"].includes(d.status),
+    ["pending", "escrow", "shipped"].includes(d.status),
   ).length;
   const [activeFilter, setActiveFilter] = useState("All");
 

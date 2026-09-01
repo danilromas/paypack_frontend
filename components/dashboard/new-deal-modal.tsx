@@ -75,6 +75,7 @@ export function NewDealModal({
   const [shippingPrice, setShippingPrice] = useState(0)
   const [currency, setCurrency] = useState("EUR")
   const [sellerName, setSellerName] = useState("")
+  const [counterpartyEmail, setCounterpartyEmail] = useState("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [cryptoCoin, setCryptoCoin] = useState<CryptoCoin>("BTC")
   const [cryptoAddressCopied, setCryptoAddressCopied] = useState(false)
@@ -95,7 +96,8 @@ export function NewDealModal({
   const total = price + shippingPrice + fee
   const sellerReceives = Math.round((price + shippingPrice - fee) * 100) / 100
 
-  const detailsValid = itemTitle.trim().length > 0 && price > 0
+  const counterpartyEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(counterpartyEmail.trim())
+  const detailsValid = itemTitle.trim().length > 0 && price > 0 && counterpartyEmailValid
 
   const sourcePlatform = useMemo(
     () => detectMarketplacePlatform(productLink),
@@ -205,10 +207,10 @@ export function NewDealModal({
       price,
       shippingPrice,
       currency,
-      status: "pending" as const,
       role,
       counterparty:
         role === "buyer" ? sellerName.trim() || "Awaiting counterparty" : "Awaiting counterparty",
+      counterpartyEmail: counterpartyEmail.trim().toLowerCase(),
       sourceUrl: trimmedLink || null,
       sourcePlatform: detectMarketplacePlatform(trimmedLink),
       paymentMethod: role === "buyer" ? paymentMethod : null,
@@ -592,6 +594,25 @@ export function NewDealModal({
                 )}
 
                 <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">
+                    {role === "buyer" ? "Seller's" : "Buyer's"} email
+                  </label>
+                  <input
+                    type="email"
+                    value={counterpartyEmail}
+                    onChange={(e) => setCounterpartyEmail(e.target.value)}
+                    placeholder="counterparty@email.com"
+                    className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    They'll need this to join the deal — it can't move to escrow until they do.
+                  </p>
+                  {counterpartyEmail.trim().length > 0 && !counterpartyEmailValid && (
+                    <p className="mt-1 text-[11px] text-destructive">Enter a valid email.</p>
+                  )}
+                </div>
+
+                <div>
                   <label className="mb-1 block text-xs text-muted-foreground">Currency</label>
                   <select
                     value={currency}
@@ -644,7 +665,7 @@ export function NewDealModal({
             <div className="flex items-center justify-end gap-3 pt-2">
               {!detailsValid && (
                 <p className="text-xs text-destructive">
-                  Title and a price greater than 0 are required.
+                  Title, a price greater than 0, and a valid counterparty email are required.
                 </p>
               )}
               <button

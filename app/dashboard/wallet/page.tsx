@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Wallet, ArrowUpRight, ArrowDownRight, CreditCard } from "lucide-react"
+import { Wallet, ArrowUpRight, ArrowDownRight, CreditCard, Lock, Undo2 } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { useAppStore } from "@/store/app-store"
 import { Badge } from "@/components/ui/badge"
@@ -33,6 +33,10 @@ function typeMeta(type: WalletTxType) {
       return { label: "Top up", icon: CreditCard, badge: "bg-primary/10 text-primary" }
     case "withdrawal":
       return { label: "Withdrawal", icon: ArrowUpRight, badge: "bg-destructive/10 text-destructive" }
+    case "escrow_hold":
+      return { label: "Escrow hold", icon: Lock, badge: "bg-warning/10 text-warning" }
+    case "refund":
+      return { label: "Refund", icon: Undo2, badge: "bg-primary/10 text-primary" }
     case "payout":
     default:
       return { label: "Payout", icon: ArrowDownRight, badge: "bg-success/10 text-success" }
@@ -170,6 +174,8 @@ export default function WalletPage() {
                     <option value="all">All</option>
                     <option value="topup">Top up</option>
                     <option value="withdrawal">Withdrawal</option>
+                    <option value="escrow_hold">Escrow hold</option>
+                    <option value="refund">Refund</option>
                     <option value="payout">Payout</option>
                   </select>
                 </div>

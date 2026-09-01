@@ -65,6 +65,22 @@ async function main() {
     console.log("  - demo deal already exists, skipping")
   }
 
+  // Backfill: any deal that predates deal_participants (or was inserted directly, like the one above)
+  // needs its creator linked as a participant, or they'd be locked out once deal access became
+  // participant-based instead of owner-based. Idempotent — safe to run on every boot.
+  const backfilled = await pool.query(`
+    INSERT INTO deal_participants (deal_id, user_id, role, joined_at)
+    SELECT d.id, d.user_id, d.role, now()
+    FROM deals d
+    WHERE NOT EXISTS (
+      SELECT 1 FROM deal_participants dp WHERE dp.deal_id = d.id AND dp.user_id = d.user_id
+    )
+    RETURNING deal_id
+  `)
+  if (backfilled.rowCount > 0) {
+    console.log(`  - backfilled deal_participants for ${backfilled.rowCount} deal(s)`)
+  }
+
   console.log("Done.")
   await pool.end()
 }
