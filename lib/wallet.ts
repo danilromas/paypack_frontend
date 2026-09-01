@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, walletTransactions } from "@/db/schema"
 
-export type WalletTxType = "topup" | "withdrawal" | "payout"
+export type WalletTxType = "topup" | "withdrawal" | "payout" | "escrow_hold" | "refund"
 export type WalletTxStatus = "pending" | "processing" | "completed" | "failed"
 
 export interface WalletTransactionDTO {
@@ -38,7 +38,9 @@ export function toWalletTransaction(row: WalletTxRow): WalletTransactionDTO {
   }
 }
 
-const SELLER_PENDING_STATUSES = ["escrow", "shipped", "in-transit", "delivered"] as const
+// Deal statuses where a buyer's escrow_hold is still "live" (not yet released as a payout, not refunded).
+const HOLD_STILL_TIED_UP_STATUSES = ["escrow", "shipped", "disputed"] as const
+const SELLER_PENDING_STATUSES = ["escrow", "shipped"] as const
 
 export async function getWalletSummary(userId: string): Promise<WalletSummary> {
   const [[balanceRow], [inEscrowRow], [pendingPayoutRow], operationRows] = await Promise.all([
@@ -46,10 +48,22 @@ export async function getWalletSummary(userId: string): Promise<WalletSummary> {
       .select({ total: sql<string>`coalesce(sum(${walletTransactions.amount}), 0)` })
       .from(walletTransactions)
       .where(and(eq(walletTransactions.userId, userId), eq(walletTransactions.status, "completed"))),
+    // Real held funds: escrow_hold rows whose deal hasn't been completed/cancelled yet — a display
+    // breakdown of `balance`, not something subtracted from it again (the hold already left the balance).
     db
-      .select({ total: sql<string>`coalesce(sum(${deals.price} + ${deals.shippingPrice}), 0)` })
-      .from(deals)
-      .where(and(eq(deals.userId, userId), eq(deals.role, "buyer"), eq(deals.status, "escrow"))),
+      .select({ total: sql<string>`coalesce(sum(-${walletTransactions.amount}), 0)` })
+      .from(walletTransactions)
+      .innerJoin(deals, eq(deals.id, walletTransactions.relatedDealId))
+      .where(
+        and(
+          eq(walletTransactions.userId, userId),
+          eq(walletTransactions.type, "escrow_hold"),
+          eq(walletTransactions.status, "completed"),
+          inArray(deals.status, HOLD_STILL_TIED_UP_STATUSES),
+        ),
+      ),
+    // Not yet a real transaction (no payout row exists until the buyer confirms receipt) — genuinely
+    // has to be computed live from the seller's in-flight deals.
     db
       .select({ total: sql<string>`coalesce(sum(${deals.price} + ${deals.shippingPrice}), 0)` })
       .from(deals)
@@ -75,7 +89,8 @@ export async function getWalletSummary(userId: string): Promise<WalletSummary> {
     balance,
     inEscrow,
     pendingPayout,
-    available: balance - inEscrow,
+    // `balance` already reflects every real hold/payout/refund — nothing left to subtract.
+    available: balance,
     operations: operationRows.map(toWalletTransaction),
   }
 }

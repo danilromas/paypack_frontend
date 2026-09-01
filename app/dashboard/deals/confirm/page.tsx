@@ -71,35 +71,16 @@ function DealConfirmPageContent() {
         return
       }
 
-      const putRes = await fetch(`/api/deals/${parsed.dealId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: deal.title,
-          description: deal.description,
-          imageUrl: deal.imageUrl ?? null,
-          price: deal.price,
-          shippingPrice: deal.shippingPrice,
-          currency: deal.currency,
-          status: "escrow",
-          role: deal.role,
-          counterparty: deal.counterparty,
-          counterpartyAvatar: deal.counterpartyAvatar ?? null,
-          sourceUrl: deal.sourceUrl ?? null,
-          sourcePlatform: deal.sourcePlatform ?? null,
-          paymentMethod: deal.paymentMethod ?? null,
-          paymentCryptoCoin: deal.paymentCryptoCoin ?? null,
-        }),
-      })
-      if (!putRes.ok) {
-        const body = (await putRes.json().catch(() => null)) as
+      const acceptRes = await fetch(`/api/deals/${parsed.dealId}/accept`, { method: "POST" })
+      if (!acceptRes.ok) {
+        const body = (await acceptRes.json().catch(() => null)) as
           | { error?: string }
           | null
         throw new Error(body?.error ?? "Failed to confirm on PayPack")
       }
 
       setConfirmed(true)
-      setStatusMessage("Confirmed. Deal status changed from pending to escrow.")
+      setStatusMessage("Confirmed. Deal accepted and paid into escrow.")
     } catch (e) {
       setConfirmed(false)
       setError(e instanceof Error ? e.message : "Confirmation failed")

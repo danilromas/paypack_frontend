@@ -62,7 +62,7 @@ export const deals = pgTable("deals", {
 }, (table) => [
   check(
     "deals_status_check",
-    sql`${table.status} in ('pending', 'escrow', 'shipped', 'in-transit', 'delivered', 'completed', 'disputed', 'cancelled')`,
+    sql`${table.status} in ('pending', 'escrow', 'shipped', 'completed', 'disputed', 'cancelled')`,
   ),
   check("deals_role_check", sql`${table.role} in ('buyer', 'seller')`),
   index("deals_created_at_idx").on(table.createdAt.desc()),
@@ -79,7 +79,7 @@ export const walletTransactions = pgTable("wallet_transactions", {
   description: text("description").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  check("wallet_tx_type_check", sql`${table.type} in ('topup', 'withdrawal', 'payout')`),
+  check("wallet_tx_type_check", sql`${table.type} in ('topup', 'withdrawal', 'payout', 'escrow_hold', 'refund')`),
   check(
     "wallet_tx_status_check",
     sql`${table.status} in ('pending', 'processing', 'completed', 'failed')`,

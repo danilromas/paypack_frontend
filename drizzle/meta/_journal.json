@@ -43,6 +43,13 @@
       "when": 1786561865417,
       "tag": "0005_cool_ender_wiggin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788287399127,
+      "tag": "0006_special_namor",
+      "breakpoints": true
     }
   ]
 }

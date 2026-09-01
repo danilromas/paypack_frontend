@@ -90,7 +90,7 @@ export function AdminDashboard() {
     const disputed = deals.filter((x) => x.status === "disputed").length
     const pendingDeals = deals.filter((x) => x.status === "pending").length
     const activePipeline = deals.filter((x) =>
-      ["escrow", "shipped", "in-transit", "delivered"].includes(x.status),
+      ["escrow", "shipped"].includes(x.status),
     ).length
     const escrowHeld = deals
       .filter((x) => x.status === "escrow")

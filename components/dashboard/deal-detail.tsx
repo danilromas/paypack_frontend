@@ -17,14 +17,23 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 
-const progressSteps = ["Created", "Funds Locked", "Shipped", "In Transit", "Received"]
+const progressSteps = ["Created", "Escrow", "Shipped", "Completed"]
+
+const progressStepIndex: Record<string, number> = {
+  pending: 0,
+  escrow: 1,
+  shipped: 2,
+  completed: 3,
+  disputed: 2,
+  cancelled: 0,
+}
 
 export function DealDetail() {
   const router = useRouter()
   const { selectedDealId, deals, updateDeal, refreshWallet, chatThreads, refreshChats } = useAppStore()
-  const deal =
-    deals.find((d) => d.id === selectedDealId) ?? deals[0]
-  const [confirming, setConfirming] = useState(false)
+  const deal = deals.find((d) => d.id === selectedDealId) ?? deals[0]
+  const [acting, setActing] = useState<"accept" | "ship" | "confirm-receipt" | "cancel" | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -34,6 +43,24 @@ export function DealDetail() {
   const [disputeError, setDisputeError] = useState<string | null>(null)
 
   const thread = deal ? chatThreads.find((t) => t.dealId === deal.id) ?? null : null
+
+  async function runAction(action: "accept" | "ship" | "confirm-receipt" | "cancel") {
+    if (!deal) return
+    setActing(action)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/${action}`, { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setActionError(data.error ?? "Something went wrong")
+        return
+      }
+      updateDeal(data)
+      await refreshWallet()
+    } finally {
+      setActing(null)
+    }
+  }
 
   async function handleInvite() {
     if (!deal || !inviteEmail.trim()) return
@@ -54,40 +81,6 @@ export function DealDetail() {
       router.push(`/dashboard/chats/?thread=${data.threadId}`)
     } finally {
       setInviting(false)
-    }
-  }
-
-  async function handleConfirmReceipt() {
-    if (!deal) return
-    setConfirming(true)
-    try {
-      const res = await fetch(`/api/deals/${deal.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: deal.title,
-          description: deal.description,
-          imageUrl: deal.imageUrl ?? null,
-          price: deal.price,
-          shippingPrice: deal.shippingPrice,
-          currency: deal.currency,
-          status: "completed",
-          role: deal.role,
-          counterparty: deal.counterparty,
-          counterpartyAvatar: deal.counterpartyAvatar ?? null,
-          sourceUrl: deal.sourceUrl ?? null,
-          sourcePlatform: deal.sourcePlatform ?? null,
-          paymentMethod: deal.paymentMethod ?? null,
-          paymentCryptoCoin: deal.paymentCryptoCoin ?? null,
-        }),
-      })
-      if (res.ok) {
-        const updated = await res.json()
-        updateDeal(updated)
-        await refreshWallet()
-      }
-    } finally {
-      setConfirming(false)
     }
   }
 
@@ -128,16 +121,40 @@ export function DealDetail() {
     )
   }
 
-  const activeStep =
-    deal.status === "pending"
-      ? 0
-      : deal.status === "escrow"
-        ? 1
-        : deal.status === "shipped"
-          ? 2
-          : deal.status === "in-transit"
-            ? 3
-            : 4
+  const activeStep = progressStepIndex[deal.status] ?? 0
+  const counterpartyLabel = deal.counterpartyName ?? deal.counterparty
+
+  // One clear primary action at a time — whoever's turn it is to move the deal forward.
+  let primaryAction: { label: string; action: "accept" | "ship" | "confirm-receipt"; hint: string } | null = null
+  if (deal.status === "pending" && deal.myRole === "buyer") {
+    primaryAction = {
+      label: `Accept & Pay ${deal.price + deal.shippingPrice} ${deal.currency} into Escrow`,
+      action: "accept",
+      hint: "This charges your PayPack wallet balance immediately.",
+    }
+  } else if (deal.status === "escrow" && deal.myRole === "seller") {
+    primaryAction = { label: "Mark as Shipped", action: "ship", hint: "Let the buyer know their item is on its way." }
+  } else if (deal.status === "shipped" && deal.myRole === "buyer") {
+    primaryAction = {
+      label: "Confirm Receipt",
+      action: "confirm-receipt",
+      hint: "This releases the funds to the seller — only confirm once you've received the item.",
+    }
+  }
+
+  const waitingMessage =
+    deal.status === "pending" && deal.myRole === "seller"
+      ? deal.counterpartyJoined
+        ? "Waiting for the buyer to accept and pay."
+        : `Waiting for ${counterpartyLabel} to join PayPack.`
+      : deal.status === "escrow" && deal.myRole === "buyer"
+        ? "Waiting for the seller to ship."
+        : deal.status === "shipped" && deal.myRole === "seller"
+          ? "Waiting for the buyer to confirm receipt."
+          : null
+
+  const canDispute = deal.status === "escrow" || deal.status === "shipped"
+  const canCancel = deal.status === "pending" || deal.status === "escrow"
 
   return (
     <div>
@@ -158,21 +175,9 @@ export function DealDetail() {
                 #{deal.id.slice(0, 8)}
               </Badge>
               <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-foreground">
-                {deal.status === "escrow"
-                  ? "In Escrow"
-                  : deal.status === "pending"
-                    ? "Pending Payment"
-                    : deal.status === "completed"
-                      ? "Completed"
-                      : "Active"}
+                {deal.status}
               </span>
-              <span>
-                {deal.status === "escrow"
-                  ? "Funds have locked in escrow."
-                  : deal.status === "pending"
-                    ? "Waiting for funds."
-                    : "Deal completed."}
-              </span>
+              <span className="capitalize">You're the {deal.myRole}</span>
             </div>
           </div>
           <Dialog>
@@ -184,35 +189,18 @@ export function DealDetail() {
             <DialogContent className="max-w-sm">
               <DialogHeader className="space-y-1">
                 <DialogTitle className="text-base">
-                  Counterparty details
+                  Counterparty
                 </DialogTitle>
                 <DialogDescription className="text-xs">
-                  Quick overview of who you are trading with.
+                  Who you're trading with on this deal.
                 </DialogDescription>
               </DialogHeader>
-              <div className="mt-3 space-y-4 text-sm">
-                <div>
-                  <div className="text-sm font-semibold text-foreground">
-                    {deal.counterparty}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Verified PayPack Uno user
-                  </div>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="text-sm font-semibold text-foreground">
+                  {counterpartyLabel}
                 </div>
-                <Separator />
-                <div className="space-y-2 text-xs text-muted-foreground">
-                  <div className="flex items-center justify-between">
-                    <span>Completed deals</span>
-                    <span className="font-medium text-foreground">24</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Disputes</span>
-                    <span className="font-medium text-success">0</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Trust score</span>
-                    <span className="font-medium text-primary">4.9 / 5</span>
-                  </div>
+                <div className="text-xs text-muted-foreground">
+                  {deal.counterpartyJoined ? "Joined PayPack" : "Invited — hasn't joined yet"}
                 </div>
               </div>
             </DialogContent>
@@ -309,15 +297,34 @@ export function DealDetail() {
           </div>
         )}
 
-        {/* Action Buttons + deal details modal */}
+        {/* Primary action — one clear next step, or a status message when it's the other side's turn */}
+        {primaryAction ? (
+          <div className="mb-3 space-y-2">
+            <Button
+              className="w-full rounded-xl bg-primary py-5 text-sm font-semibold"
+              disabled={acting !== null}
+              onClick={() => runAction(primaryAction!.action)}
+            >
+              {acting === primaryAction.action ? <Loader2 className="h-4 w-4 animate-spin" /> : primaryAction.label}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">{primaryAction.hint}</p>
+          </div>
+        ) : waitingMessage ? (
+          <div className="mb-3 rounded-2xl border border-dashed border-border bg-secondary/40 p-4 text-center text-sm text-muted-foreground">
+            {waitingMessage}
+          </div>
+        ) : null}
+        {actionError ? <p className="mb-3 text-center text-xs text-destructive">{actionError}</p> : null}
+
+        {/* Secondary actions + deal details modal */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Button
             variant="outline"
-            disabled={confirming || ["completed", "cancelled", "disputed"].includes(deal.status)}
-            onClick={handleConfirmReceipt}
-            className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-success/30 hover:bg-success/10 hover:text-success disabled:opacity-50"
+            disabled={!canCancel || acting !== null}
+            onClick={() => runAction("cancel")}
+            className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
           >
-            {confirming ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm Receipt"}
+            {acting === "cancel" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Cancel Deal"}
           </Button>
           <Dialog
             open={disputeOpen}
@@ -329,7 +336,7 @@ export function DealDetail() {
             <DialogTrigger asChild>
               <Button
                 variant="outline"
-                disabled={["disputed", "cancelled"].includes(deal.status)}
+                disabled={!canDispute}
                 className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
               >
                 Open Dispute
