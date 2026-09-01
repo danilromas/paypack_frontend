@@ -2,9 +2,9 @@ import { NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { shipments } from "@/db/schema"
-import { toShipment, validateShipmentPayload, type ShipmentPayload } from "@/lib/shipments"
+import { toShipment, validateShipmentEditPayload, type ShipmentEditPayload } from "@/lib/shipments"
 import { getCurrentUser } from "@/lib/auth/session"
-import { notifyUser } from "@/lib/notifications"
+import { estimateShippingCost, getServiceTier } from "@/lib/shipping-rates"
 
 export async function GET(
   _req: Request,
@@ -34,6 +34,7 @@ export async function GET(
   }
 }
 
+/** Edits package/route details only, and only before the shipment has started moving. */
 export async function PUT(
   req: Request,
   context: { params: Promise<{ id: string }> },
@@ -45,56 +46,48 @@ export async function PUT(
 
   try {
     const { id } = await context.params
-    const body = (await req.json()) as Partial<ShipmentPayload>
-    const validationError = validateShipmentPayload(body)
+    const body = (await req.json()) as Partial<ShipmentEditPayload>
+    const validationError = validateShipmentEditPayload(body)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    const updated = await db.transaction(async (tx) => {
-      const existingRows = await tx
-        .select({ status: shipments.status })
-        .from(shipments)
-        .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
-        .limit(1)
-      const existing = existingRows[0]
-      if (!existing) return null
+    const tier = getServiceTier(body.serviceTier!)!
+    const estimatedCost = estimateShippingCost(
+      {
+        weightKg: body.weightKg!,
+        lengthCm: body.lengthCm!,
+        widthCm: body.widthCm!,
+        heightCm: body.heightCm!,
+      },
+      tier,
+    )
 
-      const rows = await tx
-        .update(shipments)
-        .set({
-          senderName: body.senderName!,
-          senderLocation: body.senderLocation!,
-          receiverName: body.receiverName!,
-          receiverLocation: body.receiverLocation!,
-          service: body.service!,
-          dimensions: body.dimensions!,
-          weight: body.weight!,
-          status: body.status!,
-          dealId: body.dealId ?? null,
-        })
-        .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
-        .returning()
+    const rows = await db
+      .update(shipments)
+      .set({
+        senderName: body.senderName!,
+        senderLocation: body.senderLocation!,
+        receiverName: body.receiverName!,
+        receiverLocation: body.receiverLocation!,
+        serviceTier: body.serviceTier!,
+        weightKg: body.weightKg!.toFixed(2),
+        lengthCm: body.lengthCm!.toFixed(1),
+        widthCm: body.widthCm!.toFixed(1),
+        heightCm: body.heightCm!.toFixed(1),
+        estimatedCost: estimatedCost.toFixed(2),
+      })
+      .where(and(eq(shipments.id, id), eq(shipments.userId, user.id), eq(shipments.status, "pending")))
+      .returning()
 
-      const shipment = rows[0]
-      if (shipment && existing.status !== shipment.status) {
-        await notifyUser(tx, {
-          userId: user.id,
-          type: "shipment",
-          title: `Shipment status updated to ${shipment.status}`,
-          description: `${shipment.senderLocation} → ${shipment.receiverLocation}`,
-          relatedHref: "/dashboard/shipments/",
-        })
-      }
-
-      return shipment ?? null
-    })
-
-    if (!updated) {
-      return NextResponse.json({ error: "Shipment not found" }, { status: 404 })
+    if (!rows[0]) {
+      return NextResponse.json(
+        { error: "Shipment not found, not yours, or no longer editable" },
+        { status: 404 },
+      )
     }
 
-    return NextResponse.json(toShipment(updated))
+    return NextResponse.json(toShipment(rows[0]))
   } catch (error) {
     console.error("PUT /api/shipments/[id] failed", error)
     return NextResponse.json({ error: "Failed to update shipment" }, { status: 500 })

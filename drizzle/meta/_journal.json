@@ -50,6 +50,13 @@
       "when": 1788287399127,
       "tag": "0006_special_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788290741251,
+      "tag": "0007_shipments_structured_packages",
+      "breakpoints": true
     }
   ]
 }
