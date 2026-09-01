@@ -809,11 +809,12 @@ function createNativeComposerButton(sendButton, paypackOrigin, sourceEl) {
     clone;
   if (labelNode) labelNode.textContent = "Buy in PayPack";
 
+  const color = getButtonColor();
   const roots = [clone, ...clone.querySelectorAll("*")];
   roots.forEach((n) => {
     if (!(n instanceof HTMLElement)) return;
-    n.style.setProperty("background", "#22a559", "important");
-    n.style.setProperty("border-color", "#22a559", "important");
+    n.style.setProperty("background", color, "important");
+    n.style.setProperty("border-color", color, "important");
     n.style.setProperty("color", "#ffffff", "important");
   });
 
