@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Loader2, MessageCircle, User } from "lucide-react"
+import { CheckCircle2, Copy, FileText, Loader2, MessageCircle, Truck, User } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { cn, formatDealDateTime, formatDealRelativeTime } from "@/lib/utils"
 import {
@@ -28,28 +28,56 @@ const progressStepIndex: Record<string, number> = {
   cancelled: 0,
 }
 
+interface ConfettiPiece {
+  left: number
+  color: string
+  delay: number
+  size: number
+}
+
+const CONFETTI_COLORS = ["#f97316", "#22c55e", "#3b82f6", "#eab308", "#ec4899", "#06b6d4"]
+
+function buildConfetti(count = 14): ConfettiPiece[] {
+  return Array.from({ length: count }, () => ({
+    left: Math.random() * 100,
+    color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+    delay: Math.random() * 0.4,
+    size: 6 + Math.random() * 6,
+  }))
+}
+
 export function DealDetail() {
   const router = useRouter()
-  const { selectedDealId, deals, updateDeal, refreshWallet, chatThreads, refreshChats } = useAppStore()
+  const { selectedDealId, deals, updateDeal, refreshWallet, chatThreads } = useAppStore()
   const deal = deals.find((d) => d.id === selectedDealId) ?? deals[0]
   const [acting, setActing] = useState<"accept" | "ship" | "confirm-receipt" | "cancel" | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviting, setInviting] = useState(false)
-  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteCopied, setInviteCopied] = useState(false)
+  const [shipDialogOpen, setShipDialogOpen] = useState(false)
+  const [carrier, setCarrier] = useState("")
+  const [trackingNumber, setTrackingNumber] = useState("")
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeReason, setDisputeReason] = useState("")
   const [disputing, setDisputing] = useState(false)
   const [disputeError, setDisputeError] = useState<string | null>(null)
+  const [celebration, setCelebration] = useState<{ name: string; pieces: ConfettiPiece[] } | null>(null)
 
   const thread = deal ? chatThreads.find((t) => t.dealId === deal.id) ?? null : null
+  const inviteUrl = useMemo(() => {
+    if (!deal) return ""
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    return `${origin}/dashboard/deals/join/${deal.id}`
+  }, [deal])
 
-  async function runAction(action: "accept" | "ship" | "confirm-receipt" | "cancel") {
+  async function runAction(action: "accept" | "ship" | "confirm-receipt" | "cancel", body?: Record<string, unknown>) {
     if (!deal) return
     setActing(action)
     setActionError(null)
     try {
-      const res = await fetch(`/api/deals/${deal.id}/${action}`, { method: "POST" })
+      const res = await fetch(`/api/deals/${deal.id}/${action}`, {
+        method: "POST",
+        ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+      })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setActionError(data.error ?? "Something went wrong")
@@ -57,31 +85,35 @@ export function DealDetail() {
       }
       updateDeal(data)
       await refreshWallet()
+      if (action === "confirm-receipt") {
+        const name = data.counterpartyName ?? data.counterparty ?? "the seller"
+        setCelebration({ name, pieces: buildConfetti() })
+        setTimeout(() => setCelebration(null), 3500)
+      }
     } finally {
       setActing(null)
     }
   }
 
-  async function handleInvite() {
-    if (!deal || !inviteEmail.trim()) return
-    setInviting(true)
-    setInviteError(null)
+  async function handleCopyInviteLink() {
+    if (!inviteUrl) return
     try {
-      const res = await fetch(`/api/deals/${deal.id}/invite`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail.trim() }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setInviteError(data.error ?? "Failed to send invite")
-        return
-      }
-      await refreshChats()
-      router.push(`/dashboard/chats/?thread=${data.threadId}`)
-    } finally {
-      setInviting(false)
+      await navigator.clipboard.writeText(inviteUrl)
+      setInviteCopied(true)
+      setTimeout(() => setInviteCopied(false), 1500)
+    } catch {
+      setInviteCopied(false)
     }
+  }
+
+  async function handleConfirmShip() {
+    await runAction("ship", {
+      carrier: carrier.trim() || undefined,
+      trackingNumber: trackingNumber.trim() || undefined,
+    })
+    setShipDialogOpen(false)
+    setCarrier("")
+    setTrackingNumber("")
   }
 
   async function handleOpenDispute() {
@@ -250,15 +282,51 @@ export function DealDetail() {
           ))}
         </div>
 
+        {/* Invite link — while waiting for a counterparty to join */}
+        {!deal.counterpartyJoined && deal.status === "pending" && (
+          <div className="pp-animate-slide-in mb-6 rounded-2xl border border-border bg-card/60 p-4">
+            <div className="mb-2 text-sm font-semibold text-foreground">Invite your counterparty</div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Share this link — they'll join automatically once they open it and sign in.
+            </p>
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-secondary px-3 py-2">
+              <span className="flex-1 truncate font-mono text-xs text-foreground">{inviteUrl}</span>
+              <button
+                type="button"
+                onClick={handleCopyInviteLink}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+            </div>
+            {inviteCopied ? <p className="mt-1 text-[11px] text-primary">Copied</p> : null}
+          </div>
+        )}
+
+        {/* Shipping status — visible to both sides once the seller adds it */}
+        {(deal.carrier || deal.trackingNumber) && (
+          <div className="pp-animate-slide-in mb-6 flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Truck className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">Shipping</div>
+              <p className="truncate text-xs text-muted-foreground">
+                {[deal.carrier, deal.trackingNumber].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Chat */}
         {thread ? (
           <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 p-4">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-foreground">
-                {thread.otherName ?? thread.otherInvitedEmail ?? "Invited"}
+                {thread.otherName ?? "Waiting for counterparty"}
               </div>
               <p className="truncate text-xs text-muted-foreground">
-                {thread.lastMessage ?? (thread.otherJoined ? "No messages yet" : "Waiting to join PayPack")}
+                {thread.lastMessage ?? (thread.otherJoined ? "No messages yet" : "They haven't joined yet")}
               </p>
               {thread.lastMessageAt ? (
                 <p className="text-[10px] text-muted-foreground">{formatDealRelativeTime(thread.lastMessageAt)}</p>
@@ -278,27 +346,52 @@ export function DealDetail() {
               ) : null}
             </Button>
           </div>
-        ) : (
-          <div className="mb-6 rounded-2xl border border-border bg-card/60 p-4">
-            <div className="mb-2 text-sm font-semibold text-foreground">Invite counterparty to chat</div>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="counterparty@email.com"
-                className="flex-1 rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              <Button size="sm" className="rounded-xl bg-primary" disabled={inviting || !inviteEmail.trim()} onClick={handleInvite}>
-                {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Invite"}
-              </Button>
-            </div>
-            {inviteError ? <p className="mt-2 text-xs text-destructive">{inviteError}</p> : null}
-          </div>
-        )}
+        ) : null}
 
         {/* Primary action — one clear next step, or a status message when it's the other side's turn */}
-        {primaryAction ? (
+        {primaryAction?.action === "ship" ? (
+          <div className="mb-3 space-y-2">
+            <Dialog open={shipDialogOpen} onOpenChange={setShipDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full rounded-xl bg-primary py-5 text-sm font-semibold">
+                  {primaryAction.label}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm">
+                <DialogHeader className="space-y-1">
+                  <DialogTitle className="text-base">Add tracking info</DialogTitle>
+                  <DialogDescription className="text-xs">
+                    Optional — the buyer will see this on the deal.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-3 space-y-3">
+                  <input
+                    type="text"
+                    value={carrier}
+                    onChange={(e) => setCarrier(e.target.value)}
+                    placeholder="Carrier (e.g. DHL, UPS)"
+                    className="w-full rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  <input
+                    type="text"
+                    value={trackingNumber}
+                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    placeholder="Tracking number"
+                    className="w-full rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <Button
+                  className="mt-4 w-full rounded-xl bg-primary"
+                  disabled={acting !== null}
+                  onClick={handleConfirmShip}
+                >
+                  {acting === "ship" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Mark as Shipped"}
+                </Button>
+              </DialogContent>
+            </Dialog>
+            <p className="text-center text-xs text-muted-foreground">{primaryAction.hint}</p>
+          </div>
+        ) : primaryAction ? (
           <div className="mb-3 space-y-2">
             <Button
               className="w-full rounded-xl bg-primary py-5 text-sm font-semibold"
@@ -446,6 +539,37 @@ export function DealDetail() {
           </Dialog>
         </div>
       </div>
+
+      {celebration && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm"
+          onClick={() => setCelebration(null)}
+        >
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            {celebration.pieces.map((p, i) => (
+              <span
+                key={i}
+                className="pp-confetti-piece"
+                style={
+                  {
+                    "--pp-left": `${p.left}%`,
+                    "--pp-color": p.color,
+                    "--pp-delay": `${p.delay}s`,
+                    "--pp-size": `${p.size}px`,
+                  } as React.CSSProperties
+                }
+              />
+            ))}
+          </div>
+          <div className="pp-animate-scale-in relative z-10 rounded-3xl border border-border bg-card p-8 text-center shadow-2xl">
+            <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full bg-success/15 text-success">
+              <CheckCircle2 className="h-8 w-8" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">Funds released! 🎉</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{celebration.name} has been paid.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

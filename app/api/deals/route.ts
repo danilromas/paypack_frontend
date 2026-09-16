@@ -3,7 +3,7 @@ import { db } from "@/lib/db"
 import { deals } from "@/db/schema"
 import { validateDealCreatePayload, type DealCreatePayload } from "@/lib/deals"
 import { getCurrentUser } from "@/lib/auth/session"
-import { ensureParticipantsAndThread, getDealForViewer, listDealsForViewer } from "@/lib/deals-access"
+import { ensureCreatorParticipant, getDealForViewer, listDealsForViewer } from "@/lib/deals-access"
 
 function normalizePayload(body: Record<string, unknown>): DealCreatePayload {
   return {
@@ -20,8 +20,6 @@ function normalizePayload(body: Record<string, unknown>): DealCreatePayload {
     counterparty: typeof body.counterparty === "string" ? body.counterparty : "",
     counterpartyAvatar:
       typeof body.counterpartyAvatar === "string" ? body.counterpartyAvatar : null,
-    counterpartyEmail:
-      typeof body.counterpartyEmail === "string" ? body.counterpartyEmail.trim().toLowerCase() : "",
     sourceUrl: typeof body.sourceUrl === "string" ? body.sourceUrl : null,
     sourcePlatform:
       typeof body.sourcePlatform === "string" ? body.sourcePlatform : null,
@@ -59,9 +57,6 @@ export async function POST(req: Request) {
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
-    if (payload.counterpartyEmail === user.email) {
-      return NextResponse.json({ error: "You can't invite yourself" }, { status: 400 })
-    }
 
     const dealId = await db.transaction(async (tx) => {
       const inserted = await tx
@@ -87,12 +82,7 @@ export async function POST(req: Request) {
         .returning({ id: deals.id })
 
       const deal = inserted[0]
-      await ensureParticipantsAndThread(
-        tx,
-        { id: deal.id, role: payload.role },
-        user.id,
-        payload.counterpartyEmail,
-      )
+      await ensureCreatorParticipant(tx, { id: deal.id, role: payload.role }, user.id)
       return deal.id
     })
 

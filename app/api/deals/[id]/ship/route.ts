@@ -6,8 +6,8 @@ import { getCurrentUser } from "@/lib/auth/session"
 import { getParticipantRole, getDealForViewer } from "@/lib/deals-access"
 import { notifyOtherParticipants } from "@/lib/notifications"
 
-/** Seller marks a paid-for deal as shipped. */
-export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
+/** Seller marks a paid-for deal as shipped, optionally with tracking info the buyer can see. */
+export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
@@ -20,19 +20,26 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
       return NextResponse.json({ error: "Only the seller can mark this as shipped" }, { status: 403 })
     }
 
+    const raw = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const carrier = typeof raw.carrier === "string" && raw.carrier.trim() ? raw.carrier.trim() : null
+    const trackingNumber =
+      typeof raw.trackingNumber === "string" && raw.trackingNumber.trim() ? raw.trackingNumber.trim() : null
+
     const updated = await db.transaction(async (tx) => {
       const rows = await tx
         .update(deals)
-        .set({ status: "shipped", updatedAt: new Date() })
+        .set({ status: "shipped", carrier, trackingNumber, updatedAt: new Date() })
         .where(and(eq(deals.id, id), eq(deals.status, "escrow")))
         .returning()
       const deal = rows[0]
       if (!deal) return null
 
+      const trackingSuffix = trackingNumber ? ` — ${[carrier, trackingNumber].filter(Boolean).join(" ")}` : ""
       await notifyOtherParticipants(tx, deal.id, user.id, {
         type: "deal",
         title: `"${deal.title}" has shipped`,
-        relatedHref: "/dashboard/",
+        description: trackingNumber ? `Tracking${trackingSuffix}` : "",
+        relatedHref: "/dashboard/deals",
       })
 
       return deal

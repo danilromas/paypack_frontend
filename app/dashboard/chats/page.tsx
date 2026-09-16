@@ -138,7 +138,7 @@ function ChatsPageContent() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold text-foreground">
-                        {t.otherName ?? t.otherInvitedEmail ?? "Invited"}
+                        {t.otherName ?? "Waiting for counterparty"}
                       </span>
                       {t.lastMessageAt ? (
                         <span className="shrink-0 text-xs text-muted-foreground">
@@ -175,7 +175,7 @@ function ChatsPageContent() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground">
-                      {activeThread.otherName ?? activeThread.otherInvitedEmail ?? "Waiting to join"}
+                      {activeThread.otherName ?? "Waiting for counterparty"}
                     </h3>
                     <span className="text-xs text-muted-foreground">{activeThread.dealTitle}</span>
                   </div>
@@ -187,7 +187,7 @@ function ChatsPageContent() {
                   <div className="flex justify-center">
                     <span className="flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary">
                       <Shield className="h-3 w-3" />
-                      Waiting for {activeThread.otherInvitedEmail ?? "the counterparty"} to join PayPack
+                      Waiting for the counterparty to join PayPack
                     </span>
                   </div>
                 ) : null}
