@@ -57,6 +57,8 @@ export const deals = pgTable("deals", {
   sourcePlatform: text("source_platform"),
   paymentMethod: text("payment_method"),
   paymentCryptoCoin: text("payment_crypto_coin"),
+  carrier: text("carrier"),
+  trackingNumber: text("tracking_number"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -104,6 +106,9 @@ export const dealParticipants = pgTable("deal_participants", {
   uniqueIndex("deal_participants_deal_email_idx")
     .on(table.dealId, table.invitedEmail)
     .where(sql`${table.invitedEmail} is not null`),
+  uniqueIndex("deal_participants_deal_role_joined_idx")
+    .on(table.dealId, table.role)
+    .where(sql`${table.userId} is not null`),
   index("deal_participants_user_id_idx").on(table.userId),
 ])
 

@@ -24,15 +24,6 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
-const statusSortOrder: DealStatus[] = [
-  "pending",
-  "escrow",
-  "shipped",
-  "completed",
-  "disputed",
-  "cancelled",
-];
-
 function getStatusConfig(status: DealStatus) {
   switch (status) {
     case "pending":
@@ -143,17 +134,7 @@ export function DealsList({
       );
     }
 
-    // Сортировка по статусам в порядке, как они отображаются пользователю
-    filtered.sort((a, b) => {
-      const aIndex = statusSortOrder.indexOf(a.status);
-      const bIndex = statusSortOrder.indexOf(b.status);
-
-      const safeAIndex = aIndex === -1 ? statusSortOrder.length : aIndex;
-      const safeBIndex = bIndex === -1 ? statusSortOrder.length : bIndex;
-
-      return safeAIndex - safeBIndex;
-    });
-
+    // `deals` from the store already arrives newest-first (created_at DESC) — keep that order.
     return filtered;
   };
 

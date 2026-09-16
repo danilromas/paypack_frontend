@@ -9,7 +9,6 @@ import {
   Gift,
   Copy,
   Share2,
-  CheckCircle2,
   MessageCircle,
   Coins,
   AlertTriangle,
@@ -75,7 +74,6 @@ export function NewDealModal({
   const [shippingPrice, setShippingPrice] = useState(0)
   const [currency, setCurrency] = useState("EUR")
   const [sellerName, setSellerName] = useState("")
-  const [counterpartyEmail, setCounterpartyEmail] = useState("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [cryptoCoin, setCryptoCoin] = useState<CryptoCoin>("BTC")
   const [cryptoAddressCopied, setCryptoAddressCopied] = useState(false)
@@ -84,10 +82,10 @@ export function NewDealModal({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [createdDealId, setCreatedDealId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const [confirmInput, setConfirmInput] = useState("")
-  const [confirmState, setConfirmState] = useState<"idle" | "ok" | "error">("idle")
   const [sellerMessage, setSellerMessage] = useState("")
   const [messageCopied, setMessageCopied] = useState(false)
+  const [counterpartyJoinedLive, setCounterpartyJoinedLive] = useState(false)
+  const [joinedCounterpartyName, setJoinedCounterpartyName] = useState<string | null>(null)
 
   const phases = useMemo(() => getPhases(role), [role])
   const currentPhase: WizardPhase = phases[step - 1] ?? "role"
@@ -96,8 +94,7 @@ export function NewDealModal({
   const total = price + shippingPrice + fee
   const sellerReceives = Math.round((price + shippingPrice - fee) * 100) / 100
 
-  const counterpartyEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(counterpartyEmail.trim())
-  const detailsValid = itemTitle.trim().length > 0 && price > 0 && counterpartyEmailValid
+  const detailsValid = itemTitle.trim().length > 0 && price > 0
 
   const sourcePlatform = useMemo(
     () => detectMarketplacePlatform(productLink),
@@ -105,33 +102,54 @@ export function NewDealModal({
   )
   const isBuyerWithMarketplace = role === "buyer" && sourcePlatform === "facebook_marketplace"
 
-  const sharePayload = useMemo(() => {
+  const inviteUrl = useMemo(() => {
     if (!createdDealId) return ""
-    return JSON.stringify({
-      type: "deal-confirm",
-      dealId: createdDealId,
-      role,
-      ts: Date.now(),
-    })
-  }, [createdDealId, role])
-
-  const confirmUrl = useMemo(() => {
-    if (!sharePayload) return ""
-    return `/dashboard/deals/confirm?payload=${encodeURIComponent(sharePayload)}`
-  }, [sharePayload])
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    return `${origin}/dashboard/deals/join/${createdDealId}`
+  }, [createdDealId])
 
   const successSubtext = isBuyerWithMarketplace
-    ? "Message the seller to confirm, or share this QR code another way."
+    ? "Message the seller to confirm, or share this invite link another way."
     : role === "seller"
-      ? "Share this with your buyer so they can pay into escrow."
-      : "Share this QR code with your counterparty to join the deal."
+      ? "Share this invite link with your buyer so they can pay into escrow."
+      : "Share this invite link with your counterparty to join the deal."
 
   useEffect(() => {
-    if (!successOpen || !confirmUrl || !isBuyerWithMarketplace) return
-    const absoluteConfirmUrl =
-      typeof window !== "undefined" ? `${window.location.origin}${confirmUrl}` : confirmUrl
-    setSellerMessage(buildDefaultSellerMessage(itemTitle, absoluteConfirmUrl))
-  }, [successOpen, confirmUrl, isBuyerWithMarketplace, itemTitle])
+    if (!successOpen || !inviteUrl || !isBuyerWithMarketplace) return
+    setSellerMessage(buildDefaultSellerMessage(itemTitle, inviteUrl))
+  }, [successOpen, inviteUrl, isBuyerWithMarketplace, itemTitle])
+
+  // Live-checks whether the counterparty has joined yet, so the success screen doesn't
+  // just sit there — same 4s cadence chat already polls at.
+  useEffect(() => {
+    if (!successOpen || !createdDealId || counterpartyJoinedLive) return
+    let cancelled = false
+    let attempts = 0
+    const interval = setInterval(async () => {
+      attempts += 1
+      if (attempts > 60) {
+        clearInterval(interval)
+        return
+      }
+      try {
+        const res = await fetch(`/api/deals/${createdDealId}`, { cache: "no-store" })
+        if (!res.ok) return
+        const data = (await res.json()) as Deal
+        if (cancelled) return
+        if (data.counterpartyJoined) {
+          setCounterpartyJoinedLive(true)
+          setJoinedCounterpartyName(data.counterpartyName ?? "Your counterparty")
+          clearInterval(interval)
+        }
+      } catch {
+        // transient — try again next tick
+      }
+    }, 4000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [successOpen, createdDealId, counterpartyJoinedLive])
 
   function handleSendToSeller() {
     const link = productLink.trim()
@@ -210,7 +228,6 @@ export function NewDealModal({
       role,
       counterparty:
         role === "buyer" ? sellerName.trim() || "Awaiting counterparty" : "Awaiting counterparty",
-      counterpartyEmail: counterpartyEmail.trim().toLowerCase(),
       sourceUrl: trimmedLink || null,
       sourcePlatform: detectMarketplacePlatform(trimmedLink),
       paymentMethod: role === "buyer" ? paymentMethod : null,
@@ -241,9 +258,9 @@ export function NewDealModal({
   }
 
   async function handleCopy() {
-    if (!sharePayload) return
+    if (!inviteUrl) return
     try {
-      await navigator.clipboard.writeText(sharePayload)
+      await navigator.clipboard.writeText(inviteUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
@@ -252,35 +269,20 @@ export function NewDealModal({
   }
 
   async function handleShare() {
-    if (!sharePayload) return
-    const text = `PayPack deal confirmation payload:\n${sharePayload}`
+    if (!inviteUrl) return
     try {
       if (navigator.share) {
         await navigator.share({
-          title: "Deal confirmation",
-          text,
-          url: confirmUrl,
+          title: "Join my PayPack deal",
+          url: inviteUrl,
         })
       } else {
-        await navigator.clipboard.writeText(text)
+        await navigator.clipboard.writeText(inviteUrl)
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
       }
     } catch {
       // user cancelled share
-    }
-  }
-
-  function handleConfirmFromScan() {
-    try {
-      const parsed = JSON.parse(confirmInput)
-      if (parsed?.type === "deal-confirm" && parsed?.dealId === createdDealId) {
-        setConfirmState("ok")
-      } else {
-        setConfirmState("error")
-      }
-    } catch {
-      setConfirmState("error")
     }
   }
 
@@ -368,6 +370,7 @@ export function NewDealModal({
               {(["buyer", "seller"] as const).map((r) => (
                 <button
                   key={r}
+                  data-tour={r === "buyer" ? "role-buyer" : undefined}
                   onClick={() => setRole(r)}
                   className={cn(
                     "flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition-all",
@@ -399,6 +402,7 @@ export function NewDealModal({
             </div>
             <div className="mt-8 flex justify-end">
               <button
+                data-tour="role-next"
                 onClick={() => setStep(2)}
                 disabled={!role}
                 className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:opacity-90 disabled:opacity-40"
@@ -454,6 +458,7 @@ export function NewDealModal({
             <div className="mx-auto max-w-md">
               <button
                 type="button"
+                data-tour="skip-link"
                 onClick={() => setStep(step + 1)}
                 className="w-full rounded-xl border border-border bg-secondary/80 py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
               >
@@ -516,7 +521,7 @@ export function NewDealModal({
 
         {/* Phase: Item Details */}
         {currentPhase === "details" && (
-          <div className="space-y-4">
+          <div className="space-y-4" data-tour="details-step">
 
             <div className="text-center">
               <h3 className="text-lg font-semibold text-foreground">
@@ -594,25 +599,6 @@ export function NewDealModal({
                 )}
 
                 <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">
-                    {role === "buyer" ? "Seller's" : "Buyer's"} email
-                  </label>
-                  <input
-                    type="email"
-                    value={counterpartyEmail}
-                    onChange={(e) => setCounterpartyEmail(e.target.value)}
-                    placeholder="counterparty@email.com"
-                    className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    They'll need this to join the deal — it can't move to escrow until they do.
-                  </p>
-                  {counterpartyEmail.trim().length > 0 && !counterpartyEmailValid && (
-                    <p className="mt-1 text-[11px] text-destructive">Enter a valid email.</p>
-                  )}
-                </div>
-
-                <div>
                   <label className="mb-1 block text-xs text-muted-foreground">Currency</label>
                   <select
                     value={currency}
@@ -665,10 +651,11 @@ export function NewDealModal({
             <div className="flex items-center justify-end gap-3 pt-2">
               {!detailsValid && (
                 <p className="text-xs text-destructive">
-                  Title, a price greater than 0, and a valid counterparty email are required.
+                  Title and a price greater than 0 are required.
                 </p>
               )}
               <button
+                data-tour="details-next"
                 onClick={() => setStep(step + 1)}
                 disabled={!detailsValid}
                 className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-all hover:opacity-90 disabled:opacity-40"
@@ -767,6 +754,7 @@ export function NewDealModal({
             )}
             <button
               type="button"
+              data-tour="create-deal-button"
               onClick={handleCreateDeal}
               disabled={submitting || !detailsValid}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-base font-semibold text-primary-foreground transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -790,7 +778,7 @@ export function NewDealModal({
             <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-2xl">
               <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
               <div className="relative z-10">
-                <div className="mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
+                <div className="pp-animate-scale-in mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
                   <Gift className="h-9 w-9" />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">
@@ -799,6 +787,12 @@ export function NewDealModal({
                 <p className="mt-2 text-sm text-muted-foreground">
                   {successSubtext}
                 </p>
+
+                {counterpartyJoinedLive && (
+                  <div className="pp-animate-slide-in mt-4 flex items-center justify-center gap-2 rounded-xl bg-success/10 px-4 py-2 text-sm font-medium text-success">
+                    ✓ {joinedCounterpartyName} joined the deal!
+                  </div>
+                )}
 
                 {isBuyerWithMarketplace && (
                   <div className="mt-6 rounded-2xl border border-border bg-secondary/40 p-3 text-left">
@@ -835,22 +829,25 @@ export function NewDealModal({
                   </div>
                 )}
 
-                <div className="mx-auto mt-6 w-fit rounded-2xl bg-background p-3 shadow-inner">
+                <div
+                  data-tour="invite-link-card"
+                  className="pp-animate-slide-in mx-auto mt-6 w-fit rounded-2xl bg-background p-3 shadow-inner"
+                >
                   <div className="rounded-xl bg-white p-2">
                     <QRCodeSVG
-                      value={sharePayload || "pending"}
+                      value={inviteUrl || "pending"}
                       size={160}
                       includeMargin
                       level="M"
                     />
                   </div>
-                  <p className="mt-3 break-all text-[10px] font-mono text-muted-foreground">
-                    DEAL: {createdDealId ?? "—"}
+                  <p className="mt-3 max-w-[220px] break-all text-[10px] font-mono text-muted-foreground">
+                    {inviteUrl || "—"}
                   </p>
                 </div>
                 {isBuyerWithMarketplace && (
                   <p className="mt-2 text-center text-[10px] text-muted-foreground">
-                    Or share this QR code another way
+                    Or share this invite link another way
                   </p>
                 )}
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -859,7 +856,7 @@ export function NewDealModal({
                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-border py-2 text-xs font-medium text-foreground transition-all hover:bg-secondary"
                   >
                     <Copy className="h-3.5 w-3.5" />
-                    {copied ? "Copied" : "Copy payload"}
+                    {copied ? "Copied" : "Copy link"}
                   </button>
                   <button
                     onClick={handleShare}
@@ -904,52 +901,6 @@ export function NewDealModal({
                     </div>
                   </div>
                 )}
-
-                <a
-                  href={confirmUrl || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={cn(
-                    "mt-2 inline-flex w-full items-center justify-center rounded-xl border border-border py-2 text-xs font-medium text-foreground transition-all hover:bg-secondary",
-                    !confirmUrl && "pointer-events-none opacity-50",
-                  )}
-                >
-                  Open confirm page
-                </a>
-
-                <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-3 text-left">
-                  <p className="mb-2 text-xs font-medium text-foreground">
-                    Simulate scan confirmation
-                  </p>
-                  <textarea
-                    value={confirmInput}
-                    onChange={(e) => {
-                      setConfirmInput(e.target.value)
-                      setConfirmState("idle")
-                    }}
-                    placeholder="Paste scanned payload here..."
-                    className="h-20 w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
-                  />
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <button
-                      onClick={handleConfirmFromScan}
-                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90"
-                    >
-                      Confirm via scan
-                    </button>
-                    {confirmState === "ok" && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Confirmed
-                      </span>
-                    )}
-                    {confirmState === "error" && (
-                      <span className="text-xs font-medium text-destructive">
-                        Invalid payload
-                      </span>
-                    )}
-                  </div>
-                </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-3">
                   <button

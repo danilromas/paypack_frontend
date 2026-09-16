@@ -19,7 +19,6 @@ export interface DealCreatePayload {
   role: "buyer" | "seller"
   counterparty: string
   counterpartyAvatar?: string | null
-  counterpartyEmail: string
   sourceUrl?: string | null
   sourcePlatform?: string | null
   paymentMethod?: string | null
@@ -34,8 +33,6 @@ export interface DealEditPayload {
   shippingPrice: number
   currency: string
 }
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function validateCommonFields(payload: Partial<DealEditPayload>): string | null {
   if (!payload.title || typeof payload.title !== "string" || !payload.title.trim()) return "Invalid title"
@@ -52,9 +49,6 @@ export function validateDealCreatePayload(payload: Partial<DealCreatePayload>): 
   if (commonError) return commonError
   if (payload.role !== "buyer" && payload.role !== "seller") return "Invalid role"
   if (payload.counterparty === undefined || typeof payload.counterparty !== "string") return "Invalid counterparty"
-  if (!payload.counterpartyEmail || !EMAIL_RE.test(payload.counterpartyEmail)) {
-    return "A valid counterparty email is required"
-  }
   return null
 }
 
@@ -79,6 +73,8 @@ export interface DealRowForViewer {
   sourcePlatform: string | null
   paymentMethod: string | null
   paymentCryptoCoin: string | null
+  carrier: string | null
+  trackingNumber: string | null
   createdAt: string | Date
   updatedAt: string | Date
   myRole: string
@@ -106,6 +102,8 @@ export function toDeal(row: DealRowForViewer): Deal {
     sourcePlatform: row.sourcePlatform ?? undefined,
     paymentMethod: row.paymentMethod ?? undefined,
     paymentCryptoCoin: row.paymentCryptoCoin ?? undefined,
+    carrier: row.carrier ?? undefined,
+    trackingNumber: row.trackingNumber ?? undefined,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
   }

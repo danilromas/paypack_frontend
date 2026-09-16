@@ -3,6 +3,7 @@ import type { AppMode, Deal } from "@/types"
 import type { WalletSummary } from "@/lib/wallet"
 import type { ChatThreadSummaryDTO } from "@/lib/chat"
 import type { NotificationDTO } from "@/lib/notifications"
+import { TOUR_STEPS } from "@/lib/tour-steps"
 
 export interface AuthUser {
   id: string
@@ -23,6 +24,8 @@ interface AppState {
   setDeals: (deals: Deal[]) => void
   addDeal: (deal: Deal) => void
   updateDeal: (deal: Deal) => void
+  dealsError: string | null
+  setDealsError: (error: string | null) => void
   selectedDealId: string | null
   setSelectedDealId: (id: string | null) => void
   chatThreads: ChatThreadSummaryDTO[]
@@ -35,6 +38,13 @@ interface AppState {
   setNewDealModalOpen: (open: boolean) => void
   newDealStep: number
   setNewDealStep: (step: number) => void
+  tourActive: boolean
+  tourStepIndex: number
+  tourPendingStart: boolean
+  startTour: () => void
+  stopTour: () => void
+  nextTourStep: () => void
+  setTourPendingStart: (pending: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -66,6 +76,8 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       deals: state.deals.map((d) => (d.id === deal.id ? deal : d)),
     })),
+  dealsError: null,
+  setDealsError: (error) => set({ dealsError: error }),
   selectedDealId: null,
   setSelectedDealId: (id) => set({ selectedDealId: id }),
   chatThreads: [],
@@ -99,4 +111,16 @@ export const useAppStore = create<AppState>((set) => ({
   setNewDealModalOpen: (open) => set({ newDealModalOpen: open }),
   newDealStep: 1,
   setNewDealStep: (step) => set({ newDealStep: step }),
+  tourActive: false,
+  tourStepIndex: 0,
+  tourPendingStart: false,
+  startTour: () => set({ tourActive: true, tourStepIndex: 0 }),
+  stopTour: () => set({ tourActive: false, tourStepIndex: 0 }),
+  nextTourStep: () =>
+    set((state) => {
+      const next = state.tourStepIndex + 1
+      if (next >= TOUR_STEPS.length) return { tourActive: false, tourStepIndex: 0 }
+      return { tourStepIndex: next }
+    }),
+  setTourPendingStart: (pending) => set({ tourPendingStart: pending }),
 }))

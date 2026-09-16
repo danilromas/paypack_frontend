@@ -2,8 +2,9 @@ import "server-only"
 import type { PgTransaction } from "drizzle-orm/pg-core"
 import { and, eq, ne, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { dealParticipants, chatThreads, users } from "@/db/schema"
+import { dealParticipants, chatThreads, deals, users } from "@/db/schema"
 import { toDeal, type DealRowForViewer } from "@/lib/deals"
+import { notifyOtherParticipants } from "@/lib/notifications"
 import type { Deal } from "@/types"
 
 export type DealRole = "buyer" | "seller"
@@ -35,6 +36,7 @@ const DEAL_FOR_VIEWER_SELECT = sql`
     d.currency, d.status, d.role, d.counterparty, d.counterparty_avatar AS "counterpartyAvatar",
     d.source_url AS "sourceUrl", d.source_platform AS "sourcePlatform",
     d.payment_method AS "paymentMethod", d.payment_crypto_coin AS "paymentCryptoCoin",
+    d.carrier, d.tracking_number AS "trackingNumber",
     d.created_at AS "createdAt", d.updated_at AS "updatedAt",
     dp.role AS "myRole",
     coalesce(other_user.name, other_dp.invited_email) AS "counterpartyName",
@@ -67,17 +69,15 @@ export async function getDealForViewer(dealId: string, userId: string): Promise<
 }
 
 /**
- * Links a deal to its creator and a counterparty (by email — either an existing account or a pending
- * invite claimed at registration), and ensures a chat thread exists. Idempotent — safe to call again for
- * the same deal/email. Shared by deal creation (email is required up front) and the standalone invite
- * endpoint (kept as a fallback for deals that predate this, or where the invite needs to be resent).
+ * Creates the deal creator's participant row (if missing) and ensures a chat thread exists.
+ * The counterparty slot is intentionally left open — they attach themselves via `joinDealByLink`
+ * when they open the deal's invite link. Idempotent — safe to call again for the same deal.
  */
-export async function ensureParticipantsAndThread(
+export async function ensureCreatorParticipant(
   tx: DbOrTx,
   deal: { id: string; role: DealRole },
   creatorUserId: string,
-  counterpartyEmail: string,
-): Promise<{ threadId: string; counterpartyJoined: boolean }> {
+): Promise<{ threadId: string }> {
   const creatorRows = await tx
     .select({ id: dealParticipants.id })
     .from(dealParticipants)
@@ -92,36 +92,93 @@ export async function ensureParticipantsAndThread(
     })
   }
 
-  const counterpartyRole: DealRole = deal.role === "buyer" ? "seller" : "buyer"
-  const counterpartyUserRows = await tx.select({ id: users.id }).from(users).where(eq(users.email, counterpartyEmail)).limit(1)
-  const counterpartyUser = counterpartyUserRows[0]
-
-  const existingParticipant = counterpartyUser
-    ? (
-        await tx
-          .select({ id: dealParticipants.id })
-          .from(dealParticipants)
-          .where(and(eq(dealParticipants.dealId, deal.id), eq(dealParticipants.userId, counterpartyUser.id)))
-          .limit(1)
-      )[0]
-    : (
-        await tx
-          .select({ id: dealParticipants.id })
-          .from(dealParticipants)
-          .where(and(eq(dealParticipants.dealId, deal.id), eq(dealParticipants.invitedEmail, counterpartyEmail)))
-          .limit(1)
-      )[0]
-
-  if (!existingParticipant) {
-    await tx.insert(dealParticipants).values(
-      counterpartyUser
-        ? { dealId: deal.id, userId: counterpartyUser.id, role: counterpartyRole, joinedAt: new Date() }
-        : { dealId: deal.id, invitedEmail: counterpartyEmail, role: counterpartyRole },
-    )
-  }
-
   const threadRows = await tx.select().from(chatThreads).where(eq(chatThreads.dealId, deal.id)).limit(1)
   const thread = threadRows[0] ?? (await tx.insert(chatThreads).values({ dealId: deal.id }).returning())[0]
 
-  return { threadId: thread.id, counterpartyJoined: Boolean(counterpartyUser) }
+  return { threadId: thread.id }
+}
+
+export type JoinDealResult =
+  | { ok: true }
+  | { ok: false; error: string }
+
+/**
+ * Attaches the given user as the counterparty on a pending deal via its invite link. The deal's own
+ * UUID is the "token" — unguessable, same trust model `/api/deals/[id]/accept` already relies on.
+ * The partial unique index on (deal_id, role) where user_id is not null makes a concurrent double-join
+ * fail cleanly instead of silently overwriting the first joiner.
+ */
+export async function joinDealByLink(
+  tx: DbOrTx,
+  dealId: string,
+  joiningUserId: string,
+): Promise<JoinDealResult> {
+  const dealRows = await tx.select().from(deals).where(eq(deals.id, dealId)).limit(1)
+  const deal = dealRows[0]
+  if (!deal) return { ok: false, error: "Invite not found" }
+  if (deal.status !== "pending") return { ok: false, error: "This deal is no longer awaiting a counterparty" }
+  if (deal.userId === joiningUserId) return { ok: false, error: "You created this deal — share the link with the other side" }
+
+  const existing = await tx
+    .select({ id: dealParticipants.id })
+    .from(dealParticipants)
+    .where(and(eq(dealParticipants.dealId, dealId), eq(dealParticipants.userId, joiningUserId)))
+    .limit(1)
+  if (existing[0]) return { ok: false, error: "You're already part of this deal" }
+
+  const counterpartyRole: DealRole = deal.role === "buyer" ? "seller" : "buyer"
+  try {
+    await tx.insert(dealParticipants).values({
+      dealId,
+      userId: joiningUserId,
+      role: counterpartyRole,
+      joinedAt: new Date(),
+    })
+  } catch {
+    return { ok: false, error: "This invite was already used" }
+  }
+
+  await notifyOtherParticipants(tx, dealId, joiningUserId, {
+    type: "deal",
+    title: `Your counterparty joined "${deal.title}"`,
+    relatedHref: "/dashboard/deals",
+  })
+
+  return { ok: true }
+}
+
+export interface DealInvitePreview {
+  id: string
+  title: string
+  price: string | number
+  currency: string
+  role: DealRole
+  status: string
+  creatorName: string
+  creatorUserId: string
+}
+
+/**
+ * Minimal deal info for the invite/join page, shown to someone who is NOT yet a participant —
+ * unlike `getDealForViewer`, this doesn't require the caller to already be attached to the deal.
+ */
+export async function getDealPreviewForInvite(dealId: string): Promise<DealInvitePreview | null> {
+  const rows = await db
+    .select({
+      id: deals.id,
+      title: deals.title,
+      price: deals.price,
+      currency: deals.currency,
+      role: deals.role,
+      status: deals.status,
+      creatorName: users.name,
+      creatorUserId: deals.userId,
+    })
+    .from(deals)
+    .innerJoin(users, eq(users.id, deals.userId))
+    .where(eq(deals.id, dealId))
+    .limit(1)
+  const row = rows[0]
+  if (!row) return null
+  return { ...row, role: row.role as DealRole }
 }

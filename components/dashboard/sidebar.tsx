@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   LayoutDashboard,
+  Handshake,
   MessageCircle,
   HelpCircle,
   Settings,
@@ -33,6 +34,7 @@ export function DashboardSidebar() {
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/dashboard/deals", icon: Handshake, label: "Deals" },
     { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: unreadChats || undefined },
     { href: "/dashboard/support", icon: HelpCircle, label: "Support" },
     {

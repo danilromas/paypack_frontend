@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { AuthPanel } from "@/components/auth/auth-panel"
 import Image from "next/image"
@@ -14,6 +14,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useAppStore } from "@/store/app-store"
 
 const navLinks = [
   { href: "#about", label: "About" },
@@ -27,6 +29,24 @@ export function LandingHeader() {
   const [open, setOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [defaultTab, setDefaultTab] = useState<"login" | "signup">("login")
+  const user = useAppStore((s) => s.user)
+  const setUser = useAppStore((s) => s.setUser)
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((u) => setUser(u))
+      .catch(() => setUser(null))
+  }, [setUser])
+
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "?"
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
@@ -87,54 +107,80 @@ export function LandingHeader() {
                 </SheetClose>
               ))}
               <div className="mt-4 flex flex-col gap-2 border-t border-border px-4 py-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDefaultTab("login")
-                    setOpen(true)
-                    setMenuOpen(false)
-                  }}
-                  className="w-full rounded-lg border border-border py-2.5 text-sm font-medium"
-                >
-                  Log in
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDefaultTab("signup")
-                    setOpen(true)
-                    setMenuOpen(false)
-                  }}
-                  className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground"
-                >
-                  Sign up
-                </button>
+                {user ? (
+                  <SheetClose asChild>
+                    <Link
+                      href="/dashboard"
+                      className="flex w-full items-center gap-2 rounded-lg border border-border py-2.5 px-3 text-sm font-medium"
+                    >
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+                      </Avatar>
+                      Go to dashboard
+                    </Link>
+                  </SheetClose>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDefaultTab("login")
+                        setOpen(true)
+                        setMenuOpen(false)
+                      }}
+                      className="w-full rounded-lg border border-border py-2.5 text-sm font-medium"
+                    >
+                      Log in
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDefaultTab("signup")
+                        setOpen(true)
+                        setMenuOpen(false)
+                      }}
+                      className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground"
+                    >
+                      Sign up
+                    </button>
+                  </>
+                )}
               </div>
             </nav>
           </SheetContent>
         </Sheet>
 
         <div className="hidden items-center gap-3 md:flex">
-          <button
-            type="button"
-            onClick={() => {
-              setDefaultTab("login")
-              setOpen(true)
-            }}
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Log in
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDefaultTab("signup")
-              setOpen(true)
-            }}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:opacity-90 sm:px-4 sm:py-2"
-          >
-            Sign up
-          </button>
+          {user ? (
+            <Link href="/dashboard" aria-label="Go to dashboard">
+              <Avatar className="h-9 w-9 border border-border transition-opacity hover:opacity-80">
+                <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+              </Avatar>
+            </Link>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDefaultTab("login")
+                  setOpen(true)
+                }}
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDefaultTab("signup")
+                  setOpen(true)
+                }}
+                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:opacity-90 sm:px-4 sm:py-2"
+              >
+                Sign up
+              </button>
+            </>
+          )}
         </div>
       </div>
 

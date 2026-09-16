@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Menu, Wallet } from "lucide-react"
+import { Bell, Compass, Menu, Wallet } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -37,7 +37,7 @@ const notificationDotClass: Record<string, string> = {
 
 export function DashboardHeader() {
   const router = useRouter()
-  const { mode, wallet, user, notifications, markNotificationRead } = useAppStore()
+  const { mode, wallet, user, notifications, markNotificationRead, setTourPendingStart } = useAppStore()
   const balance = wallet?.balance ?? 0
   const inEscrow = wallet?.inEscrow ?? 0
   const pendingPayout = wallet?.pendingPayout ?? 0
@@ -91,6 +91,7 @@ export function DashboardHeader() {
             <nav className="space-y-1 px-3 py-4 text-sm">
               {[
                 { href: "/dashboard", label: "Dashboard" },
+                { href: "/dashboard/deals", label: "Deals" },
                 { href: "/dashboard/shipments", label: "Shipments" },
                 { href: "/dashboard/chats", label: "Chats" },
                 { href: "/dashboard/support", label: "Support" },
@@ -118,6 +119,20 @@ export function DashboardHeader() {
       </div>
 
       <div className="flex items-center gap-4 sm:gap-6">
+        {/* Guided tour */}
+        <button
+          type="button"
+          onClick={() => {
+            setTourPendingStart(true)
+            router.push("/dashboard")
+          }}
+          className="hidden items-center gap-1.5 rounded-lg border border-white/30 bg-white/15 px-2.5 py-1.5 text-xs font-medium text-inherit transition-colors hover:bg-white/25 sm:flex"
+          title="Take a guided tour"
+        >
+          <Compass className="h-4 w-4" />
+          Take a tour
+        </button>
+
         {/* Notifications */}
         <Dialog>
           <DialogTrigger asChild>
