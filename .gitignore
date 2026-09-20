@@ -13,3 +13,4 @@ marketplace/
 market/
 .claude/
 tsconfig.tsbuildinfo
+.vercel
