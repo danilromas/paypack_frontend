@@ -170,6 +170,20 @@ export const disputeEvents = pgTable("dispute_events", {
   index("dispute_events_dispute_id_idx").on(table.disputeId, table.createdAt),
 ])
 
+export const ratings = pgTable("ratings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dealId: uuid("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  raterUserId: uuid("rater_user_id").notNull().references(() => users.id),
+  ratedUserId: uuid("rated_user_id").notNull().references(() => users.id),
+  score: integer("score").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("ratings_score_check", sql`${table.score} >= 1 and ${table.score} <= 5`),
+  uniqueIndex("ratings_deal_rater_idx").on(table.dealId, table.raterUserId),
+  index("ratings_rated_user_id_idx").on(table.ratedUserId),
+])
+
 export const kycVerifications = pgTable("kyc_verifications", {
   userId: uuid("user_id").primaryKey().references(() => users.id),
   status: text("status").notNull().default("unverified"),

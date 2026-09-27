@@ -81,6 +81,8 @@ export interface DealRowForViewer {
   boxLengthCm: string | number | null
   boxWidthCm: string | number | null
   boxHeightCm: string | number | null
+  counterpartyUserId: string | null
+  hasRated: boolean
   createdAt: string | Date
   updatedAt: string | Date
   myRole: string
@@ -113,6 +115,8 @@ export function toDeal(row: DealRowForViewer): Deal {
     boxLengthCm: row.boxLengthCm != null ? Number(row.boxLengthCm) : undefined,
     boxWidthCm: row.boxWidthCm != null ? Number(row.boxWidthCm) : undefined,
     boxHeightCm: row.boxHeightCm != null ? Number(row.boxHeightCm) : undefined,
+    counterpartyUserId: row.counterpartyUserId ?? undefined,
+    hasRated: row.hasRated,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
   }

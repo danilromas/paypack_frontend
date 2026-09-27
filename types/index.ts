@@ -27,6 +27,8 @@ export interface Deal {
   boxLengthCm?: number
   boxWidthCm?: number
   boxHeightCm?: number
+  counterpartyUserId?: string
+  hasRated?: boolean
   createdAt: string
   updatedAt: string
   images?: string[]

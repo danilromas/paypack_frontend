@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, walletTransactions } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/session"
-import { getParticipantRole, getDealForViewer } from "@/lib/deals-access"
+import { getParticipantRole, getOtherParticipantUserId, getDealForViewer } from "@/lib/deals-access"
 import { getWalletSummary } from "@/lib/wallet"
 import { notifyOtherParticipants } from "@/lib/notifications"
 
@@ -26,6 +26,14 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
     if (!deal || deal.status !== "pending") {
       return NextResponse.json(
         { error: "Deal isn't awaiting acceptance (already accepted, cancelled, or not found)" },
+        { status: 409 },
+      )
+    }
+
+    const otherParticipantId = await getOtherParticipantUserId(id, user.id)
+    if (!otherParticipantId) {
+      return NextResponse.json(
+        { error: "The seller hasn't joined this deal yet — wait for them before paying into escrow" },
         { status: 409 },
       )
     }

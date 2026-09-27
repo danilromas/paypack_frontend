@@ -30,6 +30,19 @@ export async function getOtherParticipantUserId(dealId: string, actorUserId: str
   return rows[0]?.userId ?? null
 }
 
+/** True if the viewer is allowed to see the target's public profile — themselves, or someone they've shared a deal with. */
+export async function canViewUserProfile(viewerUserId: string, targetUserId: string): Promise<boolean> {
+  if (viewerUserId === targetUserId) return true
+  const result = await db.execute(sql`
+    SELECT 1
+    FROM deal_participants dp1
+    JOIN deal_participants dp2 ON dp1.deal_id = dp2.deal_id
+    WHERE dp1.user_id = ${viewerUserId} AND dp2.user_id = ${targetUserId}
+    LIMIT 1
+  `)
+  return result.rows.length > 0
+}
+
 const DEAL_FOR_VIEWER_SELECT = sql`
   SELECT
     d.id, d.title, d.description, d.image_url AS "imageUrl", d.price, d.shipping_price AS "shippingPrice",
@@ -41,7 +54,11 @@ const DEAL_FOR_VIEWER_SELECT = sql`
     d.created_at AS "createdAt", d.updated_at AS "updatedAt",
     dp.role AS "myRole",
     coalesce(other_user.name, other_dp.invited_email) AS "counterpartyName",
-    (other_dp.joined_at IS NOT NULL) AS "counterpartyJoined"
+    (other_dp.joined_at IS NOT NULL) AS "counterpartyJoined",
+    other_user.id AS "counterpartyUserId",
+    EXISTS (
+      SELECT 1 FROM ratings r WHERE r.deal_id = d.id AND r.rater_user_id = dp.user_id
+    ) AS "hasRated"
   FROM deal_participants dp
   JOIN deals d ON d.id = dp.deal_id
   LEFT JOIN deal_participants other_dp ON other_dp.deal_id = dp.deal_id AND other_dp.id <> dp.id
