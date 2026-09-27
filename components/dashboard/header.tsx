@@ -1,8 +1,7 @@
 "use client"
 
-import { Bell, Compass, Menu, Wallet } from "lucide-react"
+import { Bell, Compass, Menu } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
-import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -37,11 +36,7 @@ const notificationDotClass: Record<string, string> = {
 
 export function DashboardHeader() {
   const router = useRouter()
-  const { mode, wallet, user, notifications, markNotificationRead, setTourPendingStart } = useAppStore()
-  const balance = wallet?.balance ?? 0
-  const inEscrow = wallet?.inEscrow ?? 0
-  const pendingPayout = wallet?.pendingPayout ?? 0
-  const recentOps = wallet?.operations.slice(0, 2) ?? []
+  const { mode, user, notifications, markNotificationRead, setTourPendingStart } = useAppStore()
   const unreadNotifications = notifications.filter((n) => !n.readAt).length
   const recentNotifications = notifications.slice(0, 5)
 
@@ -147,7 +142,7 @@ export function DashboardHeader() {
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-md overflow-y-auto">
             <DialogHeader className="space-y-1">
-              <DialogTitle className="flex items-center justify-between text-base">
+              <DialogTitle className="flex items-center justify-between pr-6 text-base">
                 <span>Notifications</span>
                 <Badge variant="secondary" className="px-2 py-0.5 text-[10px]">
                   {unreadNotifications} unread
@@ -197,97 +192,6 @@ export function DashboardHeader() {
                 View all
               </Link>
             </ScrollArea>
-          </DialogContent>
-        </Dialog>
-
-        {/* Wallet */}
-        <Dialog>
-          <DialogTrigger asChild>
-            <button className="flex items-center gap-1.5 rounded-lg border border-white/30 bg-white/15 px-2 py-1.5 text-sm text-inherit transition-colors hover:bg-white/25 sm:gap-2 sm:px-3">
-              <Wallet className="h-4 w-4 shrink-0 opacity-90" />
-              <span>{balance.toFixed(0)}€</span>
-            </button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto">
-            <DialogHeader className="space-y-1">
-              <DialogTitle className="flex items-center justify-between text-base">
-                <span>Wallet</span>
-                <Badge variant="outline" className="text-[10px]">
-                  Escrow wallet
-                </Badge>
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Manage your PayPack Uno balance.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="mt-4 space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="flex-1 rounded-2xl bg-secondary px-4 py-3">
-                  <div className="text-xs text-muted-foreground">
-                    Available balance
-                  </div>
-                  <div className="text-2xl font-bold text-foreground">
-                    {balance.toFixed(2)}€
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Ready to withdraw or use for new deals.
-                  </div>
-                </div>
-                <div className="hidden w-px shrink-0 bg-border sm:block" />
-                <div className="flex flex-col justify-between rounded-2xl bg-card px-3 py-3 text-xs">
-                  <div>
-                    <div className="text-muted-foreground">In escrow</div>
-                    <div className="text-sm font-semibold text-foreground">
-                      {inEscrow.toFixed(2)}€
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Pending payout</div>
-                    <div className="text-sm font-semibold text-success">
-                      {pendingPayout.toFixed(2)}€
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Button asChild size="lg" className="w-full">
-                  <Link href="/dashboard/wallet">Top up</Link>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="w-full">
-                  <Link href="/dashboard/wallet">Withdraw</Link>
-                </Button>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  <span>Recent transactions</span>
-                  <Link href="/dashboard/wallet" className="text-[10px] font-normal text-primary hover:underline">
-                    View all
-                  </Link>
-                </div>
-                {recentOps.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No transactions yet.</p>
-                ) : (
-                  <div className="space-y-1 text-sm">
-                    {recentOps.map((op, i) => (
-                      <div key={op.id}>
-                        <div className="flex items-center justify-between">
-                          <span className="capitalize">{op.type} {op.relatedDealId ? `• Deal #${op.relatedDealId.slice(0, 8)}` : ""}</span>
-                          <span className={cn("font-medium", op.amount >= 0 ? "text-success" : "text-destructive")}>
-                            {op.amount >= 0 ? "+" : ""}
-                            {op.amount.toFixed(2)}€
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-muted-foreground text-xs">
-                          <span>{formatDealRelativeTime(op.createdAt)}</span>
-                          <span className="capitalize">{op.status}</span>
-                        </div>
-                        {i < recentOps.length - 1 && <Separator className="my-1" />}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
           </DialogContent>
         </Dialog>
 

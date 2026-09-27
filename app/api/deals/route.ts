@@ -26,6 +26,9 @@ function normalizePayload(body: Record<string, unknown>): DealCreatePayload {
     paymentMethod: typeof body.paymentMethod === "string" ? body.paymentMethod : null,
     paymentCryptoCoin:
       typeof body.paymentCryptoCoin === "string" ? body.paymentCryptoCoin : null,
+    boxLengthCm: typeof body.boxLengthCm === "number" ? body.boxLengthCm : null,
+    boxWidthCm: typeof body.boxWidthCm === "number" ? body.boxWidthCm : null,
+    boxHeightCm: typeof body.boxHeightCm === "number" ? body.boxHeightCm : null,
   }
 }
 
@@ -78,6 +81,9 @@ export async function POST(req: Request) {
           sourcePlatform: payload.sourcePlatform ?? null,
           paymentMethod: payload.paymentMethod ?? null,
           paymentCryptoCoin: payload.paymentCryptoCoin ?? null,
+          boxLengthCm: payload.boxLengthCm != null ? String(payload.boxLengthCm) : null,
+          boxWidthCm: payload.boxWidthCm != null ? String(payload.boxWidthCm) : null,
+          boxHeightCm: payload.boxHeightCm != null ? String(payload.boxHeightCm) : null,
         })
         .returning({ id: deals.id })
 

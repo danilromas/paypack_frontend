@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { CheckCircle2, Copy, FileText, Loader2, MessageCircle, Truck, User } from "lucide-react"
+import Link from "next/link"
+import { CheckCircle2, Copy, FileText, Loader2, MessageCircle, Star, Truck, User } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { cn, formatDealDateTime, formatDealRelativeTime } from "@/lib/utils"
 import {
@@ -61,6 +62,10 @@ export function DealDetail() {
   const [disputing, setDisputing] = useState(false)
   const [disputeError, setDisputeError] = useState<string | null>(null)
   const [celebration, setCelebration] = useState<{ name: string; pieces: ConfettiPiece[] } | null>(null)
+  const [ratingScore, setRatingScore] = useState(0)
+  const [ratingComment, setRatingComment] = useState("")
+  const [submittingRating, setSubmittingRating] = useState(false)
+  const [ratingError, setRatingError] = useState<string | null>(null)
 
   const thread = deal ? chatThreads.find((t) => t.dealId === deal.id) ?? null : null
   const inviteUrl = useMemo(() => {
@@ -139,6 +144,29 @@ export function DealDetail() {
     }
   }
 
+  async function handleSubmitRating() {
+    if (!deal || ratingScore < 1) return
+    setSubmittingRating(true)
+    setRatingError(null)
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/rating`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score: ratingScore, comment: ratingComment.trim() || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setRatingError(data.error ?? "Failed to submit rating")
+        return
+      }
+      updateDeal(data.deal)
+      setRatingScore(0)
+      setRatingComment("")
+    } finally {
+      setSubmittingRating(false)
+    }
+  }
+
   if (!deal) {
     return (
       <div>
@@ -158,7 +186,7 @@ export function DealDetail() {
 
   // One clear primary action at a time — whoever's turn it is to move the deal forward.
   let primaryAction: { label: string; action: "accept" | "ship" | "confirm-receipt"; hint: string } | null = null
-  if (deal.status === "pending" && deal.myRole === "buyer") {
+  if (deal.status === "pending" && deal.myRole === "buyer" && deal.counterpartyJoined) {
     primaryAction = {
       label: `Accept & Pay ${deal.price + deal.shippingPrice} ${deal.currency} into Escrow`,
       action: "accept",
@@ -179,7 +207,9 @@ export function DealDetail() {
       ? deal.counterpartyJoined
         ? "Waiting for the buyer to accept and pay."
         : `Waiting for ${counterpartyLabel} to join PayPack.`
-      : deal.status === "escrow" && deal.myRole === "buyer"
+      : deal.status === "pending" && deal.myRole === "buyer" && !deal.counterpartyJoined
+        ? `Waiting for ${counterpartyLabel} to join PayPack before you can pay into escrow.`
+        : deal.status === "escrow" && deal.myRole === "buyer"
         ? "Waiting for the seller to ship."
         : deal.status === "shipped" && deal.myRole === "seller"
           ? "Waiting for the buyer to confirm receipt."
@@ -234,6 +264,14 @@ export function DealDetail() {
                 <div className="text-xs text-muted-foreground">
                   {deal.counterpartyJoined ? "Joined PayPack" : "Invited — hasn't joined yet"}
                 </div>
+                {deal.counterpartyJoined && deal.counterpartyUserId && (
+                  <Link
+                    href={`/dashboard/users/${deal.counterpartyUserId}`}
+                    className="inline-block text-xs font-medium text-primary hover:underline"
+                  >
+                    View profile
+                  </Link>
+                )}
               </div>
             </DialogContent>
           </Dialog>
@@ -409,6 +447,46 @@ export function DealDetail() {
         ) : null}
         {actionError ? <p className="mb-3 text-center text-xs text-destructive">{actionError}</p> : null}
 
+        {deal.status === "completed" && !deal.hasRated && deal.counterpartyUserId && (
+          <div className="mb-3 space-y-3 rounded-2xl border border-border bg-secondary/40 p-4">
+            <p className="text-center text-sm font-medium text-foreground">
+              Rate {counterpartyLabel}
+            </p>
+            <div className="flex items-center justify-center gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setRatingScore(n)}
+                  className="p-0.5"
+                >
+                  <Star
+                    className={cn(
+                      "h-6 w-6",
+                      n <= ratingScore ? "fill-warning text-warning" : "text-muted-foreground/30",
+                    )}
+                  />
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={2}
+              value={ratingComment}
+              onChange={(e) => setRatingComment(e.target.value)}
+              placeholder="Leave a comment (optional)"
+              className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+            {ratingError && <p className="text-center text-xs text-destructive">{ratingError}</p>}
+            <Button
+              className="w-full rounded-xl bg-primary"
+              disabled={ratingScore < 1 || submittingRating}
+              onClick={handleSubmitRating}
+            >
+              {submittingRating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit rating"}
+            </Button>
+          </div>
+        )}
+
         {/* Secondary actions + deal details modal */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Button
@@ -513,9 +591,11 @@ export function DealDetail() {
                     </div>
                   </div>
                   <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">
-                    <div className="text-muted-foreground">Shipping</div>
+                    <div className="text-muted-foreground">Box size</div>
                     <div className="text-sm font-semibold text-foreground">
-                      {deal.shippingPrice} {deal.currency}
+                      {deal.boxLengthCm || deal.boxWidthCm || deal.boxHeightCm
+                        ? `${deal.boxLengthCm ?? 0}×${deal.boxWidthCm ?? 0}×${deal.boxHeightCm ?? 0} cm`
+                        : "—"}
                     </div>
                   </div>
                 </div>

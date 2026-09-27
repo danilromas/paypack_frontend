@@ -458,8 +458,12 @@ export function AdminDashboard() {
                 <dd>{formatMoneyEUR(dealModal.price)}</dd>
               </div>
               <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Shipping</dt>
-                <dd>{formatMoneyEUR(dealModal.shippingPrice)}</dd>
+                <dt className="text-muted-foreground">Box size</dt>
+                <dd>
+                  {dealModal.boxLengthCm || dealModal.boxWidthCm || dealModal.boxHeightCm
+                    ? `${dealModal.boxLengthCm ?? 0}×${dealModal.boxWidthCm ?? 0}×${dealModal.boxHeightCm ?? 0} cm`
+                    : "—"}
+                </dd>
               </div>
               <div className="grid grid-cols-[8rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Currency</dt>

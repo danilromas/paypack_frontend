@@ -241,8 +241,12 @@ export function DealsList({
                 <dd>{detailDeal.price} {detailDeal.currency}</dd>
               </div>
               <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Shipping</dt>
-                <dd>{detailDeal.shippingPrice} {detailDeal.currency}</dd>
+                <dt className="text-muted-foreground">Box size</dt>
+                <dd>
+                  {detailDeal.boxLengthCm || detailDeal.boxWidthCm || detailDeal.boxHeightCm
+                    ? `${detailDeal.boxLengthCm ?? 0}×${detailDeal.boxWidthCm ?? 0}×${detailDeal.boxHeightCm ?? 0} cm`
+                    : "—"}
+                </dd>
               </div>
               <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
                 <dt className="text-muted-foreground">Status</dt>

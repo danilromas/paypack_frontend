@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react"
 import { useForm, type UseFormRegisterReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import type { z } from "zod"
+import { z } from "zod"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Shield, Mail, Lock, User } from "lucide-react"
+import { Shield, Mail, Lock, User, Eye, EyeOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAppStore } from "@/store/app-store"
@@ -13,7 +13,15 @@ import { loginSchema, registerSchema, forgotPasswordSchema } from "@/lib/auth/sc
 
 type AuthTab = "login" | "signup"
 type LoginValues = z.infer<typeof loginSchema>
-type SignupValues = z.infer<typeof registerSchema>
+const signupFormSchema = registerSchema
+  .extend({
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  })
+type SignupValues = z.infer<typeof signupFormSchema>
 type ForgotValues = z.infer<typeof forgotPasswordSchema>
 
 async function postJson(url: string, body: unknown) {
@@ -68,7 +76,7 @@ export function AuthPanel({
   }, [tab])
 
   const loginForm = useForm<LoginValues>({ resolver: zodResolver(loginSchema) })
-  const signupForm = useForm<SignupValues>({ resolver: zodResolver(registerSchema) })
+  const signupForm = useForm<SignupValues>({ resolver: zodResolver(signupFormSchema) })
   const forgotForm = useForm<ForgotValues>({ resolver: zodResolver(forgotPasswordSchema) })
 
   function goToApp() {
@@ -91,7 +99,8 @@ export function AuthPanel({
   async function onSignup(values: SignupValues) {
     setServerError(null)
     try {
-      const user = await postJson("/api/auth/register", values)
+      const { confirmPassword: _confirmPassword, ...payload } = values
+      const user = await postJson("/api/auth/register", payload)
       setUser(user)
       goToApp()
     } catch (error) {
@@ -205,6 +214,7 @@ export function AuthPanel({
               placeholder="••••••••"
               register={loginForm.register("password")}
               error={loginForm.formState.errors.password?.message}
+              revealable
             />
 
             {serverError && <p className="text-xs text-destructive">{serverError}</p>}
@@ -258,6 +268,16 @@ export function AuthPanel({
               placeholder="••••••••"
               register={signupForm.register("password")}
               error={signupForm.formState.errors.password?.message}
+              revealable
+            />
+            <Field
+              icon={Lock}
+              label="Confirm password"
+              type="password"
+              placeholder="••••••••"
+              register={signupForm.register("confirmPassword")}
+              error={signupForm.formState.errors.confirmPassword?.message}
+              revealable
             />
 
             {serverError && <p className="text-xs text-destructive">{serverError}</p>}
@@ -297,6 +317,7 @@ function Field({
   placeholder,
   register,
   error,
+  revealable,
 }: {
   icon: typeof Mail
   label: string
@@ -304,7 +325,11 @@ function Field({
   placeholder: string
   register: UseFormRegisterReturn
   error?: string
+  revealable?: boolean
 }) {
+  const [revealed, setRevealed] = useState(false)
+  const resolvedType = revealable ? (revealed ? "text" : "password") : type
+
   return (
     <label className="block">
       <span className="mb-2 block text-xs font-medium text-muted-foreground">
@@ -313,11 +338,24 @@ function Field({
       <div className="relative">
         <Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
-          type={type}
+          type={resolvedType}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-border bg-secondary py-3 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className={cn(
+            "w-full rounded-xl border border-border bg-secondary py-3 pl-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30",
+            revealable ? "pr-10" : "pr-4",
+          )}
           {...register}
         />
+        {revealable && (
+          <button
+            type="button"
+            onClick={() => setRevealed((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            tabIndex={-1}
+          >
+            {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        )}
       </div>
       {error && <span className="mt-1 block text-xs text-destructive">{error}</span>}
     </label>

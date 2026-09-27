@@ -59,6 +59,9 @@ export const deals = pgTable("deals", {
   paymentCryptoCoin: text("payment_crypto_coin"),
   carrier: text("carrier"),
   trackingNumber: text("tracking_number"),
+  boxLengthCm: numeric("box_length_cm", { precision: 8, scale: 2 }),
+  boxWidthCm: numeric("box_width_cm", { precision: 8, scale: 2 }),
+  boxHeightCm: numeric("box_height_cm", { precision: 8, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -165,6 +168,20 @@ export const disputeEvents = pgTable("dispute_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("dispute_events_dispute_id_idx").on(table.disputeId, table.createdAt),
+])
+
+export const ratings = pgTable("ratings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dealId: uuid("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  raterUserId: uuid("rater_user_id").notNull().references(() => users.id),
+  ratedUserId: uuid("rated_user_id").notNull().references(() => users.id),
+  score: integer("score").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check("ratings_score_check", sql`${table.score} >= 1 and ${table.score} <= 5`),
+  uniqueIndex("ratings_deal_rater_idx").on(table.dealId, table.raterUserId),
+  index("ratings_rated_user_id_idx").on(table.ratedUserId),
 ])
 
 export const kycVerifications = pgTable("kyc_verifications", {
