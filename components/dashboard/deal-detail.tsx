@@ -513,9 +513,11 @@ export function DealDetail() {
                     </div>
                   </div>
                   <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">
-                    <div className="text-muted-foreground">Shipping</div>
+                    <div className="text-muted-foreground">Box size</div>
                     <div className="text-sm font-semibold text-foreground">
-                      {deal.shippingPrice} {deal.currency}
+                      {deal.boxLengthCm || deal.boxWidthCm || deal.boxHeightCm
+                        ? `${deal.boxLengthCm ?? 0}×${deal.boxWidthCm ?? 0}×${deal.boxHeightCm ?? 0} cm`
+                        : "—"}
                     </div>
                   </div>
                 </div>

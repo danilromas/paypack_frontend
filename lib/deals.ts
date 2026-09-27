@@ -23,6 +23,9 @@ export interface DealCreatePayload {
   sourcePlatform?: string | null
   paymentMethod?: string | null
   paymentCryptoCoin?: string | null
+  boxLengthCm?: number | null
+  boxWidthCm?: number | null
+  boxHeightCm?: number | null
 }
 
 export interface DealEditPayload {
@@ -75,6 +78,9 @@ export interface DealRowForViewer {
   paymentCryptoCoin: string | null
   carrier: string | null
   trackingNumber: string | null
+  boxLengthCm: string | number | null
+  boxWidthCm: string | number | null
+  boxHeightCm: string | number | null
   createdAt: string | Date
   updatedAt: string | Date
   myRole: string
@@ -104,6 +110,9 @@ export function toDeal(row: DealRowForViewer): Deal {
     paymentCryptoCoin: row.paymentCryptoCoin ?? undefined,
     carrier: row.carrier ?? undefined,
     trackingNumber: row.trackingNumber ?? undefined,
+    boxLengthCm: row.boxLengthCm != null ? Number(row.boxLengthCm) : undefined,
+    boxWidthCm: row.boxWidthCm != null ? Number(row.boxWidthCm) : undefined,
+    boxHeightCm: row.boxHeightCm != null ? Number(row.boxHeightCm) : undefined,
     createdAt: new Date(row.createdAt).toISOString(),
     updatedAt: new Date(row.updatedAt).toISOString(),
   }

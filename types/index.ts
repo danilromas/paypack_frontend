@@ -24,6 +24,9 @@ export interface Deal {
   paymentCryptoCoin?: string
   carrier?: string
   trackingNumber?: string
+  boxLengthCm?: number
+  boxWidthCm?: number
+  boxHeightCm?: number
   createdAt: string
   updatedAt: string
   images?: string[]

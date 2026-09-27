@@ -71,7 +71,9 @@ export function NewDealModal({
   const [itemDetailDesc, setItemDetailDesc] = useState("")
   const [itemImageUrl, setItemImageUrl] = useState("")
   const [price, setPrice] = useState(0)
-  const [shippingPrice, setShippingPrice] = useState(0)
+  const [boxLengthCm, setBoxLengthCm] = useState(0)
+  const [boxWidthCm, setBoxWidthCm] = useState(0)
+  const [boxHeightCm, setBoxHeightCm] = useState(0)
   const [currency, setCurrency] = useState("EUR")
   const [sellerName, setSellerName] = useState("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
@@ -84,6 +86,7 @@ export function NewDealModal({
   const [copied, setCopied] = useState(false)
   const [sellerMessage, setSellerMessage] = useState("")
   const [messageCopied, setMessageCopied] = useState(false)
+  const [popupBlocked, setPopupBlocked] = useState(false)
   const [counterpartyJoinedLive, setCounterpartyJoinedLive] = useState(false)
   const [joinedCounterpartyName, setJoinedCounterpartyName] = useState<string | null>(null)
 
@@ -91,8 +94,9 @@ export function NewDealModal({
   const currentPhase: WizardPhase = phases[step - 1] ?? "role"
 
   const fee = Math.round(price * 0.03 * 100) / 100
-  const total = price + shippingPrice + fee
-  const sellerReceives = Math.round((price + shippingPrice - fee) * 100) / 100
+  const total = price + fee
+  const sellerReceives = Math.round((price - fee) * 100) / 100
+  const hasBoxSize = boxLengthCm > 0 || boxWidthCm > 0 || boxHeightCm > 0
 
   const detailsValid = itemTitle.trim().length > 0 && price > 0
 
@@ -155,7 +159,8 @@ export function NewDealModal({
     const link = productLink.trim()
     if (!link || !createdDealId || !sellerMessage.trim()) return
     const url = buildSellerMessageUrl(link, createdDealId, sellerMessage)
-    window.open(url, "_blank", "noopener,noreferrer")
+    const win = window.open(url, "_blank", "noopener,noreferrer")
+    setPopupBlocked(win === null)
   }
 
   async function handleCopyMessage() {
@@ -223,7 +228,7 @@ export function NewDealModal({
       description: parts.join(" · ") || "",
       imageUrl: itemImageUrl.trim() || null,
       price,
-      shippingPrice,
+      shippingPrice: 0,
       currency,
       role,
       counterparty:
@@ -232,6 +237,9 @@ export function NewDealModal({
       sourcePlatform: detectMarketplacePlatform(trimmedLink),
       paymentMethod: role === "buyer" ? paymentMethod : null,
       paymentCryptoCoin: role === "buyer" && paymentMethod === "crypto" ? cryptoCoin : null,
+      boxLengthCm: boxLengthCm > 0 ? boxLengthCm : null,
+      boxWidthCm: boxWidthCm > 0 ? boxWidthCm : null,
+      boxHeightCm: boxHeightCm > 0 ? boxHeightCm : null,
     }
     setSubmitting(true)
     setSubmitError(null)
@@ -629,20 +637,38 @@ export function NewDealModal({
                       <span className="text-xs text-muted-foreground">{currency}</span>
                     </div>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Shipping</label>
-                    <div className="flex items-center rounded-lg border border-border bg-secondary px-3 py-1.5">
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={shippingPrice || ""}
-                        onChange={(e) => setShippingPrice(Number(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-                      />
-                      <span className="text-xs text-muted-foreground">{currency}</span>
-                    </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">Box size (cm, optional)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={boxLengthCm || ""}
+                      onChange={(e) => setBoxLengthCm(Number(e.target.value) || 0)}
+                      placeholder="L"
+                      className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={boxWidthCm || ""}
+                      onChange={(e) => setBoxWidthCm(Number(e.target.value) || 0)}
+                      placeholder="W"
+                      className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={boxHeightCm || ""}
+                      onChange={(e) => setBoxHeightCm(Number(e.target.value) || 0)}
+                      placeholder="H"
+                      className="w-full rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    />
                   </div>
                 </div>
               </div>
@@ -684,10 +710,14 @@ export function NewDealModal({
                 <span className="text-muted-foreground">Price:</span>
                 <span className="font-medium text-foreground">{price} {currency}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Shipping:</span>
-                <span className="font-medium text-foreground">{shippingPrice} {currency}</span>
-              </div>
+              {hasBoxSize && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Box size:</span>
+                  <span className="font-medium text-foreground">
+                    {boxLengthCm || 0}×{boxWidthCm || 0}×{boxHeightCm || 0} cm
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Fee (3%):</span>
                 <span className="font-medium text-foreground">{fee} {currency}</span>
@@ -775,7 +805,7 @@ export function NewDealModal({
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-foreground/80 backdrop-blur-sm" />
           <div className="absolute inset-0 grid place-items-center p-4">
-            <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card p-8 text-center shadow-2xl">
+            <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-border bg-card p-8 text-center shadow-2xl">
               <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
               <div className="relative z-10">
                 <div className="pp-animate-scale-in mx-auto mb-5 grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
@@ -809,6 +839,11 @@ export function NewDealModal({
                     <p className="mt-1.5 text-[10px] text-muted-foreground">
                       Opens the listing and sends this via the PayPack browser extension, if installed. Otherwise copy it and paste manually.
                     </p>
+                    {popupBlocked && (
+                      <p className="mt-1.5 text-[10px] text-destructive">
+                        Pop-up blocked — use Copy message instead.
+                      </p>
+                    )}
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <button
                         onClick={handleCopyMessage}

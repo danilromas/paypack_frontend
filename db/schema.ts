@@ -59,6 +59,9 @@ export const deals = pgTable("deals", {
   paymentCryptoCoin: text("payment_crypto_coin"),
   carrier: text("carrier"),
   trackingNumber: text("tracking_number"),
+  boxLengthCm: numeric("box_length_cm", { precision: 8, scale: 2 }),
+  boxWidthCm: numeric("box_width_cm", { precision: 8, scale: 2 }),
+  boxHeightCm: numeric("box_height_cm", { precision: 8, scale: 2 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [

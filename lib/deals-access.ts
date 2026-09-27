@@ -37,6 +37,7 @@ const DEAL_FOR_VIEWER_SELECT = sql`
     d.source_url AS "sourceUrl", d.source_platform AS "sourcePlatform",
     d.payment_method AS "paymentMethod", d.payment_crypto_coin AS "paymentCryptoCoin",
     d.carrier, d.tracking_number AS "trackingNumber",
+    d.box_length_cm AS "boxLengthCm", d.box_width_cm AS "boxWidthCm", d.box_height_cm AS "boxHeightCm",
     d.created_at AS "createdAt", d.updated_at AS "updatedAt",
     dp.role AS "myRole",
     coalesce(other_user.name, other_dp.invited_email) AS "counterpartyName",

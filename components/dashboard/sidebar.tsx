@@ -13,13 +13,12 @@ import {
   Bell,
   Wallet,
   LogOut,
-  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const lowerNavItems = [
-  { href: "/dashboard/profile", icon: User, label: "Profile" },
   { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   { href: "/admin", icon: ShieldCheck, label: "Admin" },
 ];
@@ -27,10 +26,20 @@ const lowerNavItems = [
 export function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const user = useAppStore((s) => s.user);
   const chatThreads = useAppStore((s) => s.chatThreads);
   const notifications = useAppStore((s) => s.notifications);
   const unreadChats = chatThreads.reduce((sum, t) => sum + t.unreadCount, 0);
   const unreadNotifications = notifications.filter((n) => !n.readAt).length;
+
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "?";
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -72,6 +81,29 @@ export function DashboardSidebar() {
           </div>
         </Link>
       </div>
+
+      {/* Profile */}
+      <Link
+        href="/dashboard/profile"
+        className={cn(
+          "flex items-center gap-3 border-b border-sidebar-border px-6 py-4 transition-colors hover:bg-sidebar-accent/50",
+          pathname.startsWith("/dashboard/profile") && "bg-sidebar-accent",
+        )}
+      >
+        <Avatar className="h-10 w-10">
+          <AvatarFallback className="bg-sidebar-accent text-sm font-bold text-primary">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex min-w-0 flex-col text-left text-sm">
+          <span className="truncate font-semibold text-sidebar-foreground">
+            {user?.name ?? "..."}
+          </span>
+          <span className="truncate text-xs text-sidebar-muted">
+            {user?.email ?? ""}
+          </span>
+        </div>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-4">

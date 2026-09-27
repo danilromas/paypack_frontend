@@ -185,7 +185,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-primary" />
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Verification
+                  KYC
                 </h4>
               </div>
               <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold uppercase", kycBadgeClass[kycStatus])}>
