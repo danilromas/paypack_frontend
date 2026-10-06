@@ -1,4 +1,4 @@
-PayPack Marketplace — Chrome extension v1.0
+PayPack Marketplace — Chrome extension v1.1
 
 1) Download paypack-marketplace-extension.zip from your PayPack site:
    /api/extension/download/

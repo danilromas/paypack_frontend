@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle2, Copy, FileText, Loader2, MessageCircle, Star, Truck, User } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronRight, Coins, Copy, FileText, Loader2, MessageCircle, Star, Truck, User } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { cn, formatDealDateTime, formatDealRelativeTime } from "@/lib/utils"
 import {
@@ -17,6 +17,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { RatingStars } from "@/components/dashboard/rating-stars"
+import {
+  PAYMENT_METHODS,
+  CRYPTO_COINS,
+  buildDemoCryptoAddress,
+  type PaymentMethod,
+  type CryptoCoin,
+} from "@/lib/payments"
 
 const progressSteps = ["Created", "Escrow", "Shipped", "Completed"]
 
@@ -66,6 +74,26 @@ export function DealDetail() {
   const [ratingComment, setRatingComment] = useState("")
   const [submittingRating, setSubmittingRating] = useState(false)
   const [ratingError, setRatingError] = useState<string | null>(null)
+  const [payDialogOpen, setPayDialogOpen] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
+  const [cryptoCoin, setCryptoCoin] = useState<CryptoCoin>("BTC")
+  const [counterpartyRating, setCounterpartyRating] = useState<{ average: number | null; count: number } | null>(null)
+
+  const counterpartyUserId = deal?.counterpartyUserId
+  useEffect(() => {
+    setCounterpartyRating(null)
+    if (!counterpartyUserId) return
+    let cancelled = false
+    fetch(`/api/users/${counterpartyUserId}/public`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setCounterpartyRating({ average: data.ratingAverage, count: data.ratingCount })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [counterpartyUserId])
 
   const thread = deal ? chatThreads.find((t) => t.dealId === deal.id) ?? null : null
   const inviteUrl = useMemo(() => {
@@ -98,6 +126,14 @@ export function DealDetail() {
     } finally {
       setActing(null)
     }
+  }
+
+  async function handleConfirmPay() {
+    await runAction("accept", {
+      paymentMethod,
+      paymentCryptoCoin: paymentMethod === "crypto" ? cryptoCoin : undefined,
+    })
+    setPayDialogOpen(false)
   }
 
   async function handleCopyInviteLink() {
@@ -190,7 +226,7 @@ export function DealDetail() {
     primaryAction = {
       label: `Accept & Pay ${deal.price + deal.shippingPrice} ${deal.currency} into Escrow`,
       action: "accept",
-      hint: "This charges your PayPack wallet balance immediately.",
+      hint: "Choose how you pay — funds are held in escrow until you confirm receipt.",
     }
   } else if (deal.status === "escrow" && deal.myRole === "seller") {
     primaryAction = { label: "Mark as Shipped", action: "ship", hint: "Let the buyer know their item is on its way." }
@@ -239,43 +275,43 @@ export function DealDetail() {
               <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-foreground">
                 {deal.status}
               </span>
-              <span className="capitalize">You're the {deal.myRole}</span>
+              <span>You&apos;re the {deal.myRole}</span>
             </div>
           </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <button className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary transition-colors hover:bg-secondary/80">
-                <User className="h-5 w-5 text-muted-foreground" />
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-sm">
-              <DialogHeader className="space-y-1">
-                <DialogTitle className="text-base">
-                  Counterparty
-                </DialogTitle>
-                <DialogDescription className="text-xs">
-                  Who you're trading with on this deal.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="text-sm font-semibold text-foreground">
-                  {counterpartyLabel}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {deal.counterpartyJoined ? "Joined PayPack" : "Invited — hasn't joined yet"}
-                </div>
-                {deal.counterpartyJoined && deal.counterpartyUserId && (
-                  <Link
-                    href={`/dashboard/users/${deal.counterpartyUserId}`}
-                    className="inline-block text-xs font-medium text-primary hover:underline"
-                  >
-                    View profile
-                  </Link>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+          {deal.counterpartyJoined && deal.counterpartyUserId ? (
+            <Link
+              href={`/dashboard/users/${deal.counterpartyUserId}`}
+              title={`View ${counterpartyLabel}'s profile`}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary transition-colors hover:bg-secondary/80"
+            >
+              <User className="h-5 w-5 text-muted-foreground" />
+            </Link>
+          ) : (
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary">
+              <User className="h-5 w-5 text-muted-foreground" />
+            </div>
+          )}
         </div>
+
+        {deal.counterpartyJoined && deal.counterpartyUserId ? (
+          <Link
+            href={`/dashboard/users/${deal.counterpartyUserId}`}
+            className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/60 px-4 py-3 transition-colors hover:border-primary/30"
+          >
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {deal.myRole === "buyer" ? "Seller" : "Buyer"}
+              </div>
+              <div className="truncate text-sm font-semibold text-foreground">{counterpartyLabel}</div>
+              {counterpartyRating && (
+                <RatingStars score={counterpartyRating.average} count={counterpartyRating.count} size="sm" />
+              )}
+            </div>
+            <span className="flex shrink-0 items-center text-xs font-medium text-primary">
+              Profile <ChevronRight className="h-3.5 w-3.5" />
+            </span>
+          </Link>
+        ) : null}
 
         {deal.imageUrl ? (
           <div className="mb-6 overflow-hidden rounded-xl border border-border bg-secondary">
@@ -424,6 +460,77 @@ export function DealDetail() {
                   onClick={handleConfirmShip}
                 >
                   {acting === "ship" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Mark as Shipped"}
+                </Button>
+              </DialogContent>
+            </Dialog>
+            <p className="text-center text-xs text-muted-foreground">{primaryAction.hint}</p>
+          </div>
+        ) : primaryAction?.action === "accept" ? (
+          <div className="mb-3 space-y-2">
+            <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full rounded-xl bg-primary py-5 text-sm font-semibold">
+                  {primaryAction.label}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm">
+                <DialogHeader className="space-y-1">
+                  <DialogTitle className="text-base">Pay into escrow</DialogTitle>
+                  <DialogDescription className="text-xs">
+                    {deal.price + deal.shippingPrice} {deal.currency} is held safely until you confirm the item arrived.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="mt-2">
+                  <label className="mb-2 block text-xs font-medium text-muted-foreground">How will you pay?</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {PAYMENT_METHODS.map((m) => (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => setPaymentMethod(m.value)}
+                        className={cn(
+                          "rounded-xl border-2 px-2 py-2 text-xs font-medium transition-all",
+                          paymentMethod === m.value
+                            ? "border-primary bg-primary/5 text-foreground"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/30",
+                        )}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  {paymentMethod === "crypto" && (
+                    <div className="mt-3 space-y-2 rounded-xl border border-border bg-secondary/40 p-3">
+                      <select
+                        value={cryptoCoin}
+                        onChange={(e) => setCryptoCoin(e.target.value as CryptoCoin)}
+                        className="w-full rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                      >
+                        {CRYPTO_COINS.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                        <Coins className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span className="flex-1 truncate font-mono text-xs text-foreground">
+                          {buildDemoCryptoAddress(cryptoCoin, deal.id)}
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>Demo address for MVP preview — not monitored. Do not send real funds.</span>
+                      </div>
+                    </div>
+                  )}
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    MVP: the amount is deducted from your PayPack wallet balance.
+                  </p>
+                </div>
+                {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
+                <Button className="mt-2 w-full rounded-xl bg-primary" disabled={acting !== null} onClick={handleConfirmPay}>
+                  {acting === "accept" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pay into escrow"}
                 </Button>
               </DialogContent>
             </Dialog>
@@ -588,6 +695,12 @@ export function DealDetail() {
                     <div className="text-muted-foreground">Price</div>
                     <div className="text-sm font-semibold text-foreground">
                       {deal.price} {deal.currency}
+                    </div>
+                  </div>
+                  <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">
+                    <div className="text-muted-foreground">Shipping</div>
+                    <div className="text-sm font-semibold text-foreground">
+                      {deal.shippingPrice > 0 ? `${deal.shippingPrice} ${deal.currency}` : "—"}
                     </div>
                   </div>
                   <div className="space-y-1 rounded-lg bg-secondary px-3 py-2">

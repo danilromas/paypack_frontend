@@ -682,6 +682,19 @@ function scrapeListing(sourceEl) {
   return { title, link, price, desc, image };
 }
 
+// background.js asks for the listing in a hidden tab when the PayPack site needs an FB link's details.
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg?.type !== "PP_SCRAPE_CURRENT") return false;
+    try {
+      sendResponse({ data: isListingPage() ? scrapeListing(getActiveListingAnchor()) : null });
+    } catch (e) {
+      sendResponse({ data: null, error: String(e?.message || e) });
+    }
+    return false;
+  });
+}
+
 function buildImportUrl(paypackOrigin, sourceEl) {
   return PayPackUrlBuild.buildDashboardImportUrl(paypackOrigin, scrapeListing(sourceEl));
 }
@@ -1503,6 +1516,7 @@ const PP_SELLER_MSG_MAX_ATTEMPTS = 32; // ~8s at 250ms
 let ppToastHideTimer = null;
 let ppSellerMessageTimer = null;
 let ppSellerMessageAttempts = 0;
+let ppSellerChatOpenClicked = false;
 
 function applyToastStyles(shadow) {
   let style = shadow.querySelector("style");
@@ -1624,6 +1638,28 @@ function insertTextIntoComposer(textbox, text) {
   textbox.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+/**
+ * After we click the listing's "Message" button FB opens a Messenger chat popup instead of an inline
+ * composer — find its textbox. Only called after that click, so we never grab the feed's post box.
+ */
+function findOpenChatComposer() {
+  const candidates = document.querySelectorAll(
+    '[contenteditable="true"][role="textbox"], [role="dialog"] textarea',
+  );
+  for (const textbox of candidates) {
+    if (!isVisibleElement(textbox)) continue;
+    const host =
+      textbox.closest('[role="dialog"], [aria-label*="Messenger" i], [aria-label*="chat" i]') ||
+      textbox.parentElement;
+    if (!host) continue;
+    const sendButton = host.querySelector(
+      '[role="button"][aria-label*="send" i], [role="button"][aria-label*="enviar" i], [role="button"][aria-label*="invia" i], [role="button"][aria-label*="отправ" i]',
+    );
+    return { host, textbox, sendButton };
+  }
+  return null;
+}
+
 function isSendButtonDisabled(btn) {
   if (!btn) return true;
   if (btn.disabled) return true;
@@ -1649,7 +1685,23 @@ function attemptSendPendingSellerMessage(pending) {
     }
   }
 
-  const textbox = composer && findComposerTextbox(composer.host);
+  let textbox = composer && findComposerTextbox(composer.host);
+
+  // No inline composer: the listing only has a "Message" button (e.g. you've messaged this seller
+  // before). Click it once to open the chat popup, then keep polling for the popup's textbox.
+  if (composer && !textbox && !ppSellerChatOpenClicked && isMessageActionButton(composer.sendButton)) {
+    ppSellerChatOpenClicked = true;
+    composer.sendButton.click();
+    return;
+  }
+  if (!textbox && ppSellerChatOpenClicked) {
+    const chat = findOpenChatComposer();
+    if (chat) {
+      composer = { host: chat.host, sendButton: chat.sendButton };
+      textbox = chat.textbox;
+    }
+  }
+
   if (!composer || !textbox) {
     if (ppSellerMessageAttempts >= PP_SELLER_MSG_MAX_ATTEMPTS) {
       stopPendingSellerMessagePolling();
@@ -1667,7 +1719,7 @@ function attemptSendPendingSellerMessage(pending) {
   clearPendingSellerMessageFromUrl();
 
   setTimeout(() => {
-    if (!isSendButtonDisabled(composer.sendButton)) {
+    if (composer.sendButton && !isSendButtonDisabled(composer.sendButton)) {
       composer.sendButton.click();
       showPayPackToast("Message sent to the seller via PayPack.", "pp-success");
     } else {
@@ -1683,6 +1735,7 @@ function trySendPendingSellerMessage() {
   if (ppSellerMessageTimer) return;
 
   ppSellerMessageAttempts = 0;
+  ppSellerChatOpenClicked = false;
   attemptSendPendingSellerMessage(pending);
   if (!ppSellerMessageTimer && getPendingSellerMessageParams()) {
     ppSellerMessageTimer = setInterval(

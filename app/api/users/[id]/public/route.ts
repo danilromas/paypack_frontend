@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth/session"
-import { canViewUserProfile } from "@/lib/deals-access"
 import { getPublicProfile } from "@/lib/ratings"
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function GET(_req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -11,12 +12,10 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
-    const allowed = await canViewUserProfile(user.id, id)
-    if (!allowed) {
-      return NextResponse.json(
-        { error: "You can only view profiles of people you've done a deal with" },
-        { status: 403 },
-      )
+    // Any signed-in user may view a public profile (per client request: users must be able to find
+    // each other). The DTO only carries name/avatar/KYC/rating/deal count — never email or phone.
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
     const profile = await getPublicProfile(id)

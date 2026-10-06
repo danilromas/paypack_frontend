@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
@@ -9,6 +10,7 @@ import { Camera, ShieldCheck, Trash2 } from "lucide-react"
 import { profileUpdateSchema } from "@/lib/auth/schemas"
 import { useAppStore } from "@/store/app-store"
 import { cn } from "@/lib/utils"
+import { RatingStars } from "@/components/dashboard/rating-stars"
 import type { KycStatus } from "@/lib/kyc"
 
 const kycBadgeClass: Record<KycStatus, string> = {
@@ -38,6 +40,8 @@ export default function ProfilePage() {
   const [kycStatus, setKycStatus] = useState<KycStatus>("unverified")
   const [docUrl, setDocUrl] = useState("")
   const [submittingKyc, setSubmittingKyc] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [rating, setRating] = useState<{ ratingAverage: number | null; ratingCount: number; completedDealsCount: number } | null>(null)
 
   async function loadKyc() {
     const res = await fetch("/api/kyc/me")
@@ -79,6 +83,11 @@ export default function ProfilePage() {
       .then((me) => {
         if (!me) return
         setEmail(me.email)
+        setUserId(me.id)
+        fetch(`/api/users/${me.id}/public`, { cache: "no-store" })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => setRating(data))
+          .catch(() => {})
         reset({ name: me.name, phone: me.phone ?? "", bio: me.bio ?? "" })
       })
       .finally(() => setLoading(false))
@@ -130,7 +139,23 @@ export default function ProfilePage() {
             <div>
               <p className="font-medium text-foreground">{loading ? "Loading..." : name || "—"}</p>
               <p className="text-xs text-muted-foreground">{email}</p>
+              {rating && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <RatingStars score={rating.ratingAverage} count={rating.ratingCount} size="sm" />
+                  <span className="text-[11px] text-muted-foreground">
+                    {rating.completedDealsCount} completed {rating.completedDealsCount === 1 ? "deal" : "deals"}
+                  </span>
+                </div>
+              )}
             </div>
+            {userId && (
+              <Link
+                href={`/dashboard/users/${userId}`}
+                className="ml-auto shrink-0 text-xs font-medium text-primary hover:underline"
+              >
+                Public profile
+              </Link>
+            )}
           </div>
 
           <form

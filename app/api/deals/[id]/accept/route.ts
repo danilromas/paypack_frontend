@@ -6,9 +6,10 @@ import { getCurrentUser } from "@/lib/auth/session"
 import { getParticipantRole, getOtherParticipantUserId, getDealForViewer } from "@/lib/deals-access"
 import { getWalletSummary } from "@/lib/wallet"
 import { notifyOtherParticipants } from "@/lib/notifications"
+import { CRYPTO_COINS, PAYMENT_METHODS } from "@/lib/payments"
 
 /** Buyer accepts the deal and pays its price+shipping into escrow — a real, immediate ledger deduction. */
-export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
@@ -16,6 +17,15 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
 
   try {
     const { id } = await context.params
+    // The buyer picks how they pay at this step (not at deal creation) — recorded on the deal.
+    const body = (await req.json().catch(() => ({}))) as { paymentMethod?: unknown; paymentCryptoCoin?: unknown }
+    const paymentMethod = PAYMENT_METHODS.find((m) => m.value === body.paymentMethod)?.value ?? null
+    const paymentCryptoCoin =
+      paymentMethod === "crypto" ? (CRYPTO_COINS.find((c) => c.value === body.paymentCryptoCoin)?.value ?? null) : null
+    if (body.paymentMethod !== undefined && !paymentMethod) {
+      return NextResponse.json({ error: "Invalid payment method" }, { status: 400 })
+    }
+
     const role = await getParticipantRole(id, user.id)
     if (role !== "buyer") {
       return NextResponse.json({ error: "Only the buyer can accept and pay into escrow" }, { status: 403 })
@@ -50,7 +60,11 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
     const updated = await db.transaction(async (tx) => {
       const rows = await tx
         .update(deals)
-        .set({ status: "escrow", updatedAt: new Date() })
+        .set({
+          status: "escrow",
+          updatedAt: new Date(),
+          ...(paymentMethod ? { paymentMethod, paymentCryptoCoin } : {}),
+        })
         .where(and(eq(deals.id, id), eq(deals.status, "pending")))
         .returning()
       const dealRow = rows[0]

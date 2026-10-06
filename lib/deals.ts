@@ -1,4 +1,5 @@
 import type { Deal, DealStatus } from "@/types"
+import { containsCyrillic, LATIN_ONLY_MESSAGE } from "@/lib/text-validation"
 
 export const DEAL_STATUS_VALUES: DealStatus[] = [
   "pending",
@@ -44,6 +45,7 @@ function validateCommonFields(payload: Partial<DealEditPayload>): string | null 
   if (typeof payload.price !== "number" || Number.isNaN(payload.price) || payload.price < 0) return "Invalid price"
   if (typeof payload.shippingPrice !== "number" || Number.isNaN(payload.shippingPrice) || payload.shippingPrice < 0) return "Invalid shippingPrice"
   if (!payload.currency || typeof payload.currency !== "string") return "Invalid currency"
+  if (containsCyrillic(payload.title) || containsCyrillic(payload.description)) return LATIN_ONLY_MESSAGE
   return null
 }
 
@@ -52,6 +54,7 @@ export function validateDealCreatePayload(payload: Partial<DealCreatePayload>): 
   if (commonError) return commonError
   if (payload.role !== "buyer" && payload.role !== "seller") return "Invalid role"
   if (payload.counterparty === undefined || typeof payload.counterparty !== "string") return "Invalid counterparty"
+  if (containsCyrillic(payload.counterparty)) return LATIN_ONLY_MESSAGE
   return null
 }
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Handshake,
@@ -13,10 +14,19 @@ import {
   Bell,
   Wallet,
   LogOut,
+  Package,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { RatingStars } from "@/components/dashboard/rating-stars";
+
+interface RatingSummary {
+  ratingAverage: number | null;
+  ratingCount: number;
+  memberSince: string;
+}
 
 const lowerNavItems = [
   { href: "/dashboard/settings", icon: Settings, label: "Settings" },
@@ -31,6 +41,21 @@ export function DashboardSidebar() {
   const notifications = useAppStore((s) => s.notifications);
   const unreadChats = chatThreads.reduce((sum, t) => sum + t.unreadCount, 0);
   const unreadNotifications = notifications.filter((n) => !n.readAt).length;
+  const [rating, setRating] = useState<RatingSummary | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    fetch(`/api/users/${user.id}/public`, { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<RatingSummary>) : null))
+      .then((data) => {
+        if (!cancelled) setRating(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const initials = user?.name
     ? user.name
@@ -44,7 +69,9 @@ export function DashboardSidebar() {
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/dashboard/deals", icon: Handshake, label: "Deals" },
+    { href: "/dashboard/shipments", icon: Package, label: "Shipments" },
     { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: unreadChats || undefined },
+    { href: "/dashboard/users", icon: Users, label: "Find users" },
     { href: "/dashboard/support", icon: HelpCircle, label: "Support" },
     {
       href: "/dashboard/notifications",
@@ -99,9 +126,16 @@ export function DashboardSidebar() {
           <span className="truncate font-semibold text-sidebar-foreground">
             {user?.name ?? "..."}
           </span>
-          <span className="truncate text-xs text-sidebar-muted">
-            {user?.email ?? ""}
-          </span>
+          {rating ? (
+            <>
+              <RatingStars score={rating.ratingAverage} count={rating.ratingCount} size="sm" />
+              <span className="truncate text-[10px] text-sidebar-muted">
+                On PayPack since {new Date(rating.memberSince).getFullYear()}
+              </span>
+            </>
+          ) : (
+            <span className="truncate text-xs text-sidebar-muted">{user?.email ?? ""}</span>
+          )}
         </div>
       </Link>
 

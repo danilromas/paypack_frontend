@@ -52,6 +52,10 @@ async function main() {
     name: "Demo Admin",
     role: "admin",
   })
+  // QA pair for walking through a full buyer ↔ seller deal flow.
+  for (const [email, name] of [["qa-seller@paypack.test", "QA Seller"], ["qa-buyer@paypack.test", "QA Buyer"]]) {
+    await upsertUser({ email, password: "Pp-yzYwDlquV3oG", name, role: "user" })
+  }
 
   const existingDeal = await pool.query("SELECT id FROM deals WHERE user_id = $1 LIMIT 1", [demoUserId])
   if (!existingDeal.rows[0]) {

@@ -30,17 +30,51 @@ export async function getOtherParticipantUserId(dealId: string, actorUserId: str
   return rows[0]?.userId ?? null
 }
 
-/** True if the viewer is allowed to see the target's public profile — themselves, or someone they've shared a deal with. */
-export async function canViewUserProfile(viewerUserId: string, targetUserId: string): Promise<boolean> {
-  if (viewerUserId === targetUserId) return true
+export interface UserSearchResult {
+  id: string
+  name: string
+  ratingAverage: number | null
+  ratingCount: number
+  sharedDealsCount: number
+}
+
+/** Below this many characters we only list the viewer's own counterparties instead of everyone. */
+export const MIN_GLOBAL_SEARCH_LENGTH = 2
+
+/**
+ * Find users by name. With a short/empty query this lists people the viewer has traded with; from
+ * MIN_GLOBAL_SEARCH_LENGTH characters it searches all users (people you've traded with first).
+ */
+export async function searchUsers(viewerUserId: string, query: string): Promise<UserSearchResult[]> {
+  const globalSearch = query.length >= MIN_GLOBAL_SEARCH_LENGTH
+  const pattern = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
   const result = await db.execute(sql`
-    SELECT 1
-    FROM deal_participants dp1
-    JOIN deal_participants dp2 ON dp1.deal_id = dp2.deal_id
-    WHERE dp1.user_id = ${viewerUserId} AND dp2.user_id = ${targetUserId}
-    LIMIT 1
+    SELECT * FROM (
+      SELECT u.id, u.name,
+        (SELECT avg(r.score) FROM ratings r WHERE r.rated_user_id = u.id) AS "ratingAverage",
+        (SELECT count(*) FROM ratings r WHERE r.rated_user_id = u.id) AS "ratingCount",
+        (
+          SELECT count(DISTINCT dp1.deal_id)
+          FROM deal_participants dp1
+          JOIN deal_participants dp2 ON dp2.deal_id = dp1.deal_id
+          WHERE dp1.user_id = ${viewerUserId} AND dp2.user_id = u.id
+        ) AS "sharedDealsCount"
+      FROM users u
+      WHERE u.id <> ${viewerUserId} AND u.name ILIKE ${pattern}
+    ) found
+    WHERE ${globalSearch} OR found."sharedDealsCount" > 0
+    ORDER BY found."sharedDealsCount" DESC, found.name
+    LIMIT 30
   `)
-  return result.rows.length > 0
+  return (
+    result.rows as { id: string; name: string; ratingAverage: string | null; ratingCount: string; sharedDealsCount: string }[]
+  ).map((r) => ({
+    id: r.id,
+    name: r.name,
+    ratingAverage: r.ratingAverage != null ? Number(r.ratingAverage) : null,
+    ratingCount: Number(r.ratingCount),
+    sharedDealsCount: Number(r.sharedDealsCount),
+  }))
 }
 
 const DEAL_FOR_VIEWER_SELECT = sql`
