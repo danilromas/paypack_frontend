@@ -1,9 +1,13 @@
 {
   "manifest_version": 3,
   "name": "PayPack Marketplace",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Import Facebook Marketplace listings into PayPack — history, settings, and one-click overlay.",
-  "permissions": ["activeTab", "storage", "tabs"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
   "action": {
     "default_title": "PayPack Marketplace",
     "default_popup": "popup.html"
@@ -14,7 +18,8 @@
     "https://web.facebook.com/*",
     "https://m.facebook.com/*",
     "https://paypack.uno/*",
-    "https://*.vercel.app/*"
+    "https://*.vercel.app/*",
+    "http://localhost:3000/*"
   ],
   "content_scripts": [
     {
@@ -24,9 +29,29 @@
         "https://web.facebook.com/marketplace/*",
         "https://m.facebook.com/marketplace/*"
       ],
-      "js": ["storage.js", "url-build.js", "content.js"],
-      "css": ["content.css"],
+      "js": [
+        "storage.js",
+        "url-build.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://paypack.uno/*",
+        "https://*.vercel.app/*",
+        "http://localhost:3000/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start"
     }
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }

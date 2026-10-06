@@ -2,7 +2,7 @@
 
 import { Bell, Compass, Menu } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -36,7 +36,11 @@ const notificationDotClass: Record<string, string> = {
 
 export function DashboardHeader() {
   const router = useRouter()
-  const { mode, user, notifications, markNotificationRead, setTourPendingStart } = useAppStore()
+  const pathname = usePathname()
+  // Derived from the URL rather than the stored mode, so the blue "ship" header can't stick around
+  // after navigating from Shipments to any other page.
+  const isShipSection = pathname.startsWith("/dashboard/shipments")
+  const { user, notifications, markNotificationRead, setTourPendingStart } = useAppStore()
   const unreadNotifications = notifications.filter((n) => !n.readAt).length
   const recentNotifications = notifications.slice(0, 5)
 
@@ -58,7 +62,7 @@ export function DashboardHeader() {
     <header
       className={cn(
         "flex items-center justify-between border-b px-4 py-3 transition-colors sm:px-6 md:px-8",
-        mode === "ship"
+        isShipSection
           ? "border-[#4C7A99] bg-[#5E90B4] text-primary-foreground"
           : "border-primary bg-primary text-primary-foreground",
       )}
@@ -89,6 +93,7 @@ export function DashboardHeader() {
                 { href: "/dashboard/deals", label: "Deals" },
                 { href: "/dashboard/shipments", label: "Shipments" },
                 { href: "/dashboard/chats", label: "Chats" },
+                { href: "/dashboard/users", label: "Find users" },
                 { href: "/dashboard/support", label: "Support" },
                 { href: "/dashboard/notifications", label: "Notifications" },
                 { href: "/dashboard/wallet", label: "Wallet" },
@@ -195,8 +200,8 @@ export function DashboardHeader() {
           </DialogContent>
         </Dialog>
 
-        {/* Profile */}
-        <Link href="/dashboard/profile" aria-label="Open profile">
+        {/* Profile — desktop already shows it at the top of the sidebar */}
+        <Link href="/dashboard/profile" aria-label="Open profile" className="md:hidden">
           <span className="flex items-center gap-3 rounded-full border border-transparent px-1 py-1 text-inherit transition-colors hover:opacity-90">
             <Avatar className="h-10 w-10">
               <AvatarFallback className="bg-white/20 text-inherit text-sm font-bold">
