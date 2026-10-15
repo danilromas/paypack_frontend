@@ -5,13 +5,18 @@ import { shipments } from "@/db/schema"
 import { toShipment } from "@/lib/shipments"
 import { getCurrentUser } from "@/lib/auth/session"
 import { notifyUser } from "@/lib/notifications"
+import { syncEurosenderShipment } from "@/lib/eurosender-sync"
+import { EurosenderError } from "@/lib/eurosender"
 
 const NEXT_STATUS: Record<string, string | undefined> = {
   pending: "in-transit",
   "in-transit": "arrived",
 }
 
-/** Moves a shipment one step forward in its tracking timeline — pending → in-transit → arrived. */
+/**
+ * Moves a shipment one step forward in its tracking timeline — pending → in-transit → arrived.
+ * Real carrier shipments can't be advanced by hand; for those this re-syncs status from Eurosender.
+ */
 export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
   if (!user) {
@@ -20,6 +25,15 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
 
   try {
     const { id } = await context.params
+
+    const owned = await db
+      .select()
+      .from(shipments)
+      .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
+      .limit(1)
+    if (owned[0]?.provider === "eurosender") {
+      return NextResponse.json(toShipment(await syncEurosenderShipment(owned[0])))
+    }
 
     const updated = await db.transaction(async (tx) => {
       const rows = await tx
@@ -59,6 +73,9 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
 
     return NextResponse.json(toShipment(updated))
   } catch (error) {
+    if (error instanceof EurosenderError) {
+      return NextResponse.json({ error: `Carrier sync failed: ${error.message}` }, { status: 502 })
+    }
     console.error("POST /api/shipments/[id]/advance failed", error)
     return NextResponse.json({ error: "Failed to advance shipment" }, { status: 500 })
   }

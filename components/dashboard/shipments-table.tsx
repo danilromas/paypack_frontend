@@ -1,7 +1,20 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ChevronDown, ChevronUp, Eye, Loader2, Package, Pencil, Trash2, Truck, CheckCircle2 } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  ExternalLink,
+  FileDown,
+  Loader2,
+  Package,
+  Pencil,
+  RefreshCw,
+  Trash2,
+  Truck,
+  CheckCircle2,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Shipment, ShipmentEditPayload, ShipmentStatus } from "@/lib/shipments"
 import { getServiceTier, SERVICE_TIERS } from "@/lib/shipping-rates"
@@ -48,6 +61,13 @@ function formatDate(dateString: string) {
   }).format(new Date(dateString))
 }
 
+/** Pickup is a calendar day (YYYY-MM-DD) — format it without letting the timezone shift it. */
+function formatDay(day: string) {
+  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${day}T00:00:00Z`),
+  )
+}
+
 function toPayload(shipment: Shipment): ShipmentEditPayload {
   return {
     senderName: shipment.senderName,
@@ -73,7 +93,7 @@ export function ShipmentsTable({
   isLoading: boolean
   onUpdate: (id: string, payload: ShipmentEditPayload) => Promise<void>
   onDelete: (id: string) => Promise<void>
-  onAdvance: (id: string) => Promise<void>
+  onAdvance: (id: string) => Promise<Shipment>
 }) {
   const [sortField, setSortField] = useState<SortField>("date")
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
@@ -135,8 +155,13 @@ export function ShipmentsTable({
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Delete this shipment?")) return
+  const handleDelete = async (shipment: Shipment) => {
+    const id = shipment.id
+    const prompt =
+      shipment.provider === "eurosender"
+        ? "Cancel the courier booking and remove this shipment?"
+        : "Delete this shipment?"
+    if (!window.confirm(prompt)) return
     setDeletingId(id)
     setActionError(null)
     try {
@@ -152,19 +177,13 @@ export function ShipmentsTable({
     setAdvancingId(id)
     setActionError(null)
     try {
-      await onAdvance(id)
-      setDetailShipment((prev) => (prev && prev.id === id ? { ...prev, status: nextStatusOf(prev.status) } : prev))
+      const updated = await onAdvance(id)
+      setDetailShipment((prev) => (prev && prev.id === id ? updated : prev))
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to advance shipment")
+      setActionError(err instanceof Error ? err.message : "Failed to update shipment")
     } finally {
       setAdvancingId(null)
     }
-  }
-
-  function nextStatusOf(status: ShipmentStatus): ShipmentStatus {
-    if (status === "pending") return "in-transit"
-    if (status === "in-transit") return "arrived"
-    return status
   }
 
   return (
@@ -371,30 +390,61 @@ export function ShipmentsTable({
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => setDetailShipment(shipment)}
+                            onClick={() => {
+                              setActionError(null)
+                              setDetailShipment(shipment)
+                            }}
                             className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs"
                           >
                             <Eye className="h-3.5 w-3.5" />
                             Details
                           </button>
+                          {shipment.provider === "eurosender" ? (
+                            shipment.labelUrl && (
+                              <a
+                                href={shipment.labelUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs"
+                              >
+                                <FileDown className="h-3.5 w-3.5" />
+                                Label
+                              </a>
+                            )
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openEditor(shipment)}
+                              disabled={shipment.status !== "pending"}
+                              title={shipment.status !== "pending" ? "Only editable while pending" : undefined}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => openEditor(shipment)}
-                            disabled={shipment.status !== "pending"}
-                            title={shipment.status !== "pending" ? "Only editable while pending" : undefined}
-                            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(shipment.id)}
-                            disabled={deletingId === shipment.id}
-                            className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-2 text-xs text-destructive disabled:opacity-60"
+                            onClick={() => handleDelete(shipment)}
+                            disabled={
+                              deletingId === shipment.id ||
+                              (shipment.provider === "eurosender" && shipment.status !== "pending")
+                            }
+                            title={
+                              shipment.provider === "eurosender" && shipment.status !== "pending"
+                                ? "Already with the carrier — can't be cancelled"
+                                : undefined
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-2 text-xs text-destructive disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                            {deletingId === shipment.id ? "Deleting..." : "Delete"}
+                            {deletingId === shipment.id
+                              ? shipment.provider === "eurosender"
+                                ? "Cancelling..."
+                                : "Deleting..."
+                              : shipment.provider === "eurosender"
+                                ? "Cancel"
+                                : "Delete"}
                           </button>
                         </div>
                       )}
@@ -454,21 +504,90 @@ export function ShipmentsTable({
                   })}
                 </div>
 
-                {detailShipment.status !== "arrived" && (
-                  <button
-                    onClick={() => handleAdvance(detailShipment.id)}
-                    disabled={advancingId === detailShipment.id}
-                    className="mb-4 w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-                  >
-                    {advancingId === detailShipment.id
-                      ? "Updating..."
-                      : detailShipment.status === "pending"
-                        ? "Mark as picked up"
-                        : "Mark as delivered"}
-                  </button>
+                {detailShipment.provider === "eurosender" ? (
+                  <div className="mb-4 grid gap-2 sm:grid-cols-2">
+                    {detailShipment.labelUrl && (
+                      <a
+                        href={detailShipment.labelUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground"
+                      >
+                        <FileDown className="h-4 w-4" />
+                        Shipping label (PDF)
+                      </a>
+                    )}
+                    {detailShipment.status !== "arrived" && (
+                      <button
+                        onClick={() => handleAdvance(detailShipment.id)}
+                        disabled={advancingId === detailShipment.id}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-semibold disabled:opacity-60"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", advancingId === detailShipment.id && "animate-spin")} />
+                        {advancingId === detailShipment.id ? "Checking carrier..." : "Refresh status"}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  detailShipment.status !== "arrived" && (
+                    <button
+                      onClick={() => handleAdvance(detailShipment.id)}
+                      disabled={advancingId === detailShipment.id}
+                      className="mb-4 w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                    >
+                      {advancingId === detailShipment.id
+                        ? "Updating..."
+                        : detailShipment.status === "pending"
+                          ? "Mark as picked up"
+                          : "Mark as delivered"}
+                    </button>
+                  )
+                )}
+
+                {actionError && (
+                  <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {actionError}
+                  </div>
                 )}
 
                 <dl className="grid gap-3 text-sm">
+                  {detailShipment.provider === "eurosender" && (
+                    <>
+                      <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                        <dt className="text-muted-foreground">Carrier</dt>
+                        <dd>
+                          {detailShipment.carrierName ?? "Assigned by Eurosender"}
+                          {detailShipment.providerOrderCode && (
+                            <div className="font-mono text-xs text-muted-foreground">
+                              Order {detailShipment.providerOrderCode}
+                            </div>
+                          )}
+                        </dd>
+                      </div>
+                      {detailShipment.trackingUrl && (
+                        <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                          <dt className="text-muted-foreground">Live tracking</dt>
+                          <dd>
+                            <a
+                              href={detailShipment.trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                            >
+                              Open carrier tracking
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </dd>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {detailShipment.pickupDate && (
+                    <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
+                      <dt className="text-muted-foreground">Pickup</dt>
+                      <dd>{formatDay(detailShipment.pickupDate)}</dd>
+                    </div>
+                  )}
                   <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
                     <dt className="text-muted-foreground">Tracking #</dt>
                     <dd className="font-mono text-xs">{detailShipment.trackingNumber}</dd>
@@ -499,7 +618,9 @@ export function ShipmentsTable({
                     </dd>
                   </div>
                   <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                    <dt className="text-muted-foreground">Estimated cost</dt>
+                    <dt className="text-muted-foreground">
+                      {detailShipment.provider === "eurosender" ? "Price" : "Estimated cost"}
+                    </dt>
                     <dd>
                       {detailShipment.estimatedCost.toFixed(2)} {detailShipment.estimatedCurrency}
                     </dd>

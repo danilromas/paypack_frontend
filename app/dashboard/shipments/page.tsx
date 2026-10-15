@@ -62,7 +62,11 @@ function ShipmentsPageContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
-    if (!response.ok) throw new Error("Failed to create shipment")
+    if (!response.ok) {
+      // Carrier rejections (bad postcode, unavailable pickup day…) are actionable — show them as-is.
+      const data = await response.json().catch(() => null)
+      throw new Error(data?.error ?? "Failed to create shipment")
+    }
     await loadShipments()
   }
 
@@ -80,14 +84,19 @@ function ShipmentsPageContent() {
     const response = await fetch(`/api/shipments/${id}`, {
       method: "DELETE",
     })
-    if (!response.ok) throw new Error("Failed to delete shipment")
+    if (!response.ok) {
+      const data = await response.json().catch(() => null)
+      throw new Error(data?.error ?? "Failed to delete shipment")
+    }
     await loadShipments()
   }
 
   const advanceShipment = async (id: string) => {
     const response = await fetch(`/api/shipments/${id}/advance`, { method: "POST" })
-    if (!response.ok) throw new Error("Failed to advance shipment")
+    const data = await response.json().catch(() => null)
+    if (!response.ok) throw new Error(data?.error ?? "Failed to update shipment")
     await loadShipments()
+    return data as Shipment
   }
 
   const filteredShipments = useMemo(() => {
