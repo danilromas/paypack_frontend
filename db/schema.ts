@@ -9,6 +9,8 @@ import {
   check,
   index,
   uniqueIndex,
+  jsonb,
+  date,
 } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
@@ -265,6 +267,16 @@ export const notificationPreferences = pgTable("notification_preferences", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
+/** Structured postal address + contact, needed to book a real carrier shipment. */
+export interface ShipmentAddressColumn {
+  country: string
+  zip: string
+  city: string
+  street: string
+  phone: string
+  email: string
+}
+
 export const shipments = pgTable("shipments", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id),
@@ -282,8 +294,19 @@ export const shipments = pgTable("shipments", {
   estimatedCurrency: text("estimated_currency").notNull().default("EUR"),
   trackingNumber: text("tracking_number").notNull(),
   status: text("status").notNull(),
+  // "internal" = our own estimate/tracking only; "eurosender" = a real booked order with Eurosender.
+  provider: text("provider").notNull().default("internal"),
+  providerOrderCode: text("provider_order_code"),
+  carrierName: text("carrier_name"),
+  trackingUrl: text("tracking_url"),
+  labelUrl: text("label_url"),
+  pickupDate: date("pickup_date", { mode: "string" }),
+  senderAddress: jsonb("sender_address").$type<ShipmentAddressColumn>(),
+  receiverAddress: jsonb("receiver_address").$type<ShipmentAddressColumn>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  check("shipments_provider_check", sql`${table.provider} in ('internal', 'eurosender')`),
+  uniqueIndex("shipments_provider_order_code_idx").on(table.providerOrderCode),
   check("shipments_status_check", sql`${table.status} in ('arrived', 'in-transit', 'pending')`),
   check("shipments_tier_check", sql`${table.serviceTier} in ('economy', 'standard', 'express')`),
   index("shipments_user_id_idx").on(table.userId),

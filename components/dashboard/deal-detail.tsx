@@ -55,7 +55,7 @@ function buildConfetti(count = 14): ConfettiPiece[] {
   }))
 }
 
-export function DealDetail() {
+export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {}) {
   const router = useRouter()
   const { selectedDealId, deals, updateDeal, refreshWallet, chatThreads } = useAppStore()
   const deal = deals.find((d) => d.id === selectedDealId) ?? deals[0]
@@ -256,10 +256,12 @@ export function DealDetail() {
 
   return (
     <div>
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
-        <FileText className="h-5 w-5 text-primary" />
-        Deal Detail
-      </h2>
+      {showHeading && (
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
+          <FileText className="h-5 w-5 text-primary" />
+          Deal Detail
+        </h2>
+      )}
 
       <div className="rounded-2xl border border-border bg-card p-6 lg:sticky lg:top-0">
         {/* Header */}

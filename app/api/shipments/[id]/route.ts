@@ -5,6 +5,7 @@ import { shipments } from "@/db/schema"
 import { toShipment, validateShipmentEditPayload, type ShipmentEditPayload } from "@/lib/shipments"
 import { getCurrentUser } from "@/lib/auth/session"
 import { estimateShippingCost, getServiceTier } from "@/lib/shipping-rates"
+import { EurosenderError, cancelOrder } from "@/lib/eurosender"
 
 export async function GET(
   _req: Request,
@@ -77,7 +78,7 @@ export async function PUT(
         heightCm: body.heightCm!.toFixed(1),
         estimatedCost: estimatedCost.toFixed(2),
       })
-      .where(and(eq(shipments.id, id), eq(shipments.userId, user.id), eq(shipments.status, "pending")))
+      .where(and(eq(shipments.id, id), eq(shipments.userId, user.id), eq(shipments.status, "pending"), eq(shipments.provider, "internal")))
       .returning()
 
     if (!rows[0]) {
@@ -105,6 +106,28 @@ export async function DELETE(
 
   try {
     const { id } = await context.params
+
+    const existing = await db
+      .select()
+      .from(shipments)
+      .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
+      .limit(1)
+    const shipment = existing[0]
+    if (shipment?.provider === "eurosender" && shipment.providerOrderCode) {
+      if (shipment.status !== "pending") {
+        return NextResponse.json({ error: "Shipment is already with the carrier and can't be cancelled" }, { status: 409 })
+      }
+      // Cancel the booked order first so we never drop a live order from our records.
+      try {
+        await cancelOrder(shipment.providerOrderCode)
+      } catch (error) {
+        if (error instanceof EurosenderError) {
+          return NextResponse.json({ error: `Carrier refused cancellation: ${error.message}` }, { status: 409 })
+        }
+        throw error
+      }
+    }
+
     const rows = await db
       .delete(shipments)
       .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
