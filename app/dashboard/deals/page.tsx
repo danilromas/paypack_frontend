@@ -1,22 +1,39 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { DealsList } from "@/components/dashboard/deals-list";
 import { DealDetail } from "@/components/dashboard/deal-detail";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { useAppStore } from "@/store/app-store";
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useIsBelowLg } from "@/hooks/use-below-lg";
 import { Handshake } from "lucide-react";
 
-export default function DealsPage() {
-  const { setNewDealModalOpen, setMode, dealsError } = useAppStore();
+function DealsPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isBelowLg = useIsBelowLg();
+  const { setNewDealModalOpen, setMode, dealsError, setSelectedDealId } = useAppStore();
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     setMode("deal");
   }, [setMode]);
+
+  // Arriving from the dashboard with ?deal=<id>: select it, and on small screens open it straight away
+  // instead of leaving the detail panel somewhere below the list.
+  const dealParam = searchParams.get("deal");
+  useEffect(() => {
+    if (!dealParam) return;
+    setSelectedDealId(dealParam);
+    if (window.matchMedia("(max-width: 1023px)").matches) setSheetOpen(true);
+    router.replace("/dashboard/deals");
+  }, [dealParam, setSelectedDealId, router]);
 
   return (
     <>
@@ -42,13 +59,41 @@ export default function DealsPage() {
         )}
         <div className="mt-6 grid grid-cols-1 gap-6 lg:mt-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <DealsList activeFilter={activeFilter} searchQuery={searchQuery} />
+            <DealsList
+              activeFilter={activeFilter}
+              searchQuery={searchQuery}
+              onOpenDeal={() => {
+                if (isBelowLg) setSheetOpen(true);
+              }}
+            />
           </div>
-          <div className="lg:col-span-1">
-            <DealDetail />
-          </div>
+          {!isBelowLg && (
+            <div className="lg:col-span-1">
+              <DealDetail />
+            </div>
+          )}
         </div>
       </div>
+
+      {isBelowLg && (
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-3xl p-4">
+            <SheetHeader className="p-0 pb-2">
+              <SheetTitle>Deal</SheetTitle>
+              <SheetDescription className="sr-only">Status, next step and chat for this deal.</SheetDescription>
+            </SheetHeader>
+            <DealDetail showHeading={false} />
+          </SheetContent>
+        </Sheet>
+      )}
     </>
+  );
+}
+
+export default function DealsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DealsPageContent />
+    </Suspense>
   );
 }

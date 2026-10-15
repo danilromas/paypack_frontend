@@ -67,7 +67,7 @@ export default function DashboardOverviewPage() {
 
   function openDeal(id: string) {
     setSelectedDealId(id);
-    router.push("/dashboard/deals");
+    router.push(`/dashboard/deals/?deal=${id}`);
   }
 
   return (

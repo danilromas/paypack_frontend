@@ -11,18 +11,9 @@ import {
   AlertTriangle,
   Ban,
 } from "lucide-react";
-import { useState } from "react";
 import { useAppStore } from "@/store/app-store";
 import { cn, formatDealRelativeTime } from "@/lib/utils";
-import type { Deal, DealStatus } from "@/types";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import type { DealStatus } from "@/types";
 
 function getStatusConfig(status: DealStatus) {
   switch (status) {
@@ -95,14 +86,18 @@ function getEventLabel(status: DealStatus) {
 interface DealsListProps {
   activeFilter?: string;
   searchQuery?: string;
+  /** Called after a deal is selected — the page uses it to open the detail sheet on small screens. */
+  onOpenDeal?: (id: string) => void;
 }
 
 export function DealsList({
   activeFilter = "All",
   searchQuery = "",
+  onOpenDeal,
 }: DealsListProps) {
   const { selectedDealId, setSelectedDealId, deals } = useAppStore();
-  const [detailDeal, setDetailDeal] = useState<Deal | null>(null);
+  // DealDetail falls back to the newest deal when nothing is picked — mirror that for the highlight.
+  const highlightedId = selectedDealId ?? deals[0]?.id;
 
   // Функция для фильтрации сделок
   const getFilteredDeals = () => {
@@ -130,6 +125,8 @@ export function DealsList({
       filtered = filtered.filter(
         (deal) =>
           deal.id.toLowerCase().includes(query) ||
+          deal.title.toLowerCase().includes(query) ||
+          (deal.counterpartyName ?? deal.counterparty).toLowerCase().includes(query) ||
           deal.status.toLowerCase().includes(query),
       );
     }
@@ -161,15 +158,16 @@ export function DealsList({
             const EventIcon = eventConfig.icon;
 
             return (
-              <div
+              <button
                 key={deal.id}
+                type="button"
                 onClick={() => {
                   setSelectedDealId(deal.id);
-                  setDetailDeal(deal);
+                  onOpenDeal?.(deal.id);
                 }}
                 className={cn(
-                  "flex w-full cursor-pointer flex-col gap-3 rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:gap-0",
-                  selectedDealId === deal.id
+                  "flex w-full flex-col gap-3 rounded-2xl border bg-card p-4 text-left transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between",
+                  highlightedId === deal.id
                     ? "border-primary/30 shadow-md"
                     : "border-border hover:border-primary/20",
                 )}
@@ -184,16 +182,19 @@ export function DealsList({
                     <EventIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="truncate font-semibold text-card-foreground">
-                      {getEventLabel(deal.status)}
-                    </h4>
+                    <h4 className="truncate font-semibold text-card-foreground">{deal.title}</h4>
                     <p className="truncate text-sm text-muted-foreground">
-                      {formatDealRelativeTime(deal.createdAt)} &bull; #
-                      {deal.id.slice(0, 8)}
+                      You're the {deal.myRole} · {deal.counterpartyName ?? deal.counterparty}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {getEventLabel(deal.status)} {formatDealRelativeTime(deal.createdAt)} · #{deal.id.slice(0, 8)}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                  <span className="text-sm font-semibold text-foreground">
+                    {deal.price + deal.shippingPrice} {deal.currency}
+                  </span>
                   <span
                     className={cn(
                       "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",
@@ -204,81 +205,12 @@ export function DealsList({
                     {statusConfig.label}
                   </span>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
 
-      <button className="mt-4 w-full rounded-xl border border-border bg-card py-3 text-center text-sm font-medium text-primary transition-all hover:bg-secondary">
-        All Deals...
-      </button>
-
-      <Dialog open={!!detailDeal} onOpenChange={(open) => !open && setDetailDeal(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" showCloseButton>
-          <DialogHeader>
-            <DialogTitle>Deal details</DialogTitle>
-            <DialogDescription>
-              Read-only deal info. Use New Deal or update flow to change data.
-            </DialogDescription>
-          </DialogHeader>
-          {detailDeal && (
-            <dl className="grid gap-3 text-sm">
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">ID</dt>
-                <dd className="font-mono text-xs break-all">{detailDeal.id}</dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Title</dt>
-                <dd className="font-medium">{detailDeal.title}</dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Description</dt>
-                <dd className="whitespace-pre-wrap break-words">{detailDeal.description || "—"}</dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Amount</dt>
-                <dd>{detailDeal.price} {detailDeal.currency}</dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Box size</dt>
-                <dd>
-                  {detailDeal.boxLengthCm || detailDeal.boxWidthCm || detailDeal.boxHeightCm
-                    ? `${detailDeal.boxLengthCm ?? 0}×${detailDeal.boxWidthCm ?? 0}×${detailDeal.boxHeightCm ?? 0} cm`
-                    : "—"}
-                </dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Status</dt>
-                <dd>
-                  <Badge variant="secondary">{detailDeal.status}</Badge>
-                </dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Your role</dt>
-                <dd className="capitalize">{detailDeal.myRole}</dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Counterparty</dt>
-                <dd>
-                  {detailDeal.counterpartyName ?? detailDeal.counterparty}
-                  {!detailDeal.counterpartyJoined && (
-                    <span className="ml-2 text-xs text-muted-foreground">(not joined yet)</span>
-                  )}
-                </dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-border/60 pb-2">
-                <dt className="text-muted-foreground">Created</dt>
-                <dd>{new Date(detailDeal.createdAt).toLocaleString()}</dd>
-              </div>
-              <div className="grid grid-cols-[7.5rem_1fr] gap-2">
-                <dt className="text-muted-foreground">Updated</dt>
-                <dd>{new Date(detailDeal.updatedAt).toLocaleString()}</dd>
-              </div>
-            </dl>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

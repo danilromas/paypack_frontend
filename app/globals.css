@@ -25,6 +25,9 @@
   --success-foreground: #fdfaf6;
   --warning: #e9b850;
   --warning-foreground: #3c2e16;
+  /* Shipments section accent — the blue the Shipments header has always used. */
+  --ship: #5e90b4;
+  --ship-foreground: #fdfaf6;
   --border: #d9cfc2;
   --input: #d9cfc2;
   --ring: #0f7680;
@@ -56,6 +59,8 @@
   --popover-foreground: oklch(0.92 0.006 250);
   --primary: oklch(0.65 0.15 200);
   --primary-foreground: oklch(0.12 0.02 250);
+  --ship: oklch(0.68 0.08 240);
+  --ship-foreground: oklch(0.12 0.02 250);
   --secondary: oklch(0.22 0.02 250);
   --secondary-foreground: oklch(0.92 0.006 250);
   --muted: oklch(0.22 0.02 250);
@@ -101,6 +106,8 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-ship: var(--ship);
+  --color-ship-foreground: var(--ship-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
