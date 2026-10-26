@@ -99,6 +99,13 @@
       "when": 1792996878241,
       "tag": "0013_user_moderation_events",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793003264690,
+      "tag": "0014_sendcloud_provider",
+      "breakpoints": true
     }
   ]
 }

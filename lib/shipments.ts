@@ -2,7 +2,7 @@ import type { shipments } from "@/db/schema"
 import { validatePackageDimensions, type ServiceTier } from "@/lib/shipping-rates"
 
 export type ShipmentStatus = "arrived" | "in-transit" | "pending"
-export type ShipmentProvider = "internal" | "eurosender"
+export type ShipmentProvider = "internal" | "eurosender" | "sendcloud"
 
 /** Structured postal address + contact for one side of a shipment. Country is ISO 3166-1 alpha-2. */
 export interface ShipmentAddress {
@@ -228,7 +228,8 @@ export function toShipment(row: ShipmentRow): Shipment {
     providerOrderCode: row.providerOrderCode,
     carrierName: row.carrierName,
     trackingUrl: row.trackingUrl,
-    labelUrl: row.labelUrl,
+    // Sendcloud labels need our API credentials, so the browser downloads them through our proxy.
+    labelUrl: row.labelUrl && row.provider === "sendcloud" ? `/api/shipments/${row.id}/label/` : row.labelUrl,
     pickupDate: row.pickupDate ?? null,
     senderAddress: row.senderAddress ?? null,
     receiverAddress: row.receiverAddress ?? null,

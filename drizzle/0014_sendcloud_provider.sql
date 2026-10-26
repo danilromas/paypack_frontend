@@ -1,0 +1,2 @@
+ALTER TABLE "shipments" DROP CONSTRAINT "shipments_provider_check";--> statement-breakpoint
+ALTER TABLE "shipments" ADD CONSTRAINT "shipments_provider_check" CHECK ("shipments"."provider" in ('internal', 'eurosender', 'sendcloud'));

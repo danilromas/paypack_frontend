@@ -61,6 +61,8 @@ interface Quote {
   estimatedDelivery: string | null
   minPickupDate: string | null
   pickupExcludedDates: string[]
+  /** Sendcloud names the carrier up front; Eurosender assigns one after booking. */
+  carrierName?: string | null
 }
 
 function partyValid(p: Party) {
@@ -509,7 +511,9 @@ export function NewShipmentWizard({
                           <span className="rounded-full bg-ship/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ship">Fastest</span>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground">{formatEta(quote.estimatedDelivery)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {[quote.carrierName, formatEta(quote.estimatedDelivery)].filter(Boolean).join(" · ")}
+                      </div>
                     </div>
                     <div className="shrink-0 text-lg font-bold text-foreground">
                       {quote.priceGross.toFixed(2)} {quote.currency === "EUR" ? "€" : quote.currency}
