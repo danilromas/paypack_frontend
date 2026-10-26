@@ -82,7 +82,7 @@ export function AuthPanel({
   function goToApp() {
     onSuccess?.()
     const redirect = searchParams.get("redirect")
-    router.push(redirect && redirect.startsWith("/") ? redirect : "/dashboard")
+    router.push(redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/dashboard")
   }
 
   async function onLogin(values: LoginValues) {

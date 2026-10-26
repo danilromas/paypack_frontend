@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { kycDocuments, kycVerifications, riskFlags, users } from "@/db/schema"
+import { kycVerifications, riskFlags, users } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/session"
-import { normalizeDocuments } from "@/lib/kyc"
 
 const NEW_ACCOUNT_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 
-export async function POST(req: Request) {
+export async function POST() {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
   try {
-    const body = (await req.json().catch(() => ({}))) as { documents?: unknown }
-    const documents = normalizeDocuments(body.documents)
-
     await db.transaction(async (tx) => {
       const existing = await tx
         .select({ userId: kycVerifications.userId })
@@ -31,10 +27,6 @@ export async function POST(req: Request) {
           .where(eq(kycVerifications.userId, user.id))
       } else {
         await tx.insert(kycVerifications).values({ userId: user.id, status: "pending" })
-      }
-
-      for (const doc of documents) {
-        await tx.insert(kycDocuments).values({ userId: user.id, docType: doc.docType, fileUrl: doc.fileUrl })
       }
 
       const userRow = (await tx.select({ createdAt: users.createdAt }).from(users).where(eq(users.id, user.id)).limit(1))[0]

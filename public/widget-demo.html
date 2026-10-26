@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>PayPack widget demo shop</title>
+  <style>
+    :root { color-scheme: light; --bg: #f7f5f2; --card: #fff; --fg: #111827; --muted: #6b7280; --line: #e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    header { padding: 16px; border-bottom: 1px solid var(--line); background: var(--card); font-weight: 700; }
+    header span { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px; }
+    main { max-width: 880px; margin: 0 auto; padding: 24px 16px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .thumb { aspect-ratio: 4 / 3; border-radius: 12px; background: linear-gradient(135deg, #d1fae5, #e0e7ff); display: grid; place-items: center; font-size: 40px; }
+    h2 { margin: 4px 0 0; font-size: 17px; }
+    .price { font-weight: 700; }
+    .muted { color: var(--muted); font-size: 13px; }
+    #log { max-width: 880px; margin: 0 auto 32px; padding: 0 16px; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>Demo Shop <span>a sample partner page using the PayPack checkout widget</span></header>
+
+  <main>
+    <article class="card">
+      <div class="thumb">📱</div>
+      <h2>iPhone 15, 128 GB</h2>
+      <div class="price">650.00 EUR <span class="muted">+ 15.00 shipping</span></div>
+      <div data-paypack-button data-title="iPhone 15, 128 GB" data-price="650" data-shipping="15" data-currency="EUR"
+           data-description="Used, excellent condition, original box."></div>
+    </article>
+
+    <article class="card">
+      <div class="thumb">🎧</div>
+      <h2>Noise-cancelling headphones</h2>
+      <div class="price">180.00 EUR <span class="muted">+ 8.00 shipping</span></div>
+      <div data-paypack-button data-title="Noise-cancelling headphones" data-price="180" data-shipping="8" data-currency="EUR"
+           data-theme="dark"></div>
+    </article>
+  </main>
+
+  <p id="log" aria-live="polite"></p>
+
+  <script>
+    // The demo takes the seller from ?seller=<PayPack user id>; a real shop hard-codes its own id in the markup.
+    var seller = new URLSearchParams(location.search).get("seller") || ""
+    document.querySelectorAll("[data-paypack-button]").forEach(function (el) { el.dataset.seller = seller })
+    if (!seller) document.getElementById("log").textContent = "Add ?seller=<your PayPack user id> to the URL to try the buttons."
+    document.addEventListener("paypack:deal-created", function (e) {
+      document.getElementById("log").textContent = "PayPack deal created: " + e.detail.dealId
+    })
+  </script>
+  <script src="/widget.js"></script>
+</body>
+</html>

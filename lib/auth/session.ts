@@ -23,7 +23,10 @@ export interface SessionUser {
   bio: string | null
   avatarUrl: string | null
   role: string
+  status: UserStatus
 }
+
+export type UserStatus = "active" | "restricted" | "suspended"
 
 /**
  * Authoritative check used by Route Handlers (Node.js runtime): verifies the JWT *and*
@@ -42,6 +45,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const rows = await db.select().from(users).where(eq(users.id, claims.sub)).limit(1)
   const user = rows[0]
   if (!user || user.sessionVersion !== claims.sv) return null
+  if (user.status === "suspended") return null
 
   return {
     id: user.id,
@@ -51,5 +55,16 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     bio: user.bio,
     avatarUrl: user.avatarUrl,
     role: user.role,
+    status: user.status as UserStatus,
   }
+}
+
+/**
+ * Restricted accounts keep read access (and chat/disputes) but can't open deals or move money.
+ * Returns a ready 403 body for routes that do either, or null when the user may proceed.
+ */
+export function restrictionError(user: SessionUser): { error: string } | null {
+  return user.status === "restricted"
+    ? { error: "Your account is restricted. Contact support to restore full access." }
+    : null
 }

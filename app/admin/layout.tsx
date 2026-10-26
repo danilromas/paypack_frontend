@@ -3,12 +3,16 @@ import Link from "next/link"
 import {
   ArrowLeft,
   LayoutDashboard,
+  Receipt,
   Scale,
   ShieldCheck,
+  Users,
 } from "lucide-react"
 
 const navItems = [
   { href: "/admin", label: "Admin", icon: LayoutDashboard },
+  { href: "/admin/transactions", label: "Transactions", icon: Receipt },
+  { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/disputes", label: "Disputes", icon: Scale },
   { href: "/admin/verification", label: "Verification", icon: ShieldCheck },
 ]

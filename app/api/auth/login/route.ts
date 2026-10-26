@@ -25,6 +25,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
     }
 
+    if (user.status === "suspended") {
+      return NextResponse.json({ error: "This account has been suspended. Contact support." }, { status: 403 })
+    }
+
     const token = await signSession({
       sub: user.id,
       email: user.email,

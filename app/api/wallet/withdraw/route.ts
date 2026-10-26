@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { walletTransactions } from "@/db/schema"
-import { getCurrentUser } from "@/lib/auth/session"
+import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { getWalletSummary, toWalletTransaction, validateAmount } from "@/lib/wallet"
 
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+  const restricted = restrictionError(user)
+  if (restricted) {
+    return NextResponse.json(restricted, { status: 403 })
   }
 
   try {

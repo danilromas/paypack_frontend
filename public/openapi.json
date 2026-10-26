@@ -1,0 +1,3363 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PayPack API",
+    "version": "1.0.0",
+    "description": "HTTP API behind paypack.uno. Every route also answers with a trailing slash (the app uses `trailingSlash: true`).\n\n**Authentication** — `POST /api/auth/login` sets an httpOnly `pp_session` cookie holding a signed JWT; send it with every request. Admin routes additionally require the admin role.\n\n**Errors** — non-2xx responses carry `{ \"error\": \"message\" }`. 401 = not signed in, 403 = not allowed (including restricted accounts trying to open deals or move money), 404 = not found or not yours.\n\n**Escrow lifecycle** — pending → escrow (buyer funds, `/accept`) → shipped (seller, `/ship`) → completed (buyer, `/confirm-receipt`); cancel is allowed until shipped; a dispute freezes the deal until an admin decides.\n\n**Checkout widget** — see `/widget.js` and Settings → Checkout Widget in the app."
+  },
+  "servers": [
+    {
+      "url": "https://paypack.uno"
+    },
+    {
+      "url": "http://localhost:3000"
+    }
+  ],
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Deals"
+    },
+    {
+      "name": "Wallet"
+    },
+    {
+      "name": "Shipments"
+    },
+    {
+      "name": "Communication"
+    },
+    {
+      "name": "Disputes"
+    },
+    {
+      "name": "KYC"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Settings"
+    },
+    {
+      "name": "Widget"
+    },
+    {
+      "name": "Webhooks"
+    },
+    {
+      "name": "Admin"
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create an account and start a session",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "security": [],
+        "operationId": "postAuthRegister"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign in (sets the httpOnly session cookie)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "description": "Returns 401 on wrong credentials, 403 for suspended accounts.",
+        "security": [],
+        "operationId": "postAuthLogin"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign out",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postAuthLogout"
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Current user",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getAuthMe"
+      },
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Update profile",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "bio": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "putAuthMe"
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Change password (signs out other sessions)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string"
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                },
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postAuthChangePassword"
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Email a password reset link",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "security": [],
+        "operationId": "postAuthForgotPassword"
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Set a new password with a reset token",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                },
+                "required": [
+                  "token",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "security": [],
+        "operationId": "postAuthResetPassword"
+      }
+    },
+    "/api/deals": {
+      "get": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Deals the user participates in",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Deal"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getDeals"
+      },
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Create a deal (status pending)",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealCreate"
+              }
+            }
+          }
+        },
+        "description": "403 for restricted accounts.",
+        "operationId": "postDeals"
+      }
+    },
+    "/api/deals/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Get a deal",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getDealsById"
+      },
+      "put": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Edit a pending deal",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number"
+                  },
+                  "shippingPrice": {
+                    "type": "number"
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "putDealsById"
+      },
+      "delete": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Delete a pending deal you created",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "deleteDealsById"
+      }
+    },
+    "/api/deals/{id}/preview": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Invite preview for a non-participant",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getDealsPreview"
+      }
+    },
+    "/api/deals/{id}/join": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Join a deal from its invite link as the counterparty",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postDealsJoin"
+      }
+    },
+    "/api/deals/{id}/accept": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Buyer funds the deal into escrow (pending → escrow)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "paymentMethod": {
+                    "type": "string",
+                    "enum": [
+                      "card",
+                      "bank_transfer",
+                      "crypto"
+                    ]
+                  },
+                  "paymentCryptoCoin": {
+                    "type": "string",
+                    "enum": [
+                      "BTC",
+                      "ETH",
+                      "USDT_TRC20"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postDealsAccept"
+      }
+    },
+    "/api/deals/{id}/ship": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Seller marks shipped (escrow → shipped)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "carrier": {
+                    "type": "string"
+                  },
+                  "trackingNumber": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postDealsShip"
+      }
+    },
+    "/api/deals/{id}/confirm-receipt": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Buyer confirms delivery; funds released to seller (shipped → completed)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postDealsConfirmReceipt"
+      }
+    },
+    "/api/deals/{id}/cancel": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Cancel before shipping; refunds the buyer if funded",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deal"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postDealsCancel"
+      }
+    },
+    "/api/deals/{id}/dispute": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Disputes"
+        ],
+        "summary": "Open a dispute on a deal",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispute"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postDealsDispute"
+      }
+    },
+    "/api/deals/{id}/rating": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Deals"
+        ],
+        "summary": "Rate the counterparty after completion",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "score": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "comment": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "score"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postDealsRating"
+      }
+    },
+    "/api/wallet": {
+      "get": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "Balance summary and ledger",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "balance": {
+                      "type": "number"
+                    },
+                    "available": {
+                      "type": "number"
+                    },
+                    "inEscrow": {
+                      "type": "number"
+                    },
+                    "pendingPayout": {
+                      "type": "number"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WalletTransaction"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getWallet"
+      }
+    },
+    "/api/wallet/topup": {
+      "post": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "Top up the wallet",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletTransaction"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "minimum": 0.01
+                  }
+                },
+                "required": [
+                  "amount"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postWalletTopup"
+      }
+    },
+    "/api/wallet/withdraw": {
+      "post": {
+        "tags": [
+          "Wallet"
+        ],
+        "summary": "Withdraw from the wallet",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletTransaction"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "minimum": 0.01
+                  }
+                },
+                "required": [
+                  "amount"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postWalletWithdraw"
+      }
+    },
+    "/api/shipments": {
+      "get": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "User's shipments",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Shipment"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getShipments"
+      },
+      "post": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "Create a shipment (books a real Eurosender order when enabled)",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Shipment"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParcelInput"
+              }
+            }
+          }
+        },
+        "operationId": "postShipments"
+      }
+    },
+    "/api/shipments/quote": {
+      "post": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "Price quote for a parcel",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cost": {
+                      "type": "number"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParcelInput"
+              }
+            }
+          }
+        },
+        "operationId": "postShipmentsQuote"
+      }
+    },
+    "/api/shipments/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "Get a shipment with tracking",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Shipment"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getShipmentsById"
+      },
+      "put": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "Edit a pending shipment",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Shipment"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParcelInput"
+              }
+            }
+          }
+        },
+        "operationId": "putShipmentsById"
+      },
+      "delete": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "Delete a pending shipment",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "deleteShipmentsById"
+      }
+    },
+    "/api/shipments/{id}/advance": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Shipments"
+        ],
+        "summary": "Advance an internal shipment's status",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Shipment"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postShipmentsAdvance"
+      }
+    },
+    "/api/chats": {
+      "get": {
+        "tags": [
+          "Communication"
+        ],
+        "summary": "Chat threads (one per deal)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getChats"
+      }
+    },
+    "/api/chats/{threadId}/messages": {
+      "parameters": [
+        {
+          "name": "threadId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Communication"
+        ],
+        "summary": "Messages in a thread",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatMessage"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only messages after this ISO timestamp (polling)"
+          }
+        ],
+        "operationId": "getChatsMessages"
+      },
+      "post": {
+        "tags": [
+          "Communication"
+        ],
+        "summary": "Send a message",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postChatsMessages"
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Communication"
+        ],
+        "summary": "Notifications",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getNotifications"
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Communication"
+        ],
+        "summary": "Mark one as read",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postNotificationsRead"
+      }
+    },
+    "/api/notifications/read-all": {
+      "post": {
+        "tags": [
+          "Communication"
+        ],
+        "summary": "Mark all as read",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postNotificationsReadAll"
+      }
+    },
+    "/api/disputes": {
+      "get": {
+        "tags": [
+          "Disputes"
+        ],
+        "summary": "Disputes on the user's deals (support)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Dispute"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getDisputes"
+      }
+    },
+    "/api/disputes/{id}/messages": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Disputes"
+        ],
+        "summary": "Add a message to a dispute",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postDisputesMessages"
+      }
+    },
+    "/api/kyc/me": {
+      "get": {
+        "tags": [
+          "KYC"
+        ],
+        "summary": "Own verification status",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KycStatus"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getKycMe"
+      }
+    },
+    "/api/kyc/submit": {
+      "post": {
+        "tags": [
+          "KYC"
+        ],
+        "summary": "Request verification (status → pending)",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postKycSubmit"
+      }
+    },
+    "/api/users/search": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Find users by name or email",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search text (min 2 chars)"
+          }
+        ],
+        "operationId": "getUsersSearch"
+      }
+    },
+    "/api/users/{id}/public": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Public profile with rating",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfile"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getUsersPublic"
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Payment methods, API keys, security and notification preferences",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getSettings"
+      }
+    },
+    "/api/settings/payment-methods": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Add a payment method",
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "card",
+                      "bank"
+                    ]
+                  },
+                  "brand": {
+                    "type": "string"
+                  },
+                  "last4": {
+                    "type": "string"
+                  },
+                  "holderName": {
+                    "type": "string"
+                  },
+                  "expiry": {
+                    "type": "string"
+                  },
+                  "bankName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "last4"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postSettingsPaymentMethods"
+      }
+    },
+    "/api/settings/payment-methods/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Remove a payment method",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "deleteSettingsPaymentMethodsById"
+      }
+    },
+    "/api/settings/payment-methods/{id}/default": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Make default",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postSettingsPaymentMethodsDefault"
+      }
+    },
+    "/api/settings/api-keys": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Generate an API key (raw key returned once)",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "rawKey": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "live",
+                      "test"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postSettingsApiKeys"
+      }
+    },
+    "/api/settings/api-keys/{id}/revoke": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Revoke an API key",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "postSettingsApiKeysRevoke"
+      }
+    },
+    "/api/settings/security": {
+      "patch": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Security preferences",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "loginAlertsEnabled": {
+                    "type": "boolean"
+                  },
+                  "requireWithdrawalConfirmation": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchSettingsSecurity"
+      }
+    },
+    "/api/settings/notifications": {
+      "patch": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Notification preferences",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "emailDealUpdates": {
+                    "type": "boolean"
+                  },
+                  "emailPaymentReceived": {
+                    "type": "boolean"
+                  },
+                  "emailMarketing": {
+                    "type": "boolean"
+                  },
+                  "pushNewMessages": {
+                    "type": "boolean"
+                  },
+                  "pushShippingUpdates": {
+                    "type": "boolean"
+                  },
+                  "pushSecurityAlerts": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchSettingsNotifications"
+      }
+    },
+    "/api/widget/sellers/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Widget"
+        ],
+        "summary": "Public seller card for the checkout page",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kycStatus": {
+                      "type": "string"
+                    },
+                    "ratingAverage": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "ratingCount": {
+                      "type": "integer"
+                    },
+                    "completedDealsCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [],
+        "operationId": "getWidgetSellersById"
+      }
+    },
+    "/api/widget/checkout": {
+      "post": {
+        "tags": [
+          "Widget"
+        ],
+        "summary": "Buyer confirms a widget checkout; creates a pending deal with the seller attached",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dealId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WidgetCheckout"
+              }
+            }
+          }
+        },
+        "operationId": "postWidgetCheckout"
+      }
+    },
+    "/api/webhooks/eurosender": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Eurosender order status updates",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Shared secret (EUROSENDER_WEBHOOK_SECRET)"
+          }
+        ],
+        "description": "Verified with a constant-time comparison of the token; statuses are re-fetched from Eurosender rather than trusted from the payload.",
+        "security": [],
+        "operationId": "postWebhooksEurosender"
+      }
+    },
+    "/api/admin/transactions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "All deals or wallet ledger entries, filtered",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "deals",
+                "wallet"
+              ]
+            },
+            "description": "deals (default) or wallet"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search text"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Status filter"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Wallet entry type (wallet only)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "From date, YYYY-MM-DD"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "To date, YYYY-MM-DD (inclusive)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number, 50 rows per page"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv"
+              ]
+            },
+            "description": "csv to download the whole filtered set (up to 10,000 rows)"
+          }
+        ],
+        "operationId": "getAdminTransactions"
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Users with role, status and KYC",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUser"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name or email"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "user|admin"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "active|restricted|suspended"
+          }
+        ],
+        "operationId": "getAdminUsers"
+      }
+    },
+    "/api/admin/users/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Moderation history",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getAdminUsersById"
+      }
+    },
+    "/api/admin/users/{id}/moderate": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Change role or apply/lift a sanction",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "restrict",
+                      "suspend",
+                      "reinstate",
+                      "make_admin",
+                      "remove_admin"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Required for restrict and suspend"
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postAdminUsersModerate"
+      }
+    },
+    "/api/admin/disputes": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Dispute queue",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Dispute"
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getAdminDisputes"
+      }
+    },
+    "/api/admin/disputes/{id}/decision": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Resolve a dispute",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "needs-info",
+                      "resolved"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postAdminDisputesDecision"
+      }
+    },
+    "/api/admin/verification": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "KYC review queue",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getAdminVerification"
+      }
+    },
+    "/api/admin/verification/{userId}/decision": {
+      "parameters": [
+        {
+          "name": "userId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": "UUID"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Approve, reject or request more info",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "4XX": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "approved",
+                      "rejected"
+                    ]
+                  }
+                },
+                "required": [
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "operationId": "postAdminVerificationDecision"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "pp_session"
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "restricted",
+              "suspended"
+            ]
+          }
+        }
+      },
+      "DealStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "escrow",
+          "shipped",
+          "completed",
+          "disputed",
+          "cancelled"
+        ]
+      },
+      "Deal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number"
+          },
+          "shippingPrice": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "example": "EUR"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DealStatus"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "buyer",
+              "seller"
+            ],
+            "description": "The creator's role"
+          },
+          "myRole": {
+            "type": "string",
+            "enum": [
+              "buyer",
+              "seller"
+            ],
+            "description": "The viewer's role in this deal"
+          },
+          "counterpartyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterpartyJoined": {
+            "type": "boolean"
+          },
+          "counterparty": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourcePlatform": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "card",
+              "bank_transfer",
+              "crypto"
+            ],
+            "nullable": true
+          },
+          "carrier": {
+            "type": "string",
+            "nullable": true
+          },
+          "trackingNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DealCreate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "shippingPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "example": "EUR"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "buyer",
+              "seller"
+            ],
+            "description": "Creator's role; the counterparty joins by invite link"
+          },
+          "counterparty": {
+            "type": "string",
+            "description": "Display name of the other side"
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourcePlatform": {
+            "type": "string",
+            "nullable": true
+          },
+          "boxLengthCm": {
+            "type": "number",
+            "nullable": true
+          },
+          "boxWidthCm": {
+            "type": "number",
+            "nullable": true
+          },
+          "boxHeightCm": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "title",
+          "price",
+          "shippingPrice",
+          "currency",
+          "role",
+          "counterparty"
+        ]
+      },
+      "WalletTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "topup",
+              "withdrawal",
+              "payout",
+              "escrow_hold",
+              "refund"
+            ]
+          },
+          "amount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "completed",
+              "failed"
+            ]
+          },
+          "relatedDealId": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Address": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2"
+          },
+          "zip": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "country",
+          "zip",
+          "city",
+          "street"
+        ]
+      },
+      "Shipment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dealId": {
+            "type": "string",
+            "nullable": true
+          },
+          "senderName": {
+            "type": "string"
+          },
+          "receiverName": {
+            "type": "string"
+          },
+          "serviceTier": {
+            "type": "string",
+            "enum": [
+              "economy",
+              "standard",
+              "express"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in-transit",
+              "arrived"
+            ]
+          },
+          "estimatedCost": {
+            "type": "number"
+          },
+          "trackingNumber": {
+            "type": "string"
+          },
+          "trackingUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "labelUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "eurosender"
+            ]
+          },
+          "carrierName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ParcelInput": {
+        "type": "object",
+        "properties": {
+          "weightKg": {
+            "type": "number"
+          },
+          "lengthCm": {
+            "type": "number"
+          },
+          "widthCm": {
+            "type": "number"
+          },
+          "heightCm": {
+            "type": "number"
+          },
+          "serviceTier": {
+            "type": "string",
+            "enum": [
+              "economy",
+              "standard",
+              "express"
+            ]
+          },
+          "senderName": {
+            "type": "string"
+          },
+          "receiverName": {
+            "type": "string"
+          },
+          "senderAddress": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "receiverAddress": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "pickupDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "declaredValueEur": {
+            "type": "number",
+            "nullable": true
+          },
+          "contents": {
+            "type": "string",
+            "nullable": true
+          },
+          "dealId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "deal",
+              "shipment",
+              "security",
+              "wallet",
+              "chat"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "relatedHref": {
+            "type": "string",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Dispute": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "dealId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "needs-info",
+              "resolved"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "KycStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "pending",
+              "approved",
+              "rejected"
+            ]
+          },
+          "riskLevel": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "PublicProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "memberSince": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kycStatus": {
+            "type": "string"
+          },
+          "completedDealsCount": {
+            "type": "integer"
+          },
+          "ratingAverage": {
+            "type": "number",
+            "nullable": true
+          },
+          "ratingCount": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdminUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "restricted",
+              "suspended"
+            ]
+          },
+          "statusReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "kycStatus": {
+            "type": "string"
+          },
+          "dealsCount": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          }
+        }
+      },
+      "WidgetCheckout": {
+        "type": "object",
+        "properties": {
+          "sellerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "shippingPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "EUR",
+              "USD",
+              "GBP"
+            ]
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "sellerId",
+          "title",
+          "price",
+          "currency"
+        ]
+      }
+    }
+  }
+}

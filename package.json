@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:e2e": "playwright test --grep-invert @smoke",
+    "test:smoke": "playwright test --grep @smoke",
+    "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "make-admin": "node --env-file=.env scripts/make-admin.mjs"
@@ -74,6 +77,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/archiver": "^7.0.0",
     "@types/bcryptjs": "^2.4.6",

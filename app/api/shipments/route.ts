@@ -10,7 +10,7 @@ import {
   validateShipmentCreatePayload,
   type ShipmentCreatePayload,
 } from "@/lib/shipments"
-import { getCurrentUser } from "@/lib/auth/session"
+import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { estimateShippingCost, generateTrackingNumber, getServiceTier } from "@/lib/shipping-rates"
 import { EurosenderError, createOrder, isEurosenderEnabled } from "@/lib/eurosender"
 
@@ -38,6 +38,10 @@ export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+  const restricted = restrictionError(user)
+  if (restricted) {
+    return NextResponse.json(restricted, { status: 403 })
   }
 
   try {
