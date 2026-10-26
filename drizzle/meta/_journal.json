@@ -85,6 +85,20 @@
       "when": 1792054125947,
       "tag": "0011_eurosender_shipments",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792996872843,
+      "tag": "0012_drop_kyc_documents_add_user_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792996878241,
+      "tag": "0013_user_moderation_events",
+      "breakpoints": true
     }
   ]
 }

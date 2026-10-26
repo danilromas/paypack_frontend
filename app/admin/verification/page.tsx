@@ -105,7 +105,7 @@ export default function VerificationRiskPage() {
       <div>
         <h1 className="text-2xl font-bold sm:text-3xl">User Verification & Risk Review</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Review KYC submissions and account risk flags.
+          Review verification requests and account risk flags.
         </p>
       </div>
 
@@ -265,24 +265,22 @@ export default function VerificationRiskPage() {
                 <div className="rounded-2xl border border-border bg-card/60 p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <ShieldCheck className="h-4 w-4 text-primary" />
-                    Documents
+                    Account
                   </div>
-                  <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                    {active.documents.length === 0 ? (
-                      <p>No documents submitted.</p>
-                    ) : (
-                      active.documents.map((doc) => (
-                        <div key={doc.id} className="flex gap-3">
-                          <span className="w-36 shrink-0 text-xs font-medium capitalize text-foreground">
-                            {doc.docType.replace("_", " ")}
-                          </span>
-                          <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="truncate text-primary hover:underline">
-                            {doc.fileUrl}
-                          </a>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <dl className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">KYC status</dt>
+                      <dd className="font-medium">{kycBadge(active.status).text}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Account created</dt>
+                      <dd className="font-medium">{formatDealDateTime(active.createdAccountAt)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Last reviewed</dt>
+                      <dd className="font-medium">{active.reviewedAt ? formatDealDateTime(active.reviewedAt) : "—"}</dd>
+                    </div>
+                  </dl>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-card/60 p-4">

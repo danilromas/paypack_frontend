@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, walletTransactions } from "@/db/schema"
-import { getCurrentUser } from "@/lib/auth/session"
+import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { getParticipantRole, getOtherParticipantUserId, getDealForViewer } from "@/lib/deals-access"
 import { getWalletSummary } from "@/lib/wallet"
 import { notifyOtherParticipants } from "@/lib/notifications"
@@ -13,6 +13,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+  const restricted = restrictionError(user)
+  if (restricted) {
+    return NextResponse.json(restricted, { status: 403 })
   }
 
   try {

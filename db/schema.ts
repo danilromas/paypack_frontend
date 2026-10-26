@@ -26,10 +26,30 @@ export const users = pgTable("users", {
   sessionVersion: integer("session_version").notNull().default(0),
   loginAlertsEnabled: boolean("login_alerts_enabled").notNull().default(true),
   requireWithdrawalConfirmation: boolean("require_withdrawal_confirmation").notNull().default(false),
+  // Admin sanctions: "restricted" can sign in but can't move money or open deals; "suspended" can't sign in.
+  status: text("status").notNull().default("active"),
+  statusReason: text("status_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   check("users_role_check", sql`${table.role} in ('user', 'admin')`),
+  check("users_status_check", sql`${table.status} in ('active', 'restricted', 'suspended')`),
+])
+
+/** Audit trail of admin actions on user accounts (role changes and sanctions). */
+export const userModerationEvents = pgTable("user_moderation_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  adminUserId: uuid("admin_user_id").references(() => users.id),
+  action: text("action").notNull(),
+  reason: text("reason").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  check(
+    "user_moderation_action_check",
+    sql`${table.action} in ('restrict', 'suspend', 'reinstate', 'make_admin', 'remove_admin')`,
+  ),
+  index("user_moderation_events_user_idx").on(table.userId, table.createdAt.desc()),
 ])
 
 export const passwordResetTokens = pgTable("password_reset_tokens", {
@@ -196,22 +216,6 @@ export const kycVerifications = pgTable("kyc_verifications", {
 }, (table) => [
   check("kyc_status_check", sql`${table.status} in ('unverified', 'pending', 'approved', 'rejected')`),
   check("kyc_risk_check", sql`${table.riskLevel} in ('low', 'medium', 'high')`),
-])
-
-export const kycDocuments = pgTable("kyc_documents", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id),
-  docType: text("doc_type").notNull(),
-  fileUrl: text("file_url").notNull(),
-  reviewStatus: text("review_status").notNull().default("uploaded"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  check("kyc_documents_type_check", sql`${table.docType} in ('id', 'proof_of_address', 'selfie')`),
-  check(
-    "kyc_documents_review_check",
-    sql`${table.reviewStatus} in ('uploaded', 'needs_review', 'verified', 'rejected')`,
-  ),
-  index("kyc_documents_user_id_idx").on(table.userId),
 ])
 
 export const riskFlags = pgTable("risk_flags", {

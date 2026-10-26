@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { deals } from "@/db/schema"
 import { validateDealCreatePayload, type DealCreatePayload } from "@/lib/deals"
-import { getCurrentUser } from "@/lib/auth/session"
+import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { ensureCreatorParticipant, getDealForViewer, listDealsForViewer } from "@/lib/deals-access"
 
 function normalizePayload(body: Record<string, unknown>): DealCreatePayload {
@@ -51,6 +51,10 @@ export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+  const restricted = restrictionError(user)
+  if (restricted) {
+    return NextResponse.json(restricted, { status: 403 })
   }
 
   try {

@@ -68,7 +68,7 @@ const faq = [
   },
   {
     q: "How do I verify my identity (KYC)?",
-    a: "Go to Settings → KYC Verification and submit your documents there. An admin reviews submissions manually.",
+    a: "Go to Settings → KYC Verification and request verification there. An admin reviews requests manually.",
   },
   {
     q: "What are the transaction fees?",

@@ -38,7 +38,6 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saved, setSaved] = useState(false)
   const [kycStatus, setKycStatus] = useState<KycStatus>("unverified")
-  const [docUrl, setDocUrl] = useState("")
   const [submittingKyc, setSubmittingKyc] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [rating, setRating] = useState<{ ratingAverage: number | null; ratingCount: number; completedDealsCount: number } | null>(null)
@@ -54,14 +53,8 @@ export default function ProfilePage() {
   async function submitKyc() {
     setSubmittingKyc(true)
     try {
-      const documents = docUrl.trim() ? [{ docType: "id", fileUrl: docUrl.trim() }] : []
-      const res = await fetch("/api/kyc/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documents }),
-      })
+      const res = await fetch("/api/kyc/submit", { method: "POST" })
       if (res.ok) {
-        setDocUrl("")
         await loadKyc()
       }
     } finally {
@@ -224,15 +217,8 @@ export default function ProfilePage() {
                 <p className="text-xs text-muted-foreground">
                   {kycStatus === "pending"
                     ? "Your verification is in review."
-                    : "Submit a link to a supporting document (optional) and request verification."}
+                    : "Request verification and an admin will review your account."}
                 </p>
-                <input
-                  type="url"
-                  value={docUrl}
-                  onChange={(e) => setDocUrl(e.target.value)}
-                  placeholder="Link to ID document (optional)"
-                  className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
                 <button
                   type="button"
                   onClick={submitKyc}

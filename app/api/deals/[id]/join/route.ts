@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { getCurrentUser } from "@/lib/auth/session"
+import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { joinDealByLink, getDealForViewer } from "@/lib/deals-access"
 
 /** The counterparty attaches themselves to a pending deal via its invite link. */
@@ -8,6 +8,10 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
+  const restricted = restrictionError(user)
+  if (restricted) {
+    return NextResponse.json(restricted, { status: 403 })
   }
 
   try {
