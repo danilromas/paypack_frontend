@@ -52,7 +52,11 @@ export default function AdminTransactionsPage() {
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
   const [page, setPage] = useState(1)
-  const [data, setData] = useState<AdminTransactionPage<AdminDealRow | AdminWalletRow> | null>(null)
+  // Tagged with the kind it was fetched for, so switching tabs never renders deal rows as ledger rows.
+  const [result, setResult] = useState<{
+    kind: AdminTransactionKind
+    page: AdminTransactionPage<AdminDealRow | AdminWalletRow>
+  } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -79,11 +83,12 @@ export default function AdminTransactionsPage() {
     let cancelled = false
     setLoading(true)
     const p = new URLSearchParams(params)
+    const fetchedKind = kind
     p.set("page", String(page))
     fetch(`/api/admin/transactions?${p}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (!cancelled) setData(json)
+        if (!cancelled) setResult(json ? { kind: fetchedKind, page: json } : null)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -91,7 +96,7 @@ export default function AdminTransactionsPage() {
     return () => {
       cancelled = true
     }
-  }, [params, page])
+  }, [params, page, kind])
 
   const exportHref = useMemo(() => {
     const p = new URLSearchParams(params)
@@ -99,6 +104,7 @@ export default function AdminTransactionsPage() {
     return `/api/admin/transactions?${p}`
   }, [params])
 
+  const data = result && result.kind === kind ? result.page : null
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
 
   function switchKind(next: AdminTransactionKind) {

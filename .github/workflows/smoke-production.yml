@@ -1,0 +1,25 @@
+name: Production smoke test
+
+# Vercel reports each deployment back to GitHub; once production is live, run the read-only smoke suite against it.
+on:
+  deployment_status:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      E2E_BASE_URL: https://paypack.uno
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:smoke

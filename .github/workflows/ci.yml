@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: paypack
+          POSTGRES_PASSWORD: paypack
+          POSTGRES_DB: paypack
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U paypack -d paypack"
+          --health-interval 2s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://paypack:paypack@localhost:5432/paypack
+      SESSION_SECRET: ci-only-session-secret-not-used-anywhere-else
+      APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Migrate and seed database
+        run: |
+          npm run db:migrate
+          node scripts/seed.mjs
+      - name: Build
+        run: npm run build
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: E2E tests
+        run: npm run test:e2e
+      - name: Smoke tests (against the CI build)
+        run: npm run test:smoke
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
