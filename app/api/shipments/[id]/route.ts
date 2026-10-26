@@ -6,6 +6,7 @@ import { toShipment, validateShipmentEditPayload, type ShipmentEditPayload } fro
 import { getCurrentUser } from "@/lib/auth/session"
 import { estimateShippingCost, getServiceTier } from "@/lib/shipping-rates"
 import { EurosenderError, cancelOrder } from "@/lib/eurosender"
+import { SendcloudError, cancelShipment } from "@/lib/sendcloud"
 
 export async function GET(
   _req: Request,
@@ -113,15 +114,16 @@ export async function DELETE(
       .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
       .limit(1)
     const shipment = existing[0]
-    if (shipment?.provider === "eurosender" && shipment.providerOrderCode) {
+    if (shipment && shipment.provider !== "internal" && shipment.providerOrderCode) {
       if (shipment.status !== "pending") {
         return NextResponse.json({ error: "Shipment is already with the carrier and can't be cancelled" }, { status: 409 })
       }
       // Cancel the booked order first so we never drop a live order from our records.
       try {
-        await cancelOrder(shipment.providerOrderCode)
+        if (shipment.provider === "sendcloud") await cancelShipment(shipment.providerOrderCode)
+        else await cancelOrder(shipment.providerOrderCode)
       } catch (error) {
-        if (error instanceof EurosenderError) {
+        if (error instanceof EurosenderError || error instanceof SendcloudError) {
           return NextResponse.json({ error: `Carrier refused cancellation: ${error.message}` }, { status: 409 })
         }
         throw error

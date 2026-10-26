@@ -2,7 +2,9 @@ import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth/session"
 import { validateShipmentAddress, normalizeShipmentAddress, type ShipmentAddress } from "@/lib/shipments"
 import { SERVICE_TIERS, estimateShippingCost, validatePackageDimensions } from "@/lib/shipping-rates"
-import { EurosenderError, getQuotes, isEurosenderEnabled } from "@/lib/eurosender"
+import { EurosenderError, getQuotes as getEurosenderQuotes } from "@/lib/eurosender"
+import { SendcloudError, getQuotes as getSendcloudQuotes } from "@/lib/sendcloud"
+import { isLiveShippingEnabled, liveProviderFor, unsupportedSenderMessage } from "@/lib/shipping-provider"
 
 interface QuoteBody {
   senderName?: string
@@ -17,8 +19,8 @@ interface QuoteBody {
 }
 
 /**
- * Prices for the wizard's "Compare" step. Live Eurosender rates when configured, otherwise our internal
- * estimate — the response says which via `live`.
+ * Prices for the wizard's "Compare" step. Live Sendcloud / Eurosender rates when configured (picked by
+ * sender country), otherwise our internal estimate — the response says which via `live` and `provider`.
  */
 export async function POST(req: Request) {
   const user = await getCurrentUser()
@@ -36,9 +38,10 @@ export async function POST(req: Request) {
   const pkgError = validatePackageDimensions(pkg)
   if (pkgError) return NextResponse.json({ error: pkgError }, { status: 400 })
 
-  if (!isEurosenderEnabled()) {
+  if (!isLiveShippingEnabled()) {
     return NextResponse.json({
       live: false,
+      provider: "internal",
       quotes: SERVICE_TIERS.map((tier) => ({
         tier: tier.id,
         priceGross: estimateShippingCost(pkg, tier),
@@ -54,15 +57,21 @@ export async function POST(req: Request) {
     validateShipmentAddress(body.senderAddress, "sender") ?? validateShipmentAddress(body.receiverAddress, "receiver")
   if (addressError) return NextResponse.json({ error: addressError }, { status: 400 })
 
+  const sender = normalizeShipmentAddress(body.senderAddress!)
+  const provider = liveProviderFor(sender.country)
+  if (!provider) return NextResponse.json({ error: unsupportedSenderMessage() }, { status: 400 })
+
   try {
-    const quotes = await getQuotes({
-      sender: { ...normalizeShipmentAddress(body.senderAddress!), name: body.senderName?.trim() || "Sender" },
+    const input = {
+      sender: { ...sender, name: body.senderName?.trim() || "Sender" },
       receiver: { ...normalizeShipmentAddress(body.receiverAddress!), name: body.receiverName?.trim() || "Receiver" },
       pkg: { ...pkg, valueEur: typeof body.declaredValueEur === "number" ? body.declaredValueEur : undefined },
-    })
-    return NextResponse.json({ live: true, quotes })
+    }
+    const quotes = provider === "sendcloud" ? await getSendcloudQuotes(input) : await getEurosenderQuotes(input)
+    return NextResponse.json({ live: true, provider, quotes })
   } catch (error) {
-    if (error instanceof EurosenderError) {
+    if (error instanceof EurosenderError || error instanceof SendcloudError) {
+      console.error(`${provider} quote failed`, error.status, error.details)
       return NextResponse.json({ error: error.message }, { status: error.status >= 500 ? 502 : 400 })
     }
     console.error("POST /api/shipments/quote failed", error)

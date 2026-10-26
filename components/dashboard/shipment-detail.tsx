@@ -119,7 +119,8 @@ export function ShipmentDetail({
   }
 
   const s = shipment
-  const isCarrier = s.provider === "eurosender"
+  const isCarrier = s.provider !== "internal"
+  const brokerName = s.provider === "sendcloud" ? "Sendcloud" : "Eurosender"
   const status = SHIPMENT_STATUS[s.status]
   const activeStep = shipmentStepIndex(s.status)
   const route = shipmentRoute(s)
@@ -239,7 +240,7 @@ export function ShipmentDetail({
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-foreground">{s.carrierName ?? "Courier being assigned"}</div>
                 <p className="truncate text-xs text-muted-foreground">
-                  {s.providerOrderCode ? `Order ${s.providerOrderCode}` : "Booked via Eurosender"}
+                  {s.providerOrderCode ? `${brokerName} · ${s.providerOrderCode}` : `Booked via ${brokerName}`}
                 </p>
               </div>
               {s.trackingUrl && (

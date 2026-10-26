@@ -120,7 +120,7 @@ function ShipmentsPageContent() {
     const inTransit = shipments.filter((s) => s.status === "in-transit")
     const delivered = shipments.filter((s) => s.status === "arrived")
     const spent = shipments
-      .filter((s) => s.provider === "eurosender" && s.estimatedCurrency === "EUR")
+      .filter((s) => s.provider !== "internal" && s.estimatedCurrency === "EUR")
       .reduce((sum, s) => sum + s.estimatedCost, 0)
     return { active, booked, inTransit, delivered, spent }
   }, [shipments])

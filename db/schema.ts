@@ -298,7 +298,7 @@ export const shipments = pgTable("shipments", {
   estimatedCurrency: text("estimated_currency").notNull().default("EUR"),
   trackingNumber: text("tracking_number").notNull(),
   status: text("status").notNull(),
-  // "internal" = our own estimate/tracking only; "eurosender" = a real booked order with Eurosender.
+  // "internal" = our own estimate/tracking only; "eurosender" / "sendcloud" = a real booked order with that broker.
   provider: text("provider").notNull().default("internal"),
   providerOrderCode: text("provider_order_code"),
   carrierName: text("carrier_name"),
@@ -309,7 +309,7 @@ export const shipments = pgTable("shipments", {
   receiverAddress: jsonb("receiver_address").$type<ShipmentAddressColumn>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  check("shipments_provider_check", sql`${table.provider} in ('internal', 'eurosender')`),
+  check("shipments_provider_check", sql`${table.provider} in ('internal', 'eurosender', 'sendcloud')`),
   uniqueIndex("shipments_provider_order_code_idx").on(table.providerOrderCode),
   check("shipments_status_check", sql`${table.status} in ('arrived', 'in-transit', 'pending')`),
   check("shipments_tier_check", sql`${table.serviceTier} in ('economy', 'standard', 'express')`),
