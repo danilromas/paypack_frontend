@@ -1,13 +1,13 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 const root = path.dirname(fileURLToPath(import.meta.url))
-const div2Html = readFileSync(
-  path.join(root, "../market/div2/(8) Facebook Marketplace _ Facebook.html"),
-  "utf-8",
-)
+// market/ holds saved Facebook pages and is gitignored, so the snapshot only exists on dev machines (not in CI).
+const div2Path = path.join(root, "../market/div2/(8) Facebook Marketplace _ Facebook.html")
+const hasSnapshot = existsSync(div2Path)
+const div2Html = hasSnapshot ? readFileSync(div2Path, "utf-8") : ""
 
 function parseMoneyToInt(raw: string) {
   if (!raw) return 0
@@ -52,7 +52,7 @@ describe("Italian marketplace snapshot (market/div2)", () => {
     expect(extractListingPriceFromText("12.000 €")).toBe(12000)
   })
 
-  it("exposes listing title and price in aria-label and embedded JSON", () => {
+  it.skipIf(!hasSnapshot)("exposes listing title and price in aria-label and embedded JSON", () => {
     const aria = div2Html.match(
       /aria-label="([^"]+annuncio\s+\d+[^"]*)"/i,
     )?.[1]
