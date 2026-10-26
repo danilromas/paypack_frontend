@@ -18,6 +18,8 @@ import {
   Loader2,
   Trash2,
   Star,
+  Code,
+  ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -28,12 +30,13 @@ import type {
   SecuritySettingsDTO,
 } from "@/lib/settings"
 
-type SettingsTab = "kyc" | "payment" | "api" | "security" | "notifications"
+type SettingsTab = "kyc" | "payment" | "api" | "widget" | "security" | "notifications"
 
 const tabs: { id: SettingsTab; label: string; icon: typeof CreditCard }[] = [
   { id: "kyc", label: "KYC Verification", icon: IdCard },
   { id: "payment", label: "Payment Methods", icon: CreditCard },
   { id: "api", label: "API Keys", icon: Key },
+  { id: "widget", label: "Checkout Widget", icon: Code },
   { id: "security", label: "Security", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
 ]
@@ -98,6 +101,7 @@ export default function SettingsPage() {
                   <PaymentTab methods={bundle.paymentMethods} onChange={load} />
                 )}
                 {activeTab === "api" && bundle && <APITab apiKeys={bundle.apiKeys} onChange={load} />}
+                {activeTab === "widget" && <WidgetTab />}
                 {activeTab === "security" && bundle && (
                   <SecurityTab security={bundle.security} onChange={load} />
                 )}
@@ -516,6 +520,74 @@ function APITab({ apiKeys, onChange }: { apiKeys: ApiKeyDTO[]; onChange: () => v
           </div>
         ))
       )}
+    </div>
+  )
+}
+
+function WidgetTab() {
+  const [userId, setUserId] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((me) => setUserId(me?.id ?? null))
+  }, [])
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://paypack.uno"
+  const snippet = `<script src="${origin}/widget.js" async></script>
+<div data-paypack-button
+     data-seller="${userId ?? "…"}"
+     data-title="Item name"
+     data-price="100"
+     data-shipping="10"
+     data-currency="EUR"></div>`
+
+  function copy() {
+    void navigator.clipboard.writeText(snippet)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="space-y-6">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Checkout Widget</h3>
+      <p className="text-sm text-muted-foreground">
+        Add a &ldquo;Pay safely with PayPack&rdquo; button to your own website. A buyer who clicks it confirms the
+        order on PayPack and the deal appears in your dashboard, already linked to you as the seller.
+      </p>
+
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-sm font-medium text-foreground">Embed code</p>
+          <button
+            onClick={copy}
+            disabled={!userId}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+        <pre className="overflow-x-auto rounded-lg bg-secondary p-3 text-xs text-foreground">{snippet}</pre>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Set <code>data-title</code>, <code>data-price</code>, <code>data-shipping</code> and <code>data-currency</code>{" "}
+          (EUR, USD or GBP) per product. Optional: <code>data-image</code>, <code>data-description</code>,{" "}
+          <code>data-label</code>, <code>data-theme=&quot;dark&quot;</code>. The buyer can edit the page, so check each
+          order&apos;s amount before you ship &mdash; you can cancel a deal (and refund the buyer) until it&apos;s shipped.
+        </p>
+      </div>
+
+      {userId ? (
+        <a
+          href={`/widget-demo.html?seller=${userId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 py-2 text-sm font-medium text-primary transition-all hover:bg-primary/20"
+        >
+          <ExternalLink className="h-4 w-4" /> Preview on a demo shop page
+        </a>
+      ) : null}
     </div>
   )
 }
