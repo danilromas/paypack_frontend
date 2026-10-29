@@ -56,6 +56,16 @@ describe("pickTierQuotes", () => {
     ).toEqual([])
   })
 
+  it("prefers the base product over its hand-over variants at the same price", () => {
+    // Poste Italiane International Plus, Italy → Switzerland, in the order Sendcloud returned it.
+    const quotes = pickTierQuotes([
+      option("poste_it_delivery:internationalplus/puntoposte", "21.57"),
+      option("poste_it_delivery:internationalplus/dropoff", "21.57"),
+      option("poste_it_delivery:internationalplus", "21.57"),
+    ])
+    expect(quotes.map((q) => q.serviceType)).toEqual(["poste_it_delivery:internationalplus"])
+  })
+
   it("keeps options that need customs documents and treats a missing priority as standard", () => {
     // FedEx International Connect Plus, Italy → Switzerland, as Sendcloud returns it.
     const fedex = {
