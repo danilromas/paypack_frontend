@@ -237,6 +237,16 @@ function optionPrice(o: ShippingOption): Price | null {
 }
 
 /**
+ * Cheaper wins. On a tie the carrier's base product wins over its variants ("…/dropoff", "…/puntoposte"),
+ * which narrow how the parcel is handed over; the base one leaves pickup and drop-off both open.
+ */
+function isBetterOption(option: ShippingOption, price: Price, current: ShippingOption, currentPrice: Price): boolean {
+  const diff = Number(price.value) - Number(currentPrice.value)
+  if (diff !== 0) return diff < 0
+  return !option.code.includes("/") && current.code.includes("/")
+}
+
+/**
  * Picks the option to sell for each tier: home delivery only (no service-point or locker drop at the
  * receiver's end), no age-check variants, priced, and the cheapest one within the tier. Options that need
  * customs paperwork stay in — bookings outside the EU always carry it.
@@ -251,7 +261,7 @@ export function pickTierQuotes(options: ShippingOption[]): ServiceQuote[] {
     if (lastMile && lastMile !== "home_delivery") continue
     const tier = PRIORITY_TO_TIER[option.functionalities?.priority ?? "standard"] ?? "standard"
     const current = best.get(tier)
-    if (!current || Number(price.value) < Number(current.price.value)) best.set(tier, { option, price })
+    if (!current || isBetterOption(option, price, current.option, current.price)) best.set(tier, { option, price })
   }
 
   const order: ServiceTier[] = ["economy", "standard", "express"]
