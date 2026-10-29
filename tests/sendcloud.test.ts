@@ -1,11 +1,15 @@
 import { createHmac } from "node:crypto"
 import { afterEach, describe, expect, it } from "vitest"
 import {
+  documentUrl,
   extractWebhookParcel,
   mapParcelStatus,
+  pickSellableQuotes,
   pickTierQuotes,
   sendcloudServesSender,
   toBookedShipment,
+  toCustomsInformation,
+  toParcelItem,
   verifyWebhookSignature,
   type ShippingOption,
 } from "../lib/sendcloud"
@@ -41,15 +45,80 @@ describe("pickTierQuotes", () => {
     ])
   })
 
-  it("skips unpriced, errored, service-point and customs options", () => {
+  it("skips unpriced, errored, service-point and age-check options", () => {
     expect(
       pickTierQuotes([
         option("a:std", null),
         option("b:std", "5.00", { quote_error: { code: "no_price_for_route", title: "No price" } }),
         option("c:std", "5.00", { requirements: { is_service_point_required: true } }),
-        option("d:std", "5.00", { requirements: { export_documents: true } }),
+        { ...option("d:std", "5.00"), functionalities: { priority: null, last_mile: "home_delivery", age_check: 18 } },
       ]),
     ).toEqual([])
+  })
+
+  it("keeps options that need customs documents and treats a missing priority as standard", () => {
+    // FedEx International Connect Plus, Italy → Switzerland, as Sendcloud returns it.
+    const fedex = {
+      ...option("fedex:internationalconnect", "28.15000"),
+      functionalities: { priority: null, last_mile: "home_delivery", first_mile: "pickup_dropoff" },
+      requirements: { is_service_point_required: false, export_documents: true },
+    }
+    expect(pickTierQuotes([fedex])).toEqual([
+      expect.objectContaining({ tier: "standard", serviceType: "fedex:internationalconnect", priceGross: 28.15 }),
+    ])
+  })
+})
+
+describe("pickSellableQuotes", () => {
+  const letter = option("sendcloud:letter", "0")
+  const fedex = option("fedex:internationalconnect", "28.15")
+
+  it("never sells the free test letter next to a real carrier", () => {
+    expect(pickSellableQuotes([letter, fedex], true).map((q) => q.serviceType)).toEqual(["fedex:internationalconnect"])
+    expect(pickSellableQuotes([letter, fedex], false).map((q) => q.serviceType)).toEqual(["fedex:internationalconnect"])
+  })
+
+  it("falls back to the test letter only in test mode", () => {
+    expect(pickSellableQuotes([letter], true).map((q) => q.serviceType)).toEqual(["sendcloud:letter"])
+    expect(pickSellableQuotes([letter], false)).toEqual([])
+  })
+})
+
+describe("customs", () => {
+  const pkg = { weightKg: 3, lengthCm: 40, widthCm: 30, heightCm: 20, content: "Leather handbags", valueEur: 900 }
+
+  it("splits weight and value evenly over the items", () => {
+    expect(
+      toParcelItem(pkg, { hsCode: "420221", originCountry: "IT", quantity: 3, exportReason: "commercial_goods" }),
+    ).toEqual({
+      description: "Leather handbags",
+      quantity: 3,
+      weight: { value: "1.000", unit: "kg" },
+      price: { value: "300.00", currency: "EUR" },
+      hs_code: "420221",
+      origin_country: "IT",
+    })
+  })
+
+  it("is a private export without a VAT number and a commercial one with it", () => {
+    const today = new Date("2026-10-29T10:00:00Z")
+    const base = { hsCode: "420221", originCountry: "IT", quantity: 1, exportReason: "commercial_goods" as const }
+    expect(toCustomsInformation(base, "PP-1", today)).toEqual({
+      invoice_number: "PP-1",
+      invoice_date: "2026-10-29",
+      export_reason: "commercial_goods",
+      export_type: "private",
+    })
+    expect(toCustomsInformation({ ...base, senderVatNumber: "IT12345678901" }, "PP-1", today)).toMatchObject({
+      export_type: "commercial_b2c",
+      tax_numbers: { sender: [{ name: "VAT", country_code: "IT", value: "IT12345678901" }] },
+    })
+  })
+
+  it("points the customs declaration at the label's parcel", () => {
+    const label = "https://panel.sendcloud.sc/api/v3/parcels/42/documents/label"
+    expect(documentUrl(label, "label")).toBe(label)
+    expect(documentUrl(label, "customs-declaration")).toBe("https://panel.sendcloud.sc/api/v3/parcels/42/documents/customs-declaration")
   })
 })
 

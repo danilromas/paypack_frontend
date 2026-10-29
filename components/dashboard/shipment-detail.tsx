@@ -287,6 +287,14 @@ export function ShipmentDetail({
                 </div>
               )
             )}
+            {s.customsDocumentsUrl && (
+              <Button asChild variant="outline" className="w-full rounded-xl py-5 text-sm">
+                <a href={s.customsDocumentsUrl} target="_blank" rel="noopener noreferrer">
+                  <FileDown className="mr-1.5 h-4 w-4" />
+                  Download customs documents
+                </a>
+              </Button>
+            )}
             {s.status !== "arrived" && (
               <Button
                 variant="outline"

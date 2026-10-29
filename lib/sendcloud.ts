@@ -1,7 +1,7 @@
 import "server-only"
 import { createHmac, timingSafeEqual } from "node:crypto"
 import type { ServiceTier } from "@/lib/shipping-rates"
-import type { ShipmentAddress, ShipmentStatus } from "@/lib/shipments"
+import type { CustomsDetails, ShipmentAddress, ShipmentStatus } from "@/lib/shipments"
 
 /**
  * Thin client for the Sendcloud API v3 (https://sendcloud.dev/api/v3). Sendcloud only books from the
@@ -123,6 +123,8 @@ export interface ShipmentInput {
   sender: ShipmentAddress & { name: string }
   receiver: ShipmentAddress & { name: string }
   pkg: PackageInput
+  /** Present for destinations outside the EU; turned into parcel items and customs information. */
+  customs?: CustomsDetails | null
 }
 
 function toApiAddress(a: ShipmentAddress & { name: string }) {
@@ -137,7 +139,7 @@ function toApiAddress(a: ShipmentAddress & { name: string }) {
   }
 }
 
-function toApiParcel(pkg: PackageInput) {
+function toApiParcel(pkg: PackageInput, customs?: CustomsDetails | null) {
   return {
     weight: { value: pkg.weightKg.toFixed(3), unit: "kg" },
     // Round up so we never under-declare to the carrier.
@@ -147,6 +149,44 @@ function toApiParcel(pkg: PackageInput) {
       height: String(Math.ceil(pkg.heightCm)),
       unit: "cm",
     },
+    ...(customs ? { parcel_items: [toParcelItem(pkg, customs)] } : {}),
+  }
+}
+
+/**
+ * One customs line for the whole box: Sendcloud wants per-item weight and price, so the parcel's weight and
+ * declared value are split evenly over the item count.
+ */
+export function toParcelItem(pkg: PackageInput, customs: CustomsDetails) {
+  const unitWeight = Math.max(0.001, pkg.weightKg / customs.quantity)
+  const unitValue = Math.max(0.01, (pkg.valueEur ?? 0) / customs.quantity)
+  return {
+    description: pkg.content?.trim() || "Goods",
+    quantity: customs.quantity,
+    weight: { value: unitWeight.toFixed(3), unit: "kg" },
+    price: { value: unitValue.toFixed(2), currency: "EUR" },
+    hs_code: customs.hsCode,
+    origin_country: customs.originCountry,
+  }
+}
+
+/**
+ * Invoice and export details for the customs documents. Without a sender VAT number the export is private;
+ * Sendcloud rejects a commercial export that has none.
+ */
+export function toCustomsInformation(customs: CustomsDetails, invoiceNumber: string, today: Date = new Date()) {
+  return {
+    invoice_number: invoiceNumber,
+    invoice_date: today.toISOString().slice(0, 10),
+    export_reason: customs.exportReason,
+    export_type: customs.senderVatNumber ? "commercial_b2c" : "private",
+    ...(customs.senderVatNumber
+      ? {
+          tax_numbers: {
+            sender: [{ name: "VAT", country_code: customs.senderVatNumber.slice(0, 2), value: customs.senderVatNumber }],
+          },
+        }
+      : {}),
   }
 }
 
@@ -159,7 +199,12 @@ export interface ShippingOption {
   code: string
   name?: string
   carrier?: { code?: string; name?: string } | null
-  functionalities?: { priority?: string | null; last_mile?: string | null; first_mile?: string | null } | null
+  functionalities?: {
+    priority?: string | null
+    last_mile?: string | null
+    first_mile?: string | null
+    age_check?: number | null
+  } | null
   requirements?: { is_service_point_required?: boolean; export_documents?: boolean } | null
   quote_error?: { code: string; title: string } | null
   quotes?: { lead_time?: number | null; price?: { total?: Price | null } | null }[] | null
@@ -193,14 +238,15 @@ function optionPrice(o: ShippingOption): Price | null {
 
 /**
  * Picks the option to sell for each tier: home delivery only (no service-point or locker drop at the
- * receiver's end, no customs paperwork), priced, and the cheapest one within the tier.
+ * receiver's end), no age-check variants, priced, and the cheapest one within the tier. Options that need
+ * customs paperwork stay in — bookings outside the EU always carry it.
  */
 export function pickTierQuotes(options: ShippingOption[]): ServiceQuote[] {
   const best = new Map<ServiceTier, { option: ShippingOption; price: Price }>()
   for (const option of options) {
     const price = optionPrice(option)
     if (!price || option.quote_error) continue
-    if (option.requirements?.is_service_point_required || option.requirements?.export_documents) continue
+    if (option.requirements?.is_service_point_required || option.functionalities?.age_check) continue
     const lastMile = option.functionalities?.last_mile
     if (lastMile && lastMile !== "home_delivery") continue
     const tier = PRIORITY_TO_TIER[option.functionalities?.priority ?? "standard"] ?? "standard"
@@ -246,7 +292,17 @@ export async function getQuotes(input: ShipmentInput): Promise<ServiceQuote[]> {
     parcels: [toApiParcel(input.pkg)],
     calculate_quotes: true,
   })
-  return pickTierQuotes(data.data ?? [])
+  return pickSellableQuotes(data.data ?? [], isSendcloudTestMode())
+}
+
+/**
+ * The free test letter is never sold: it would undercut every real carrier at 0 €. Test mode shows it only
+ * when the account has no real carrier for the route yet, so the flow can still be exercised end to end.
+ */
+export function pickSellableQuotes(options: ShippingOption[], testMode: boolean): ServiceQuote[] {
+  const real = pickTierQuotes(options.filter((o) => o.code !== TEST_SHIPPING_OPTION))
+  if (real.length > 0 || !testMode) return real
+  return pickTierQuotes(options.filter((o) => o.code === TEST_SHIPPING_OPTION))
 }
 
 interface ApiParcel {
@@ -316,7 +372,8 @@ export async function createShipment(
     from_address: toApiAddress(input.sender),
     to_address: toApiAddress(input.receiver),
     ship_with: { type: "shipping_option_code", properties: { shipping_option_code: optionCode } },
-    parcels: [toApiParcel(input.pkg)],
+    parcels: [toApiParcel(input.pkg, input.customs)],
+    ...(input.customs ? { customs_information: toCustomsInformation(input.customs, `PP-${reference.slice(0, 8).toUpperCase()}`) } : {}),
     order_number: reference.slice(0, 8).toUpperCase(),
     external_reference_id: reference,
     reference: input.pkg.content?.trim() || "Goods",
@@ -330,7 +387,8 @@ export async function createShipment(
     const message = formatErrors(res.data.errors ?? []) ?? booked.statusMessage ?? "Carrier announcement failed"
     throw new SendcloudError(message, 422, res.data)
   }
-  return { ...booked, priceGross: quote?.priceGross ?? null, currency: quote?.currency ?? null }
+  // The test letter is free whatever the quote said, so never record a carrier price for it.
+  return { ...booked, priceGross: testMode ? 0 : (quote?.priceGross ?? null), currency: testMode ? "EUR" : (quote?.currency ?? null) }
 }
 
 export async function getShipment(shipmentId: string): Promise<BookedShipment> {
@@ -343,14 +401,21 @@ export async function cancelShipment(shipmentId: string): Promise<"cancelled" | 
   return res.data?.status === "queued" ? "queued" : "cancelled"
 }
 
-/** Downloads a parcel label (PDF) through our credentials. Only Sendcloud's own host is ever fetched. */
-export async function fetchLabelPdf(labelUrl: string): Promise<ArrayBuffer> {
-  if (!labelUrl.startsWith(`${BASE_URL}/`)) throw new SendcloudError("Unexpected label location", 400)
-  const res = await fetch(labelUrl, {
+export type ParcelDocument = "label" | "customs-declaration"
+
+/** The customs declaration sits next to the label: same parcel, different document type. */
+export function documentUrl(labelUrl: string, type: ParcelDocument): string {
+  return type === "label" ? labelUrl : labelUrl.replace(/\/documents\/label$/, `/documents/${type}`)
+}
+
+/** Downloads a parcel document (PDF) through our credentials. Only Sendcloud's own host is ever fetched. */
+export async function fetchDocumentPdf(url: string): Promise<ArrayBuffer> {
+  if (!url.startsWith(`${BASE_URL}/`)) throw new SendcloudError("Unexpected document location", 400)
+  const res = await fetch(url, {
     headers: { Authorization: authHeader(), Accept: "application/pdf" },
     cache: "no-store",
   })
-  if (!res.ok) throw new SendcloudError(`Label download failed (${res.status})`, res.status)
+  if (!res.ok) throw new SendcloudError(`Document download failed (${res.status})`, res.status)
   return res.arrayBuffer()
 }
 
