@@ -90,8 +90,6 @@ export function DashboardHeader() {
             <nav className="space-y-1 px-3 py-4 text-sm">
               {[
                 { href: "/dashboard", label: "Dashboard" },
-                { href: "/dashboard/deals", label: "Deals" },
-                { href: "/dashboard/shipments", label: "Shipments" },
                 { href: "/dashboard/chats", label: "Chats" },
                 { href: "/dashboard/users", label: "Find users" },
                 { href: "/dashboard/support", label: "Support" },

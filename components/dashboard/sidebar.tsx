@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
-  Handshake,
   MessageCircle,
   HelpCircle,
   Settings,
@@ -14,7 +13,6 @@ import {
   Bell,
   Wallet,
   LogOut,
-  Package,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -68,8 +66,6 @@ export function DashboardSidebar() {
 
   const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/dashboard/deals", icon: Handshake, label: "Deals" },
-    { href: "/dashboard/shipments", icon: Package, label: "Shipments" },
     { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: unreadChats || undefined },
     { href: "/dashboard/users", icon: Users, label: "Find users" },
     { href: "/dashboard/support", icon: HelpCircle, label: "Support" },
