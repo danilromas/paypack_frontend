@@ -5,6 +5,8 @@ import { db } from "@/lib/db"
 import { shipments } from "@/db/schema"
 import {
   formatShipmentAddress,
+  needsCustoms,
+  normalizeCustomsDetails,
   normalizeShipmentAddress,
   toShipment,
   validateShipmentAddress,
@@ -15,7 +17,7 @@ import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { estimateShippingCost, generateTrackingNumber, getServiceTier } from "@/lib/shipping-rates"
 import { EurosenderError, createOrder } from "@/lib/eurosender"
 import { SendcloudError, createShipment as createSendcloudShipment } from "@/lib/sendcloud"
-import { isLiveShippingEnabled, liveProviderFor, unsupportedSenderMessage } from "@/lib/shipping-provider"
+import { isLiveShippingEnabled, liveProviderFor, unsupportedRouteMessage } from "@/lib/shipping-provider"
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -89,13 +91,16 @@ export async function POST(req: Request) {
       if (addressError) return NextResponse.json({ error: addressError }, { status: 400 })
       if (!body.pickupDate) return NextResponse.json({ error: "Pick a pickup date" }, { status: 400 })
 
-      const provider = liveProviderFor(senderAddress!.country)
-      if (!provider) return NextResponse.json({ error: unsupportedSenderMessage() }, { status: 400 })
+      const provider = liveProviderFor(senderAddress!.country, receiverAddress!.country)
+      if (!provider) {
+        return NextResponse.json({ error: unsupportedRouteMessage(receiverAddress!.country) }, { status: 400 })
+      }
 
       const input = {
         sender: { ...senderAddress!, name: body.senderName!.trim() },
         receiver: { ...receiverAddress!, name: body.receiverName!.trim() },
         pkg: { ...pkg, content: body.contents ?? undefined, valueEur: body.declaredValueEur ?? undefined },
+        customs: needsCustoms(receiverAddress!.country) && body.customs ? normalizeCustomsDetails(body.customs) : null,
       }
 
       if (provider === "sendcloud") {

@@ -4,7 +4,7 @@ import { validateShipmentAddress, normalizeShipmentAddress, type ShipmentAddress
 import { SERVICE_TIERS, estimateShippingCost, validatePackageDimensions } from "@/lib/shipping-rates"
 import { EurosenderError, getQuotes as getEurosenderQuotes } from "@/lib/eurosender"
 import { SendcloudError, getQuotes as getSendcloudQuotes } from "@/lib/sendcloud"
-import { isLiveShippingEnabled, liveProviderFor, unsupportedSenderMessage } from "@/lib/shipping-provider"
+import { isLiveShippingEnabled, liveProviderFor, unsupportedRouteMessage } from "@/lib/shipping-provider"
 
 interface QuoteBody {
   senderName?: string
@@ -58,8 +58,9 @@ export async function POST(req: Request) {
   if (addressError) return NextResponse.json({ error: addressError }, { status: 400 })
 
   const sender = normalizeShipmentAddress(body.senderAddress!)
-  const provider = liveProviderFor(sender.country)
-  if (!provider) return NextResponse.json({ error: unsupportedSenderMessage() }, { status: 400 })
+  const receiverCountry = body.receiverAddress!.country
+  const provider = liveProviderFor(sender.country, receiverCountry)
+  if (!provider) return NextResponse.json({ error: unsupportedRouteMessage(receiverCountry) }, { status: 400 })
 
   try {
     const input = {

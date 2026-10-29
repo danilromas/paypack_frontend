@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 import { pickTierQuotes, mapTrackingStatus, extractWebhookOrderCodes, toCreatedOrder } from "../lib/eurosender"
-import { normalizeShipmentAddress, validatePickupDate, validateShipmentAddress } from "../lib/shipments"
+import {
+  needsCustoms,
+  normalizeCustomsDetails,
+  normalizeShipmentAddress,
+  validateCustomsDetails,
+  validatePickupDate,
+  validateShipmentAddress,
+  validateShipmentCreatePayload,
+} from "../lib/shipments"
 
 const price = (gross: number) => ({ original: { currencyCode: "EUR", gross, net: gross / 1.24 } })
 
@@ -115,5 +123,55 @@ describe("validatePickupDate", () => {
     expect(validatePickupDate("2026-10-14", today)).toBe("Pickup date is in the past")
     expect(validatePickupDate("16.10.2026", today)).toBe("Invalid pickup date")
     expect(validatePickupDate("2026-02-30", today)).toBe("Invalid pickup date")
+  })
+})
+
+describe("shipping to Switzerland", () => {
+  const it_ = { country: "IT", zip: "10035", city: "Mazzè", street: "Via del Ponticello 14", phone: "+393331234567", email: "a@b.it" }
+  const ch = { country: "CH", zip: "8001", city: "Zürich", street: "Bahnhofstrasse 1", phone: "+41441234567", email: "c@d.ch" }
+  const customs = { hsCode: "4202.21", originCountry: "it", quantity: 2, exportReason: "commercial_goods" as const }
+  const payload = {
+    senderName: "Seller",
+    senderLocation: "x",
+    receiverName: "Buyer",
+    receiverLocation: "x",
+    serviceTier: "standard" as const,
+    weightKg: 3,
+    lengthCm: 40,
+    widthCm: 30,
+    heightCm: 20,
+    senderAddress: it_,
+    receiverAddress: ch,
+    contents: "Leather handbags",
+    declaredValueEur: 900,
+    customs,
+  }
+
+  it("accepts Switzerland as a receiver but not as a sender", () => {
+    expect(needsCustoms("ch")).toBe(true)
+    expect(needsCustoms("IT")).toBe(false)
+    expect(validateShipmentAddress(ch, "receiver")).toBeNull()
+    expect(validateShipmentAddress(ch, "sender")).toMatch(/from inside the EU/)
+  })
+
+  it("requires customs details, contents and a value for Swiss receivers", () => {
+    expect(validateShipmentCreatePayload(payload)).toBeNull()
+    expect(validateShipmentCreatePayload({ ...payload, customs: null })).toMatch(/Customs details are required/)
+    expect(validateShipmentCreatePayload({ ...payload, declaredValueEur: null })).toMatch(/value of the goods/)
+    expect(validateShipmentCreatePayload({ ...payload, receiverAddress: it_, customs: null })).toBeNull()
+  })
+
+  it("validates and normalizes the customs fields", () => {
+    expect(validateCustomsDetails({ ...customs, hsCode: "42" })).toMatch(/HS code/)
+    expect(validateCustomsDetails({ ...customs, quantity: 0 })).toMatch(/number of items/)
+    expect(validateCustomsDetails({ ...customs, exportReason: "smuggling" })).toMatch(/export reason/)
+    expect(validateCustomsDetails({ ...customs, senderVatNumber: "12-345" })).toMatch(/VAT/)
+    expect(normalizeCustomsDetails({ ...customs, senderVatNumber: "it 123 456 789 01" })).toEqual({
+      hsCode: "420221",
+      originCountry: "IT",
+      quantity: 2,
+      exportReason: "commercial_goods",
+      senderVatNumber: "IT12345678901",
+    })
   })
 })

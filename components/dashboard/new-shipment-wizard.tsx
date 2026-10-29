@@ -8,6 +8,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  FileText,
   Home,
   Loader2,
   MapPin,
@@ -19,7 +20,17 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { EU_COUNTRIES, formatShipmentAddress, type ShipmentAddress, type ShipmentCreatePayload } from "@/lib/shipments"
+import {
+  DESTINATION_COUNTRIES,
+  EU_COUNTRIES,
+  EXPORT_REASONS,
+  ORIGIN_COUNTRIES,
+  formatShipmentAddress,
+  needsCustoms,
+  type ExportReason,
+  type ShipmentAddress,
+  type ShipmentCreatePayload,
+} from "@/lib/shipments"
 import { SERVICE_TIERS, type ServiceTier } from "@/lib/shipping-rates"
 
 type WizardPhase = "route" | "package" | "compare" | "review"
@@ -103,18 +114,30 @@ function firstPickupDay(from: string, excluded: string[]) {
   return from
 }
 
+/** HS codes people shipping bags reach for most; any 6–10 digit code is accepted. */
+const HS_CODE_HINTS = [
+  { code: "420221", label: "Handbags, leather" },
+  { code: "420222", label: "Handbags, textile or plastic" },
+  { code: "420231", label: "Wallets & small leather goods" },
+  { code: "420292", label: "Travel & sports bags, textile" },
+]
+
 function PartyFields({
   title,
   hint,
   icon: Icon,
   value,
   onChange,
+  countries,
+  countryPlaceholder,
 }: {
   title: string
   hint: string
   icon: LucideIcon
   value: Party
   onChange: (p: Party) => void
+  countries: { code: string; name: string }[]
+  countryPlaceholder: string
 }) {
   const set = (field: keyof Party) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     onChange({ ...value, [field]: e.target.value })
@@ -133,8 +156,8 @@ function PartyFields({
       <div className="space-y-3">
         <input value={value.name} onChange={set("name")} placeholder="Full name" autoComplete="name" className={inputClass} />
         <select value={value.country} onChange={set("country")} className={cn(inputClass, !value.country && "text-muted-foreground")}>
-          <option value="">Country (EU only)</option>
-          {EU_COUNTRIES.map((c) => (
+          <option value="">{countryPlaceholder}</option>
+          {countries.map((c) => (
             <option key={c.code} value={c.code}>
               {c.name}
             </option>
@@ -170,6 +193,11 @@ export function NewShipmentWizard({
   const [heightCm, setHeightCm] = useState<number | "">("")
   const [contents, setContents] = useState("")
   const [declaredValue, setDeclaredValue] = useState<number | "">("")
+  const [hsCode, setHsCode] = useState("")
+  const [originCountry, setOriginCountry] = useState("IT")
+  const [itemCount, setItemCount] = useState<number | "">(1)
+  const [exportReason, setExportReason] = useState<ExportReason>("commercial_goods")
+  const [senderVat, setSenderVat] = useState("")
   const [serviceTier, setServiceTier] = useState<ServiceTier | null>(null)
   const [pickupDate, setPickupDate] = useState("")
   const [quotes, setQuotes] = useState<Quote[]>([])
@@ -182,7 +210,19 @@ export function NewShipmentWizard({
   const currentPhase = PHASES[step - 1]
 
   const routeValid = partyValid(sender) && partyValid(receiver)
+  const isCustoms = needsCustoms(receiver.country)
+  const customsValid =
+    !isCustoms ||
+    (typeof declaredValue === "number" &&
+      declaredValue > 0 &&
+      /^\d{6,10}$/.test(hsCode.replace(/[\s.]/g, "")) &&
+      originCountry !== "" &&
+      typeof itemCount === "number" &&
+      Number.isInteger(itemCount) &&
+      itemCount >= 1 &&
+      (senderVat.trim() === "" || /^[A-Za-z]{2}[A-Za-z0-9]{2,13}$/.test(senderVat.replace(/\s/g, ""))))
   const packageValid =
+    customsValid &&
     typeof weightKg === "number" &&
     weightKg > 0 &&
     typeof lengthCm === "number" &&
@@ -295,6 +335,15 @@ export function NewShipmentWizard({
         heightCm: heightCm as number,
         contents: contents.trim(),
         declaredValueEur: typeof declaredValue === "number" ? declaredValue : null,
+        customs: isCustoms
+          ? {
+              hsCode: hsCode.replace(/[\s.]/g, ""),
+              originCountry,
+              quantity: itemCount as number,
+              exportReason,
+              senderVatNumber: senderVat.trim() || null,
+            }
+          : null,
         pickupDate,
       })
       onClose()
@@ -349,8 +398,24 @@ export function NewShipmentWizard({
         {/* Phase: Route */}
         {currentPhase === "route" && (
           <div className="mx-auto grid max-w-3xl gap-4 md:grid-cols-2">
-            <PartyFields title="From" hint="The courier collects here" icon={MapPin} value={sender} onChange={setSender} />
-            <PartyFields title="To" hint="Delivered to the door" icon={Home} value={receiver} onChange={setReceiver} />
+            <PartyFields
+              title="From"
+              hint="The courier collects here"
+              icon={MapPin}
+              value={sender}
+              onChange={setSender}
+              countries={EU_COUNTRIES}
+              countryPlaceholder="Country (EU only)"
+            />
+            <PartyFields
+              title="To"
+              hint="Delivered to the door"
+              icon={Home}
+              value={receiver}
+              onChange={setReceiver}
+              countries={DESTINATION_COUNTRIES}
+              countryPlaceholder="Country (EU or Switzerland)"
+            />
           </div>
         )}
 
@@ -433,7 +498,7 @@ export function NewShipmentWizard({
                   <input value={contents} onChange={(e) => setContents(e.target.value)} maxLength={100} placeholder="e.g. Used camera lens" className={inputClass} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">Value, € (optional)</label>
+                  <label className="mb-1 block text-xs text-muted-foreground">{isCustoms ? "Total value, €" : "Value, € (optional)"}</label>
                   <input
                     type="number"
                     min={0}
@@ -446,6 +511,78 @@ export function NewShipmentWizard({
                 </div>
               </div>
             </div>
+
+            {isCustoms && (
+              <div className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ship/10 text-ship">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Customs</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Switzerland is outside the EU — this goes on the customs documents. Import VAT and duties are paid by the recipient.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">HS code</label>
+                    <input value={hsCode} onChange={(e) => setHsCode(e.target.value)} inputMode="numeric" maxLength={14} placeholder="420221" className={inputClass} />
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {HS_CODE_HINTS.map((h) => (
+                        <button
+                          key={h.code}
+                          type="button"
+                          onClick={() => setHsCode(h.code)}
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[11px] transition-colors",
+                            hsCode === h.code ? "border-ship bg-ship/10 text-foreground" : "border-border text-muted-foreground hover:border-ship/30",
+                          )}
+                        >
+                          {h.label} · {h.code}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Made in</label>
+                    <select value={originCountry} onChange={(e) => setOriginCountry(e.target.value)} className={inputClass}>
+                      {ORIGIN_COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Number of items</label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={itemCount}
+                      onChange={(e) => setItemCount(e.target.value ? Number(e.target.value) : "")}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Reason</label>
+                    <select value={exportReason} onChange={(e) => setExportReason(e.target.value as ExportReason)} className={inputClass}>
+                      {EXPORT_REASONS.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs text-muted-foreground">Sender VAT number (businesses only, optional)</label>
+                    <input value={senderVat} onChange={(e) => setSenderVat(e.target.value)} maxLength={20} placeholder="IT12345678901" className={inputClass} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -469,7 +606,7 @@ export function NewShipmentWizard({
               {quotesLoading
                 ? "Asking couriers for prices…"
                 : live
-                ? `Door-to-door courier, ${route.from} → ${route.to}. VAT included.`
+                ? `Door-to-door courier, ${route.from} → ${route.to}. VAT included${isCustoms ? "; Swiss import VAT and duties are paid by the recipient" : ""}.`
                 : "Internal estimate based on package size — not a live carrier rate."}
             </p>
             {quotesLoading &&
@@ -557,6 +694,18 @@ export function NewShipmentWizard({
                   <div className="text-xs text-muted-foreground">{formatEta(selectedQuote?.estimatedDelivery ?? null)}</div>
                 </div>
               </div>
+              {isCustoms && (
+                <div className="mt-4 border-t border-border pt-4 text-sm">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Customs</div>
+                  <div className="font-medium text-foreground">
+                    {itemCount} × HS {hsCode.replace(/[\s.]/g, "")} · made in {ORIGIN_COUNTRIES.find((c) => c.code === originCountry)?.name ?? originCountry}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {EXPORT_REASONS.find((r) => r.id === exportReason)?.label} · {typeof declaredValue === "number" ? declaredValue : 0} € ·{" "}
+                    {senderVat.trim() ? `commercial export, VAT ${senderVat.trim().toUpperCase()}` : "private export"} · duties paid by the recipient
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
@@ -580,7 +729,8 @@ export function NewShipmentWizard({
 
             {live && (
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Booking calls a real courier. You'll get a label to print and stick on the box.
+                Booking calls a real courier. You'll get a label to print and stick on the box
+                {isCustoms ? ", plus customs documents to attach to it" : ""}.
               </p>
             )}
             {error && (
@@ -616,7 +766,9 @@ export function NewShipmentWizard({
                 ? currentPhase === "route"
                   ? "Fill in both addresses with a valid phone and email."
                   : currentPhase === "package"
-                    ? "Add weight, all three dimensions and the contents."
+                    ? isCustoms
+                      ? "Add weight, dimensions, contents, value and the customs details."
+                      : "Add weight, all three dimensions and the contents."
                     : "Pick a service to continue."
                 : `Step ${step} of ${PHASES.length}`}
             </p>

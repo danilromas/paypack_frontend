@@ -14,7 +14,7 @@ export interface ShipmentAddress {
   email: string
 }
 
-/** We only ship inside the EU — no customs paperwork. ISO 3166-1 alpha-2 codes. */
+/** Senders are always inside the EU. ISO 3166-1 alpha-2 codes. */
 export const EU_COUNTRIES: { code: string; name: string }[] = [
   { code: "AT", name: "Austria" },
   { code: "BE", name: "Belgium" },
@@ -47,6 +47,55 @@ export const EU_COUNTRIES: { code: string; name: string }[] = [
 
 const EU_COUNTRY_CODES = new Set(EU_COUNTRIES.map((c) => c.code))
 
+/** Destinations outside the EU — these need customs paperwork, which only Sendcloud bookings carry. */
+export const NON_EU_DESTINATIONS: { code: string; name: string }[] = [{ code: "CH", name: "Switzerland" }]
+
+export const DESTINATION_COUNTRIES = [...EU_COUNTRIES, ...NON_EU_DESTINATIONS].sort((a, b) => a.name.localeCompare(b.name))
+
+const NON_EU_DESTINATION_CODES = new Set(NON_EU_DESTINATIONS.map((c) => c.code))
+
+/** True when parcels to this country cross an EU customs border. */
+export function needsCustoms(country: string | null | undefined): boolean {
+  return !!country && NON_EU_DESTINATION_CODES.has(country.trim().toUpperCase())
+}
+
+/** Where goods are usually made, for the customs "country of origin" — EU plus the common makers. */
+export const ORIGIN_COUNTRIES = [
+  ...EU_COUNTRIES,
+  { code: "CN", name: "China" },
+  { code: "IN", name: "India" },
+  { code: "MA", name: "Morocco" },
+  { code: "CH", name: "Switzerland" },
+  { code: "TR", name: "Türkiye" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "US", name: "United States" },
+  { code: "VN", name: "Vietnam" },
+].sort((a, b) => a.name.localeCompare(b.name))
+
+/** Why the goods cross the border — Sendcloud's `export_reason` values. */
+export const EXPORT_REASONS = [
+  { id: "commercial_goods", label: "Sale of goods" },
+  { id: "gift", label: "Gift" },
+  { id: "personal_use", label: "Personal belongings" },
+  { id: "commercial_sample", label: "Sample" },
+  { id: "returned_goods", label: "Returned goods" },
+] as const
+
+export type ExportReason = (typeof EXPORT_REASONS)[number]["id"]
+
+/** Customs declaration for one line of identical goods (e.g. "3 leather handbags"). */
+export interface CustomsDetails {
+  /** Harmonized System code, 6–10 digits (leather handbags: 420221). */
+  hsCode: string
+  /** Where the goods were made, ISO alpha-2. */
+  originCountry: string
+  /** Number of identical items in the box. */
+  quantity: number
+  exportReason: ExportReason
+  /** Sender's VAT number — makes it a commercial export; without it the export is private. */
+  senderVatNumber?: string | null
+}
+
 export interface ShipmentCreatePayload {
   senderName: string
   senderLocation: string
@@ -66,6 +115,8 @@ export interface ShipmentCreatePayload {
   contents?: string | null
   /** Declared value in EUR, used for the carrier's liability cover. */
   declaredValueEur?: number | null
+  /** Required when the receiver is outside the EU (see needsCustoms). */
+  customs?: CustomsDetails | null
 }
 
 export interface ShipmentEditPayload {
@@ -100,6 +151,8 @@ export interface Shipment {
   carrierName: string | null
   trackingUrl: string | null
   labelUrl: string | null
+  /** Customs declaration PDF for shipments leaving the EU, served through our proxy. */
+  customsDocumentsUrl: string | null
   pickupDate: string | null
   senderAddress: ShipmentAddress | null
   receiverAddress: ShipmentAddress | null
@@ -134,7 +187,7 @@ function validateShared(payload: Partial<ShipmentEditPayload>): string | null {
 
 const ADDRESS_FIELDS: (keyof ShipmentAddress)[] = ["country", "zip", "city", "street", "phone", "email"]
 
-export function validateShipmentAddress(address: unknown, label: string): string | null {
+export function validateShipmentAddress(address: unknown, label: "sender" | "receiver"): string | null {
   if (!address || typeof address !== "object") return `Missing ${label} address`
   const a = address as Record<string, unknown>
   for (const field of ADDRESS_FIELDS) {
@@ -142,8 +195,11 @@ export function validateShipmentAddress(address: unknown, label: string): string
       return `Invalid ${label} ${field}`
     }
   }
-  if (!EU_COUNTRY_CODES.has((a.country as string).trim().toUpperCase())) {
-    return `We only ship within the EU — unsupported ${label} country`
+  const country = (a.country as string).trim().toUpperCase()
+  if (!EU_COUNTRY_CODES.has(country) && !(label === "receiver" && NON_EU_DESTINATION_CODES.has(country))) {
+    return label === "sender"
+      ? "We only ship from inside the EU — unsupported sender country"
+      : "We only ship within the EU and to Switzerland — unsupported receiver country"
   }
   if (!/^\S+@\S+\.\S+$/.test((a.email as string).trim())) return `Invalid ${label} email`
   if (!/^\+?[\d\s()-]{6,20}$/.test((a.phone as string).trim())) return `Invalid ${label} phone`
@@ -199,7 +255,47 @@ export function validateShipmentCreatePayload(payload: Partial<ShipmentCreatePay
     const v = payload.declaredValueEur
     if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 100_000) return "Invalid declared value"
   }
+  if (needsCustoms(payload.receiverAddress?.country)) {
+    if (!payload.contents?.trim()) return "Describe the contents for customs"
+    if (!payload.declaredValueEur || payload.declaredValueEur <= 0) return "Customs needs the value of the goods"
+    const customsError = validateCustomsDetails(payload.customs)
+    if (customsError) return customsError
+  }
   return null
+}
+
+const EXPORT_REASON_IDS = new Set<string>(EXPORT_REASONS.map((r) => r.id))
+
+export function validateCustomsDetails(customs: unknown): string | null {
+  if (!customs || typeof customs !== "object") return "Customs details are required outside the EU"
+  const c = customs as Record<string, unknown>
+  if (typeof c.hsCode !== "string" || !/^\d{6,10}$/.test(c.hsCode.replace(/[\s.]/g, ""))) {
+    return "Invalid HS code — use 6 to 10 digits"
+  }
+  if (typeof c.originCountry !== "string" || !/^[A-Za-z]{2}$/.test(c.originCountry.trim())) {
+    return "Invalid country of manufacture"
+  }
+  if (typeof c.quantity !== "number" || !Number.isInteger(c.quantity) || c.quantity < 1 || c.quantity > 999) {
+    return "Invalid number of items"
+  }
+  if (typeof c.exportReason !== "string" || !EXPORT_REASON_IDS.has(c.exportReason)) return "Invalid export reason"
+  if (c.senderVatNumber !== undefined && c.senderVatNumber !== null && c.senderVatNumber !== "") {
+    if (typeof c.senderVatNumber !== "string" || !/^[A-Za-z]{2}[A-Za-z0-9]{2,13}$/.test(c.senderVatNumber.replace(/\s/g, ""))) {
+      return "Invalid sender VAT number — e.g. IT12345678901"
+    }
+  }
+  return null
+}
+
+export function normalizeCustomsDetails(c: CustomsDetails): CustomsDetails {
+  const vat = c.senderVatNumber?.replace(/\s/g, "").toUpperCase()
+  return {
+    hsCode: c.hsCode.replace(/[\s.]/g, ""),
+    originCountry: c.originCountry.trim().toUpperCase(),
+    quantity: c.quantity,
+    exportReason: c.exportReason,
+    senderVatNumber: vat || null,
+  }
 }
 
 export function validateShipmentEditPayload(payload: Partial<ShipmentEditPayload>): string | null {
@@ -230,6 +326,10 @@ export function toShipment(row: ShipmentRow): Shipment {
     trackingUrl: row.trackingUrl,
     // Sendcloud labels need our API credentials, so the browser downloads them through our proxy.
     labelUrl: row.labelUrl && row.provider === "sendcloud" ? `/api/shipments/${row.id}/label/` : row.labelUrl,
+    customsDocumentsUrl:
+      row.labelUrl && row.provider === "sendcloud" && needsCustoms(row.receiverAddress?.country)
+        ? `/api/shipments/${row.id}/label/?doc=customs-declaration`
+        : null,
     pickupDate: row.pickupDate ?? null,
     senderAddress: row.senderAddress ?? null,
     receiverAddress: row.receiverAddress ?? null,
