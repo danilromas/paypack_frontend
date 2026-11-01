@@ -10,6 +10,7 @@ import {
   ChevronRight,
   FileText,
   Home,
+  Lock,
   Loader2,
   MapPin,
   Package,
@@ -185,6 +186,10 @@ export function NewShipmentWizard({
   onCreate: (payload: ShipmentCreatePayload) => Promise<void>
 }) {
   const [step, setStep] = useState(1)
+  const [bookingPassword, setBookingPassword] = useState("")
+  const [accessGranted, setAccessGranted] = useState(false)
+  const [accessChecking, setAccessChecking] = useState(false)
+  const [accessError, setAccessError] = useState<string | null>(null)
   const [sender, setSender] = useState<Party>(EMPTY_PARTY)
   const [receiver, setReceiver] = useState<Party>(EMPTY_PARTY)
   const [weightKg, setWeightKg] = useState<number | "">("")
@@ -314,6 +319,29 @@ export function NewShipmentWizard({
     return true
   }
 
+  async function checkAccess(e: React.FormEvent) {
+    e.preventDefault()
+    setAccessChecking(true)
+    setAccessError(null)
+    try {
+      const res = await fetch("/api/shipments/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: bookingPassword }),
+      })
+      if (res.ok) {
+        setAccessGranted(true)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setAccessError(data.error ?? "Could not check the password")
+      }
+    } catch {
+      setAccessError("Could not check the password")
+    } finally {
+      setAccessChecking(false)
+    }
+  }
+
   async function handleCreate() {
     if (!packageValid || !serviceTier || pickupError) return
     setSubmitting(true)
@@ -322,6 +350,7 @@ export function NewShipmentWizard({
     const receiverAddress = toAddress(receiver)
     try {
       await onCreate({
+        bookingPassword,
         senderName: sender.name.trim(),
         senderLocation: formatShipmentAddress(senderAddress),
         receiverName: receiver.name.trim(),
@@ -352,6 +381,47 @@ export function NewShipmentWizard({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (!accessGranted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-sm">
+        <form onSubmit={checkAccess} className="w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ship/10 text-ship">
+              <Lock className="h-5 w-5" />
+            </div>
+            <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <h3 className="font-semibold text-foreground">New shipments are invite-only for now</h3>
+          <p className="mb-4 mt-1 text-sm text-muted-foreground">Enter the booking password to continue. Your existing shipments stay available as usual.</p>
+          <input
+            type="password"
+            value={bookingPassword}
+            onChange={(e) => setBookingPassword(e.target.value)}
+            placeholder="Booking password"
+            autoComplete="off"
+            autoFocus
+            className={inputClass}
+          />
+          {accessError && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{accessError}</span>
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={accessChecking || bookingPassword === ""}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-ship py-3 font-semibold text-ship-foreground shadow-md transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {accessChecking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}
+          </button>
+        </form>
+      </div>
+    )
   }
 
   return (
