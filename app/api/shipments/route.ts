@@ -14,6 +14,7 @@ import {
   type ShipmentCreatePayload,
 } from "@/lib/shipments"
 import { getCurrentUser, restrictionError } from "@/lib/auth/session"
+import { isBookingPasswordValid } from "@/lib/shipment-access"
 import { estimateShippingCost, generateTrackingNumber, getServiceTier } from "@/lib/shipping-rates"
 import { EurosenderError, createOrder } from "@/lib/eurosender"
 import { SendcloudError, createShipment as createSendcloudShipment } from "@/lib/sendcloud"
@@ -51,6 +52,9 @@ export async function POST(req: Request) {
 
   try {
     const body = (await req.json()) as Partial<ShipmentCreatePayload>
+    if (!isBookingPasswordValid(body.bookingPassword)) {
+      return NextResponse.json({ error: "Wrong booking password" }, { status: 403 })
+    }
     const validationError = validateShipmentCreatePayload(body)
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })

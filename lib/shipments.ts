@@ -117,6 +117,8 @@ export interface ShipmentCreatePayload {
   declaredValueEur?: number | null
   /** Required when the receiver is outside the EU (see needsCustoms). */
   customs?: CustomsDetails | null
+  /** Checked against SHIPMENT_BOOKING_PASSWORD while booking is invite-only; never stored. */
+  bookingPassword?: string
 }
 
 export interface ShipmentEditPayload {
