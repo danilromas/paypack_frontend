@@ -12,6 +12,8 @@ export interface ShipmentAddress {
   street: string
   phone: string
   email: string
+  /** Two-letter state code, required for the United States ("WA"). */
+  state?: string | null
 }
 
 /** Senders are always inside the EU. ISO 3166-1 alpha-2 codes. */
@@ -48,7 +50,17 @@ export const EU_COUNTRIES: { code: string; name: string }[] = [
 const EU_COUNTRY_CODES = new Set(EU_COUNTRIES.map((c) => c.code))
 
 /** Destinations outside the EU — these need customs paperwork, which only Sendcloud bookings carry. */
-export const NON_EU_DESTINATIONS: { code: string; name: string }[] = [{ code: "CH", name: "Switzerland" }]
+export const NON_EU_DESTINATIONS: { code: string; name: string }[] = [
+  { code: "CH", name: "Switzerland" },
+  { code: "US", name: "United States" },
+]
+
+/** Destinations whose carriers need a state or province on the address. */
+const STATE_REQUIRED = new Set(["US"])
+
+export function needsState(country: string | null | undefined): boolean {
+  return !!country && STATE_REQUIRED.has(country.trim().toUpperCase())
+}
 
 export const DESTINATION_COUNTRIES = [...EU_COUNTRIES, ...NON_EU_DESTINATIONS].sort((a, b) => a.name.localeCompare(b.name))
 
@@ -201,7 +213,10 @@ export function validateShipmentAddress(address: unknown, label: "sender" | "rec
   if (!EU_COUNTRY_CODES.has(country) && !(label === "receiver" && NON_EU_DESTINATION_CODES.has(country))) {
     return label === "sender"
       ? "We only ship from inside the EU — unsupported sender country"
-      : "We only ship within the EU and to Switzerland — unsupported receiver country"
+      : "We only ship within the EU, to Switzerland and to the United States — unsupported receiver country"
+  }
+  if (needsState(country) && (typeof a.state !== "string" || !/^[A-Za-z]{2}$/.test(a.state.trim()))) {
+    return `Invalid ${label} state — use the two-letter code, e.g. WA`
   }
   if (!/^\S+@\S+\.\S+$/.test((a.email as string).trim())) return `Invalid ${label} email`
   if (!/^\+?[\d\s()-]{6,20}$/.test((a.phone as string).trim())) return `Invalid ${label} phone`
@@ -226,12 +241,13 @@ export function normalizeShipmentAddress(a: ShipmentAddress): ShipmentAddress {
     // Carriers reject formatted numbers ("+372 5555 1234") — store plain digits with the leading +.
     phone: a.phone.replace(/[\s()-]/g, ""),
     email: a.email.trim(),
+    ...(needsState(a.country) && a.state ? { state: a.state.trim().toUpperCase() } : {}),
   }
 }
 
 /** One-line summary used for the legacy free-text location columns and table display. */
 export function formatShipmentAddress(a: ShipmentAddress): string {
-  return `${a.street}, ${a.zip} ${a.city}, ${a.country}`
+  return `${a.street}, ${a.zip} ${a.city}${a.state ? ` ${a.state}` : ""}, ${a.country}`
 }
 
 export function validateShipmentCreatePayload(payload: Partial<ShipmentCreatePayload>): string | null {
