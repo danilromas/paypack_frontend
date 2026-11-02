@@ -28,6 +28,7 @@ import {
   ORIGIN_COUNTRIES,
   formatShipmentAddress,
   needsCustoms,
+  needsState,
   type ExportReason,
   type ShipmentAddress,
   type ShipmentCreatePayload,
@@ -79,6 +80,7 @@ interface Quote {
 
 function partyValid(p: Party) {
   return (
+    (!needsState(p.country) || /^[A-Za-z]{2}$/.test((p.state ?? "").trim())) &&
     p.name.trim() !== "" &&
     p.country !== "" &&
     p.street.trim() !== "" &&
@@ -90,7 +92,15 @@ function partyValid(p: Party) {
 }
 
 function toAddress(p: Party): ShipmentAddress {
-  return { country: p.country, street: p.street.trim(), zip: p.zip.trim(), city: p.city.trim(), phone: p.phone.trim(), email: p.email.trim() }
+  return {
+    country: p.country,
+    street: p.street.trim(),
+    zip: p.zip.trim(),
+    city: p.city.trim(),
+    phone: p.phone.trim(),
+    email: p.email.trim(),
+    ...(needsState(p.country) ? { state: (p.state ?? "").trim().toUpperCase() } : {}),
+  }
 }
 
 /** Eurosender reports transit time in business days ("1", "3-4"); our fallback estimate is already prose. */
@@ -169,6 +179,16 @@ function PartyFields({
           <input value={value.zip} onChange={set("zip")} placeholder="Postal code" autoComplete="postal-code" className={inputClass} />
           <input value={value.city} onChange={set("city")} placeholder="City" autoComplete="address-level2" className={inputClass} />
         </div>
+        {needsState(value.country) && (
+          <input
+            value={value.state ?? ""}
+            onChange={set("state")}
+            placeholder="State, 2 letters (e.g. WA)"
+            maxLength={2}
+            autoComplete="address-level1"
+            className={inputClass}
+          />
+        )}
         <div className="grid gap-3">
           <input value={value.phone} onChange={set("phone")} placeholder="Phone, e.g. +372 5555 1234" type="tel" autoComplete="tel" className={inputClass} />
           <input value={value.email} onChange={set("email")} placeholder="Email" type="email" autoComplete="email" className={inputClass} />
@@ -484,7 +504,7 @@ export function NewShipmentWizard({
               value={receiver}
               onChange={setReceiver}
               countries={DESTINATION_COUNTRIES}
-              countryPlaceholder="Country (EU or Switzerland)"
+              countryPlaceholder="Country"
             />
           </div>
         )}
@@ -591,7 +611,7 @@ export function NewShipmentWizard({
                   <div>
                     <h3 className="font-semibold text-foreground">Customs</h3>
                     <p className="text-xs text-muted-foreground">
-                      Switzerland is outside the EU — this goes on the customs documents. Import VAT and duties are paid by the recipient.
+                      The destination is outside the EU — this goes on the customs documents. Import taxes and duties are paid by the recipient.
                     </p>
                   </div>
                 </div>
@@ -676,7 +696,7 @@ export function NewShipmentWizard({
               {quotesLoading
                 ? "Asking couriers for prices…"
                 : live
-                ? `Door-to-door courier, ${route.from} → ${route.to}. VAT included${isCustoms ? "; Swiss import VAT and duties are paid by the recipient" : ""}.`
+                ? `Door-to-door courier, ${route.from} → ${route.to}. VAT included${isCustoms ? "; import taxes and duties are paid by the recipient" : ""}.`
                 : "Internal estimate based on package size — not a live carrier rate."}
             </p>
             {quotesLoading &&

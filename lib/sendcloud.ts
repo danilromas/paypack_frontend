@@ -127,6 +127,11 @@ export interface ShipmentInput {
   customs?: CustomsDetails | null
 }
 
+/** Sendcloud wants the full ISO 3166-2 code ("US-WA"); a bare "WA" is rejected. */
+function stateCode(a: ShipmentAddress): { state_province_code?: string } {
+  return a.state ? { state_province_code: `${a.country.toUpperCase()}-${a.state.toUpperCase()}` } : {}
+}
+
 function toApiAddress(a: ShipmentAddress & { name: string }) {
   return {
     name: a.name,
@@ -134,6 +139,7 @@ function toApiAddress(a: ShipmentAddress & { name: string }) {
     postal_code: a.zip,
     city: a.city,
     country_code: a.country.toUpperCase(),
+    ...stateCode(a),
     email: a.email,
     phone_number: a.phone,
   }
@@ -298,6 +304,7 @@ export async function getQuotes(input: ShipmentInput): Promise<ServiceQuote[]> {
       postal_code: input.receiver.zip,
       city: input.receiver.city,
       address_line_1: input.receiver.street,
+      ...stateCode(input.receiver),
     },
     parcels: [toApiParcel(input.pkg)],
     calculate_quotes: true,

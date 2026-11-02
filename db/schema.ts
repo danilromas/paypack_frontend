@@ -279,6 +279,7 @@ export interface ShipmentAddressColumn {
   street: string
   phone: string
   email: string
+  state?: string | null
 }
 
 export const shipments = pgTable("shipments", {
