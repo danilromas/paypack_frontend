@@ -5,6 +5,24 @@ export type ShipmentStatus = "arrived" | "in-transit" | "pending"
 export type ShipmentProvider = "internal" | "eurosender" | "sendcloud"
 
 /** Structured postal address + contact for one side of a shipment. Country is ISO 3166-1 alpha-2. */
+/** Door delivery, or delivery to a locker / pickup point the receiver collects from. */
+export type DeliveryMode = "home" | "point"
+
+/** A carrier's locker or pickup point, as shown to people and stored with the receiver's address. */
+export interface ServicePointSummary {
+  id: string
+  name: string
+  carrierCode: string
+  carrierName: string
+  /** Sendcloud's general type: "locker", "servicepoint", "post_office"… */
+  shopType: string | null
+  street: string
+  zip: string
+  city: string
+  country: string
+  distanceM: number | null
+}
+
 export interface ShipmentAddress {
   country: string
   zip: string
@@ -14,6 +32,8 @@ export interface ShipmentAddress {
   email: string
   /** Two-letter state code, required for the United States ("WA"). */
   state?: string | null
+  /** Set on the receiver when the parcel goes to a locker or pickup point instead of the door. */
+  servicePoint?: ServicePointSummary | null
 }
 
 /** Senders are always inside the EU. ISO 3166-1 alpha-2 codes. */
@@ -131,6 +151,10 @@ export interface ShipmentCreatePayload {
   customs?: CustomsDetails | null
   /** Checked against SHIPMENT_BOOKING_PASSWORD while booking is invite-only; never stored. */
   bookingPassword?: string
+  /** Defaults to door delivery. */
+  delivery?: DeliveryMode
+  /** Sendcloud service point id; required when delivery is "point". */
+  servicePointId?: string | null
 }
 
 export interface ShipmentEditPayload {
@@ -272,6 +296,12 @@ export function validateShipmentCreatePayload(payload: Partial<ShipmentCreatePay
   if (payload.declaredValueEur !== undefined && payload.declaredValueEur !== null) {
     const v = payload.declaredValueEur
     if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 100_000) return "Invalid declared value"
+  }
+  if (payload.delivery !== undefined && payload.delivery !== "home" && payload.delivery !== "point") {
+    return "Invalid delivery"
+  }
+  if (payload.delivery === "point" && (typeof payload.servicePointId !== "string" || !/^\d{1,15}$/.test(payload.servicePointId))) {
+    return "Pick a pickup point"
   }
   if (needsCustoms(payload.receiverAddress?.country)) {
     if (!payload.contents?.trim()) return "Describe the contents for customs"

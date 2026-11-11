@@ -5,6 +5,7 @@ import {
   needsState,
   normalizeShipmentAddress,
   validateShipmentAddress,
+  validateShipmentCreatePayload,
 } from "../lib/shipments"
 
 describe("shipping to the United States", () => {
@@ -40,5 +41,30 @@ describe("shipping to the United States", () => {
   it("drops a stray state on countries that don't use one", () => {
     const it_ = { country: "IT", zip: "10035", city: "Mazzè", street: "Via del Ponticello 14", phone: "+39340", email: "a@b.it", state: "TO" }
     expect(normalizeShipmentAddress(it_).state).toBeUndefined()
+  })
+})
+
+describe("pickup point delivery", () => {
+  const it_ = { country: "IT", zip: "20121", city: "Milano", street: "Via Brera 10", phone: "+393331234567", email: "a@b.it" }
+  const payload = {
+    senderName: "S",
+    senderLocation: "x",
+    receiverName: "R",
+    receiverLocation: "x",
+    serviceTier: "standard" as const,
+    weightKg: 1,
+    lengthCm: 30,
+    widthCm: 20,
+    heightCm: 10,
+    senderAddress: it_,
+    receiverAddress: it_,
+  }
+
+  it("needs a numeric service point id only for pickup point delivery", () => {
+    expect(validateShipmentCreatePayload({ ...payload, delivery: "home" })).toBeNull()
+    expect(validateShipmentCreatePayload({ ...payload, delivery: "point", servicePointId: "17249106" })).toBeNull()
+    expect(validateShipmentCreatePayload({ ...payload, delivery: "point" })).toMatch(/pickup point/)
+    expect(validateShipmentCreatePayload({ ...payload, delivery: "point", servicePointId: "../x" })).toMatch(/pickup point/)
+    expect(validateShipmentCreatePayload({ ...payload, delivery: "drone" as never })).toMatch(/delivery/)
   })
 })

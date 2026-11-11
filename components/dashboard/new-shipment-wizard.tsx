@@ -11,6 +11,7 @@ import {
   FileText,
   Home,
   Lock,
+  MapPinned,
   Loader2,
   MapPin,
   Package,
@@ -29,7 +30,9 @@ import {
   formatShipmentAddress,
   needsCustoms,
   needsState,
+  type DeliveryMode,
   type ExportReason,
+  type ServicePointSummary,
   type ShipmentAddress,
   type ShipmentCreatePayload,
 } from "@/lib/shipments"
@@ -76,6 +79,21 @@ interface Quote {
   pickupExcludedDates: string[]
   /** Sendcloud names the carrier up front; Eurosender assigns one after booking. */
   carrierName?: string | null
+  carrierCode?: string | null
+  /** Eurosender quotes are always door delivery. */
+  delivery?: DeliveryMode
+  /** The sender takes the parcel to a locker or shop instead of a courier collecting it. */
+  dropOff?: boolean
+}
+
+/** One card per tier and delivery mode — a tier can have both a door and a pickup point option. */
+function quoteKey(q: Quote) {
+  return `${q.tier}:${q.delivery ?? "home"}`
+}
+
+function formatDistance(m: number | null) {
+  if (m === null) return ""
+  return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`
 }
 
 function partyValid(p: Party) {
@@ -223,7 +241,11 @@ export function NewShipmentWizard({
   const [itemCount, setItemCount] = useState<number | "">(1)
   const [exportReason, setExportReason] = useState<ExportReason>("commercial_goods")
   const [senderVat, setSenderVat] = useState("")
-  const [serviceTier, setServiceTier] = useState<ServiceTier | null>(null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [points, setPoints] = useState<ServicePointSummary[]>([])
+  const [pointsLoading, setPointsLoading] = useState(false)
+  const [pointsError, setPointsError] = useState<string | null>(null)
+  const [servicePointId, setServicePointId] = useState<string | null>(null)
   const [pickupDate, setPickupDate] = useState("")
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [live, setLive] = useState(false)
@@ -285,7 +307,7 @@ export function NewShipmentWizard({
         if (!res.ok) throw new Error(data.error ?? "Could not get prices")
         setLive(Boolean(data.live))
         setQuotes(data.quotes ?? [])
-        setServiceTier((prev) => (data.quotes ?? []).some((q: Quote) => q.tier === prev) ? prev : null)
+        setSelectedKey((prev) => ((data.quotes ?? []) as Quote[]).some((q) => quoteKey(q) === prev) ? prev : null)
       })
       .catch((err) => {
         if (controller.signal.aborted) return
@@ -299,14 +321,50 @@ export function NewShipmentWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPhase])
 
-  const selectedQuote = quotes.find((q) => q.tier === serviceTier) ?? null
+  const selectedQuote = quotes.find((q) => quoteKey(q) === selectedKey) ?? null
+  const serviceTier = selectedQuote?.tier ?? null
+  const isPoint = selectedQuote?.delivery === "point"
+  const selectedPoint = points.find((p) => p.id === servicePointId) ?? null
   const tierInfo = SERVICE_TIERS.find((t) => t.id === serviceTier)
   const phaseWidth = currentPhase === "route" ? "max-w-3xl" : "max-w-xl"
   const route = { from: sender.city.trim() || "Sender", to: receiver.city.trim() || "Receiver" }
-  const cheapestTier = quotes.reduce<Quote | null>((best, q) => (!best || q.priceGross < best.priceGross ? q : best), null)?.tier
+  const cheapestQuote = quotes.reduce<Quote | null>((best, q) => (!best || q.priceGross < best.priceGross ? q : best), null)
   // Eurosender reports days as "1" or "3-4" — compare on the upper bound.
   const etaDays = (q: Quote) => Number((q.estimatedDelivery ?? "").split("-").pop()) || Number.POSITIVE_INFINITY
-  const fastestTier = quotes.reduce<Quote | null>((best, q) => (!best || etaDays(q) < etaDays(best) ? q : best), null)?.tier
+  const fastestQuote = quotes.reduce<Quote | null>((best, q) => (!best || etaDays(q) < etaDays(best) ? q : best), null)
+
+  // Lockers near the receiver, for the carrier of the chosen pickup point option.
+  useEffect(() => {
+    if (currentPhase !== "review" || !isPoint || !selectedQuote?.carrierCode) return
+    const controller = new AbortController()
+    setPointsLoading(true)
+    setPointsError(null)
+    const params = new URLSearchParams({
+      carrier: selectedQuote.carrierCode,
+      country: receiver.country,
+      zip: receiver.zip.trim(),
+      city: receiver.city.trim(),
+      street: receiver.street.trim(),
+    })
+    fetch(`/api/shipments/service-points/?${params}`, { signal: controller.signal })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error ?? "Could not load pickup points")
+        const found = (data.points ?? []) as ServicePointSummary[]
+        setPoints(found)
+        setServicePointId((prev) => (found.some((p) => p.id === prev) ? prev : null))
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return
+        setPoints([])
+        setPointsError(err instanceof Error ? err.message : "Could not load pickup points")
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPointsLoading(false)
+      })
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPhase, selectedKey])
 
   const tomorrow = (() => {
     const d = new Date()
@@ -321,7 +379,7 @@ export function NewShipmentWizard({
     if (!selectedQuote) return
     setPickupDate((prev) => (prev && prev >= minPickup && !excluded.includes(prev) ? prev : firstPickupDay(minPickup, excluded)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceTier, quotes])
+  }, [selectedKey, quotes])
 
   const pickupDay = pickupDate ? new Date(`${pickupDate}T12:00:00`).getDay() : null
   const pickupError = !pickupDate
@@ -335,7 +393,7 @@ export function NewShipmentWizard({
   function canAdvanceFrom(phase: WizardPhase) {
     if (phase === "route") return routeValid
     if (phase === "package") return packageValid
-    if (phase === "compare") return serviceTier !== null && !quotesLoading
+    if (phase === "compare") return selectedQuote !== null && !quotesLoading
     return true
   }
 
@@ -363,7 +421,7 @@ export function NewShipmentWizard({
   }
 
   async function handleCreate() {
-    if (!packageValid || !serviceTier || pickupError) return
+    if (!packageValid || !serviceTier || pickupError || (isPoint && !servicePointId)) return
     setSubmitting(true)
     setError(null)
     const senderAddress = toAddress(sender)
@@ -394,6 +452,8 @@ export function NewShipmentWizard({
             }
           : null,
         pickupDate,
+        delivery: isPoint ? "point" : "home",
+        servicePointId: isPoint ? servicePointId : null,
       })
       onClose()
     } catch (err) {
@@ -696,7 +756,7 @@ export function NewShipmentWizard({
               {quotesLoading
                 ? "Asking couriers for prices…"
                 : live
-                ? `Door-to-door courier, ${route.from} → ${route.to}. VAT included${isCustoms ? "; import taxes and duties are paid by the recipient" : ""}.`
+                ? `${route.from} → ${route.to}, to the door or a pickup point. VAT included${isCustoms ? "; import taxes and duties are paid by the recipient" : ""}.`
                 : "Internal estimate based on package size — not a live carrier rate."}
             </p>
             {quotesLoading &&
@@ -713,13 +773,15 @@ export function NewShipmentWizard({
             {!quotesLoading &&
               quotes.map((quote) => {
                 const tier = SERVICE_TIERS.find((t) => t.id === quote.tier)
-                const TierIcon = TIER_ICONS[quote.tier]
-                const selected = serviceTier === quote.tier
+                const toPoint = quote.delivery === "point"
+                const TierIcon = toPoint ? MapPinned : TIER_ICONS[quote.tier]
+                const key = quoteKey(quote)
+                const selected = selectedKey === key
                 return (
                   <button
-                    key={quote.tier}
+                    key={key}
                     type="button"
-                    onClick={() => setServiceTier(quote.tier)}
+                    onClick={() => setSelectedKey(key)}
                     className={cn(
                       "flex w-full items-center gap-4 rounded-2xl border-2 px-4 py-4 text-left transition-all sm:px-5",
                       selected ? "border-ship bg-ship/10" : "border-border bg-card hover:border-ship/30",
@@ -731,15 +793,25 @@ export function NewShipmentWizard({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-foreground">{tier?.label ?? quote.tier}</span>
-                        {quotes.length > 1 && quote.tier === cheapestTier && (
+                        {toPoint && (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pickup point</span>
+                        )}
+                        {quotes.length > 1 && cheapestQuote && key === quoteKey(cheapestQuote) && (
                           <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-success">Cheapest</span>
                         )}
-                        {quotes.length > 1 && quote.tier === fastestTier && Number.isFinite(etaDays(quote)) && (
+                        {quotes.length > 1 && fastestQuote && key === quoteKey(fastestQuote) && Number.isFinite(etaDays(quote)) && (
                           <span className="rounded-full bg-ship/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ship">Fastest</span>
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {[quote.carrierName, formatEta(quote.estimatedDelivery)].filter(Boolean).join(" · ")}
+                        {[
+                          quote.carrierName,
+                          formatEta(quote.estimatedDelivery),
+                          toPoint ? "receiver collects from a locker or pickup point" : null,
+                          quote.dropOff ? "you drop it off" : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </div>
                     </div>
                     <div className="shrink-0 text-lg font-bold text-foreground">
@@ -767,7 +839,13 @@ export function NewShipmentWizard({
                 <div className="min-w-0 text-right">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">To</div>
                   <div className="truncate text-sm font-semibold text-foreground">{receiver.name}</div>
-                  <div className="text-xs text-muted-foreground">{formatShipmentAddress(toAddress(receiver))}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {isPoint
+                      ? selectedPoint
+                        ? `${selectedPoint.carrierName} · ${selectedPoint.street}, ${selectedPoint.zip} ${selectedPoint.city}`
+                        : "Pickup point — choose below"
+                      : formatShipmentAddress(toAddress(receiver))}
+                  </div>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm">
@@ -798,6 +876,52 @@ export function NewShipmentWizard({
               )}
             </div>
 
+            {isPoint && (
+              <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+                <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <MapPinned className="h-4 w-4 text-ship" />
+                  Pickup point near the receiver
+                </div>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  {selectedQuote?.carrierName} delivers here and notifies the receiver, who collects it with a code.
+                </p>
+                {pointsLoading && [0, 1, 2].map((i) => <div key={i} className="mb-2 h-14 animate-pulse rounded-xl border border-border bg-card" />)}
+                {!pointsLoading && pointsError && (
+                  <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{pointsError}</span>
+                  </div>
+                )}
+                {!pointsLoading && !pointsError && points.length === 0 && (
+                  <p className="py-3 text-center text-sm text-muted-foreground">No pickup points near this address — pick door delivery instead.</p>
+                )}
+                {!pointsLoading && points.length > 0 && (
+                  <div className="max-h-64 space-y-2 overflow-y-auto">
+                    {points.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setServicePointId(p.id)}
+                        className={cn(
+                          "flex w-full items-start justify-between gap-3 rounded-xl border-2 px-3 py-2 text-left text-sm transition-all",
+                          servicePointId === p.id ? "border-ship bg-ship/10" : "border-border bg-card hover:border-ship/30",
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground">{p.name || p.carrierName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {p.street}, {p.zip} {p.city}
+                            {p.shopType ? ` · ${p.shopType}` : ""}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-xs text-muted-foreground">{formatDistance(p.distanceM)}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="mt-3 rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
               <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                 <CalendarDays className="h-4 w-4 text-ship" />
@@ -805,7 +929,10 @@ export function NewShipmentWizard({
               </label>
               <input type="date" value={pickupDate} min={minPickup} onChange={(e) => setPickupDate(e.target.value)} className={inputClass} />
               <p className={cn("mt-1 text-xs", pickupError ? "text-destructive" : "text-muted-foreground")}>
-                {pickupError ?? "The courier collects from the sender's door during working hours."}
+                {pickupError ??
+                  (selectedQuote?.dropOff
+                    ? "You take the parcel to a locker or drop-off point — any working day from this date."
+                    : "The courier collects from the sender's door during working hours.")}
               </p>
             </div>
 
@@ -831,7 +958,7 @@ export function NewShipmentWizard({
             )}
             <button
               onClick={handleCreate}
-              disabled={submitting || pickupError !== null}
+              disabled={submitting || pickupError !== null || (isPoint && !servicePointId)}
               className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-ship py-3 font-semibold text-ship-foreground shadow-md transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? (
