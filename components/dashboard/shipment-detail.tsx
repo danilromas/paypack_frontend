@@ -63,6 +63,14 @@ function PartyBlock({ label, name, address, location }: { label: string; name: s
           location
         )}
       </div>
+      {address?.servicePoint && (
+        <div className="mt-2 rounded-xl bg-ship/10 px-3 py-2 text-xs text-foreground">
+          <div className="font-medium">Pickup point · {address.servicePoint.carrierName}</div>
+          <div className="text-muted-foreground">
+            {address.servicePoint.street}, {address.servicePoint.zip} {address.servicePoint.city}
+          </div>
+        </div>
+      )}
       {address && (
         <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
           <div className="truncate">{address.phone}</div>

@@ -17,7 +17,7 @@ import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { isBookingPasswordValid } from "@/lib/shipment-access"
 import { estimateShippingCost, generateTrackingNumber, getServiceTier } from "@/lib/shipping-rates"
 import { EurosenderError, createOrder } from "@/lib/eurosender"
-import { SendcloudError, createShipment as createSendcloudShipment } from "@/lib/sendcloud"
+import { SendcloudError, createShipment as createSendcloudShipment, getServicePoint } from "@/lib/sendcloud"
 import { isLiveShippingEnabled, liveProviderFor, unsupportedRouteMessage } from "@/lib/shipping-provider"
 
 export async function GET() {
@@ -107,14 +107,28 @@ export async function POST(req: Request) {
         customs: needsCustoms(receiverAddress!.country) && body.customs ? normalizeCustomsDetails(body.customs) : null,
       }
 
+      const delivery = body.delivery ?? "home"
+      if (delivery === "point" && provider !== "sendcloud") {
+        return NextResponse.json({ error: "Pickup point delivery isn't available on this route" }, { status: 400 })
+      }
+
       if (provider === "sendcloud") {
+        // Look the point up ourselves: it fixes which carrier must carry the parcel, and what we show later.
+        const servicePoint = delivery === "point" ? await getServicePoint(body.servicePointId!) : null
         // Our row id doubles as Sendcloud's external reference, so a retried request can't double-book.
         const id = randomUUID()
-        const booked = await createSendcloudShipment(input, tier.id, id)
+        const booked = await createSendcloudShipment(
+          { ...input, servicePointId: servicePoint?.id ?? null },
+          tier.id,
+          id,
+          delivery,
+          servicePoint?.carrierCode ?? null,
+        )
         const inserted = await db
           .insert(shipments)
           .values({
             ...base,
+            receiverAddress: servicePoint ? { ...receiverAddress!, servicePoint } : receiverAddress,
             id,
             provider: "sendcloud",
             providerOrderCode: booked.shipmentId,

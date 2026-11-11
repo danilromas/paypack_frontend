@@ -1,7 +1,7 @@
 import "server-only"
 import { createHmac, timingSafeEqual } from "node:crypto"
 import type { ServiceTier } from "@/lib/shipping-rates"
-import type { CustomsDetails, ShipmentAddress, ShipmentStatus } from "@/lib/shipments"
+import type { CustomsDetails, DeliveryMode, ServicePointSummary, ShipmentAddress, ShipmentStatus } from "@/lib/shipments"
 
 /**
  * Thin client for the Sendcloud API v3 (https://sendcloud.dev/api/v3). Sendcloud only books from the
@@ -125,6 +125,8 @@ export interface ShipmentInput {
   pkg: PackageInput
   /** Present for destinations outside the EU; turned into parcel items and customs information. */
   customs?: CustomsDetails | null
+  /** Sendcloud service point (locker, shop) the parcel goes to instead of the receiver's door. */
+  servicePointId?: string | null
 }
 
 /** Sendcloud wants the full ISO 3166-2 code ("US-WA"); a bare "WA" is rejected. */
@@ -218,9 +220,14 @@ export interface ShippingOption {
 
 export interface ServiceQuote {
   tier: ServiceTier
+  /** Door delivery, or delivery to a locker / pickup point the receiver collects from. */
+  delivery: DeliveryMode
   /** Sendcloud shipping option code — what we announce the shipment with. */
   serviceType: string
+  carrierCode: string | null
   carrierName: string | null
+  /** The sender takes the parcel to a locker or shop instead of a courier collecting it. */
+  dropOff: boolean
   priceGross: number
   currency: string
   /** Business days, same format as Eurosender's ("1", "3"). */
@@ -257,29 +264,49 @@ function isBetterOption(option: ShippingOption, price: Price, current: ShippingO
  * receiver's end), no age-check variants, priced, and the cheapest one within the tier. Options that need
  * customs paperwork stay in — bookings outside the EU always carry it.
  */
-export function pickTierQuotes(options: ShippingOption[]): ServiceQuote[] {
-  const best = new Map<ServiceTier, { option: ShippingOption; price: Price }>()
+const POINT_LAST_MILES = new Set(["service_point", "locker", "locker_or_service_point"])
+
+/** Door or pickup point; null for last miles we don't sell (mailbox drops). */
+export function deliveryModeOf(option: ShippingOption): DeliveryMode | null {
+  if (option.requirements?.is_service_point_required) return "point"
+  const lastMile = option.functionalities?.last_mile
+  if (!lastMile || lastMile === "home_delivery") return "home"
+  return POINT_LAST_MILES.has(lastMile) ? "point" : null
+}
+
+/**
+ * Picks the option to sell for each tier and delivery mode: priced, no age-check variants, and the
+ * cheapest one. `carrierCode` narrows the choice to one carrier — a booking to a service point must use
+ * the carrier that runs that point.
+ */
+export function pickTierQuotes(options: ShippingOption[], carrierCode?: string | null): ServiceQuote[] {
+  const best = new Map<string, { option: ShippingOption; price: Price; tier: ServiceTier; delivery: DeliveryMode }>()
   for (const option of options) {
     const price = optionPrice(option)
-    if (!price || option.quote_error) continue
-    if (option.requirements?.is_service_point_required || option.functionalities?.age_check) continue
-    const lastMile = option.functionalities?.last_mile
-    if (lastMile && lastMile !== "home_delivery") continue
+    if (!price || option.quote_error || option.functionalities?.age_check) continue
+    if (carrierCode && option.carrier?.code !== carrierCode) continue
+    const delivery = deliveryModeOf(option)
+    if (!delivery) continue
     const tier = PRIORITY_TO_TIER[option.functionalities?.priority ?? "standard"] ?? "standard"
-    const current = best.get(tier)
-    if (!current || isBetterOption(option, price, current.option, current.price)) best.set(tier, { option, price })
+    const key = `${tier}:${delivery}`
+    const current = best.get(key)
+    if (!current || isBetterOption(option, price, current.option, current.price)) best.set(key, { option, price, tier, delivery })
   }
 
   const order: ServiceTier[] = ["economy", "standard", "express"]
-  return order.flatMap((tier) => {
-    const hit = best.get(tier)
+  const modes: DeliveryMode[] = ["home", "point"]
+  return modes.flatMap((mode) => order.flatMap((tier) => {
+    const hit = best.get(`${tier}:${mode}`)
     if (!hit) return []
     const leadHours = hit.option.quotes?.[0]?.lead_time
     return [
       {
         tier,
+        delivery: mode,
         serviceType: hit.option.code,
+        carrierCode: hit.option.carrier?.code ?? null,
         carrierName: hit.option.carrier?.name ?? null,
+        dropOff: hit.option.functionalities?.first_mile === "dropoff",
         priceGross: Math.round(Number(hit.price.value) * 100) / 100,
         currency: hit.price.currency,
         estimatedDelivery: typeof leadHours === "number" && leadHours > 0 ? String(Math.ceil(leadHours / 24)) : null,
@@ -287,11 +314,11 @@ export function pickTierQuotes(options: ShippingOption[]): ServiceQuote[] {
         pickupExcludedDates: [],
       },
     ]
-  })
+  }))
 }
 
 /** Live prices for each of our tiers that Sendcloud can serve on this route. */
-export async function getQuotes(input: ShipmentInput): Promise<ServiceQuote[]> {
+export async function getQuotes(input: ShipmentInput, carrierCode?: string | null): Promise<ServiceQuote[]> {
   const data = await request<{ data: ShippingOption[] | null }>("POST", "/shipping-options", {
     from_address: {
       country_code: input.sender.country.toUpperCase(),
@@ -309,15 +336,15 @@ export async function getQuotes(input: ShipmentInput): Promise<ServiceQuote[]> {
     parcels: [toApiParcel(input.pkg)],
     calculate_quotes: true,
   })
-  return pickSellableQuotes(data.data ?? [], isSendcloudTestMode())
+  return pickSellableQuotes(data.data ?? [], isSendcloudTestMode(), carrierCode)
 }
 
 /**
  * The free test letter is never sold: it would undercut every real carrier at 0 €. Test mode shows it only
  * when the account has no real carrier for the route yet, so the flow can still be exercised end to end.
  */
-export function pickSellableQuotes(options: ShippingOption[], testMode: boolean): ServiceQuote[] {
-  const real = pickTierQuotes(options.filter((o) => o.code !== TEST_SHIPPING_OPTION))
+export function pickSellableQuotes(options: ShippingOption[], testMode: boolean, carrierCode?: string | null): ServiceQuote[] {
+  const real = pickTierQuotes(options.filter((o) => o.code !== TEST_SHIPPING_OPTION), carrierCode)
   if (real.length > 0 || !testMode) return real
   return pickTierQuotes(options.filter((o) => o.code === TEST_SHIPPING_OPTION))
 }
@@ -373,12 +400,15 @@ export async function createShipment(
   input: ShipmentInput,
   tier: ServiceTier,
   reference: string,
+  delivery: DeliveryMode = "home",
+  pointCarrierCode: string | null = null,
 ): Promise<BookedShipment & { priceGross: number | null; currency: string | null }> {
   const testMode = isSendcloudTestMode()
   // In test mode the quote is informational only, so a route without priced carriers still books.
-  const quote = (await getQuotes(input).catch((error) => (testMode ? [] : Promise.reject(error)))).find(
-    (q) => q.tier === tier,
+  const quotes = await getQuotes(input, delivery === "point" ? pointCarrierCode : null).catch((error) =>
+    testMode ? [] : Promise.reject(error),
   )
+  const quote = quotes.find((q) => q.tier === tier && q.delivery === delivery)
   if (!quote && !testMode) {
     throw new SendcloudError("This service is no longer available on this route — compare prices again", 409)
   }
@@ -396,6 +426,8 @@ export async function createShipment(
     reference: input.pkg.content?.trim() || "Goods",
     total_order_price: { value: valueEur.toFixed(2), currency: "EUR" },
     label_details: { mime_type: "application/pdf", dpi: 72 },
+    // The free test letter has no service points; it always goes to the address.
+    ...(input.servicePointId && !testMode ? { to_service_point: { id: input.servicePointId } } : {}),
   })
 
   const booked = toBookedShipment(res.data)
@@ -416,6 +448,53 @@ export async function getShipment(shipmentId: string): Promise<BookedShipment> {
 export async function cancelShipment(shipmentId: string): Promise<"cancelled" | "queued"> {
   const res = await request<{ data?: { status?: string } }>("POST", `/shipments/${encodeURIComponent(shipmentId)}/cancel`)
   return res.data?.status === "queued" ? "queued" : "cancelled"
+}
+
+interface ApiServicePoint {
+  id: number | string
+  name?: string
+  carrier?: { code?: string; name?: string } | null
+  general_shop_type?: string | null
+  address?: { street?: string; house_number?: string; postal_code?: string; city?: string; country_code?: string } | null
+  distance?: number | null
+}
+
+export function toServicePoint(p: ApiServicePoint): ServicePointSummary {
+  return {
+    id: String(p.id),
+    name: p.name ?? "",
+    carrierCode: p.carrier?.code ?? "",
+    carrierName: p.carrier?.name ?? "",
+    shopType: p.general_shop_type ?? null,
+    street: [p.address?.street, p.address?.house_number].filter((x) => x && x !== "snc").join(" "),
+    zip: p.address?.postal_code ?? "",
+    city: p.address?.city ?? "",
+    country: p.address?.country_code ?? "",
+    distanceM: typeof p.distance === "number" ? p.distance : null,
+  }
+}
+
+/** Lockers and pickup points of one carrier closest to an address, nearest first. */
+export async function findServicePoints(
+  near: { country: string; zip: string; city: string; street?: string },
+  carrierCode: string,
+  limit = 10,
+): Promise<ServicePointSummary[]> {
+  const params = new URLSearchParams({
+    country_code: near.country.toUpperCase(),
+    carrier_code: carrierCode,
+    address_postal_code: near.zip,
+    address_city: near.city,
+    limit: String(limit),
+  })
+  if (near.street) params.set("address_street", near.street)
+  const res = await request<{ data?: { results?: ApiServicePoint[] } }>("GET", `/service-points?${params}`)
+  return (res.data?.results ?? []).map(toServicePoint)
+}
+
+export async function getServicePoint(id: string): Promise<ServicePointSummary> {
+  const res = await request<{ data: ApiServicePoint }>("GET", `/service-points/${encodeURIComponent(id)}`)
+  return toServicePoint(res.data)
 }
 
 export type ParcelDocument = "label" | "customs-declaration"

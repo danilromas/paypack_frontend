@@ -280,6 +280,18 @@ export interface ShipmentAddressColumn {
   phone: string
   email: string
   state?: string | null
+  servicePoint?: {
+    id: string
+    name: string
+    carrierCode: string
+    carrierName: string
+    shopType: string | null
+    street: string
+    zip: string
+    city: string
+    country: string
+    distanceM: number | null
+  } | null
 }
 
 export const shipments = pgTable("shipments", {

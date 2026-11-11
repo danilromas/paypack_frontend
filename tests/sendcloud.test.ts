@@ -6,6 +6,7 @@ import {
   mapParcelStatus,
   pickSellableQuotes,
   pickTierQuotes,
+  toServicePoint,
   sendcloudServesSender,
   toBookedShipment,
   toCustomsInformation,
@@ -28,7 +29,7 @@ const option = (
 })
 
 describe("pickTierQuotes", () => {
-  it("maps priorities onto tiers and keeps the cheapest home delivery per tier", () => {
+  it("maps priorities onto tiers and keeps the cheapest option per tier and delivery mode", () => {
     const quotes = pickTierQuotes([
       option("poste:economy", "6.90", { priority: "economical", leadTime: 96 }),
       option("brt:standard", "9.40"),
@@ -42,18 +43,55 @@ describe("pickTierQuotes", () => {
       expect.objectContaining({ tier: "economy", serviceType: "poste:economy", priceGross: 6.9, estimatedDelivery: "4" }),
       expect.objectContaining({ tier: "standard", serviceType: "ups:standard", carrierName: "UPS", priceGross: 8.15, estimatedDelivery: "2" }),
       expect.objectContaining({ tier: "express", serviceType: "fedex:priority", priceGross: 19.5, estimatedDelivery: "1" }),
+      expect.objectContaining({ tier: "standard", delivery: "point", serviceType: "inpost:locker", priceGross: 3 }),
     ])
   })
 
-  it("skips unpriced, errored, service-point and age-check options", () => {
+  it("skips unpriced, errored, age-check and mailbox options", () => {
     expect(
       pickTierQuotes([
         option("a:std", null),
         option("b:std", "5.00", { quote_error: { code: "no_price_for_route", title: "No price" } }),
-        option("c:std", "5.00", { requirements: { is_service_point_required: true } }),
         { ...option("d:std", "5.00"), functionalities: { priority: null, last_mile: "home_delivery", age_check: 18 } },
+        option("e:std", "1.00", { lastMile: "mailbox" }),
       ]),
     ).toEqual([])
+  })
+
+  it("sells lockers and pickup points as their own delivery mode", () => {
+    // InPost Italy and Poste Italiane, Italy → Italy, shaped as Sendcloud returns them.
+    const inpost = (code: string, price: string, firstMile: string) => ({
+      ...option(code, price),
+      carrier: { code: "inpost_it", name: "Inpost Italy" },
+      functionalities: { priority: null, last_mile: "locker_or_service_point", first_mile: firstMile },
+      requirements: { is_service_point_required: true },
+    })
+    const quotes = pickTierQuotes([
+      option("poste_it_delivery:shop2home_postoffice/dropoff", "5.17"),
+      inpost("inpost_it:lockertolocker/dropoff,size=m", "3.44", "dropoff"),
+      inpost("inpost_it:addresstolocker/pickup,size=m", "3.84", "pickup"),
+    ])
+    expect(quotes).toEqual([
+      expect.objectContaining({ delivery: "home", priceGross: 5.17 }),
+      expect.objectContaining({
+        delivery: "point",
+        serviceType: "inpost_it:lockertolocker/dropoff,size=m",
+        carrierCode: "inpost_it",
+        dropOff: true,
+        priceGross: 3.44,
+      }),
+    ])
+  })
+
+  it("narrows to one carrier when booking to that carrier's pickup point", () => {
+    const point = (code: string, carrier: string, price: string) => ({
+      ...option(code, price),
+      carrier: { code: carrier, name: carrier },
+      requirements: { is_service_point_required: true },
+    })
+    const options = [point("inpost_it:locker", "inpost_it", "3.44"), point("poste_it_delivery:puntoposte", "poste_it_delivery", "5.17")]
+    expect(pickTierQuotes(options).map((q) => q.carrierCode)).toEqual(["inpost_it"])
+    expect(pickTierQuotes(options, "poste_it_delivery").map((q) => q.carrierCode)).toEqual(["poste_it_delivery"])
   })
 
   it("prefers the base product over its hand-over variants at the same price", () => {
@@ -213,5 +251,31 @@ describe("webhooks", () => {
     expect(sendcloudServesSender("EE")).toBe(false)
     delete process.env.SENDCLOUD_SECRET_KEY
     expect(sendcloudServesSender("IT")).toBe(false)
+  })
+})
+
+describe("toServicePoint", () => {
+  it("flattens Sendcloud's service point and drops the 'snc' (no number) placeholder", () => {
+    expect(
+      toServicePoint({
+        id: 17249106,
+        name: "InPost",
+        carrier: { code: "inpost_it", name: "Inpost Italy" },
+        general_shop_type: "locker",
+        address: { street: "Piazzale Cadorna", house_number: "snc", postal_code: "20123", city: "Milano", country_code: "IT" },
+        distance: 314,
+      }),
+    ).toEqual({
+      id: "17249106",
+      name: "InPost",
+      carrierCode: "inpost_it",
+      carrierName: "Inpost Italy",
+      shopType: "locker",
+      street: "Piazzale Cadorna",
+      zip: "20123",
+      city: "Milano",
+      country: "IT",
+      distanceM: 314,
+    })
   })
 })
