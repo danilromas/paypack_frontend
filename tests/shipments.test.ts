@@ -8,6 +8,8 @@ import {
   validatePickupDate,
   validateShipmentAddress,
   validateShipmentCreatePayload,
+  validateQuoteAddress,
+  toQuoteAddress,
 } from "../lib/shipments"
 
 const price = (gross: number) => ({ original: { currencyCode: "EUR", gross, net: gross / 1.24 } })
@@ -173,5 +175,19 @@ describe("shipping to Switzerland", () => {
       exportReason: "commercial_goods",
       senderVatNumber: "IT12345678901",
     })
+  })
+})
+
+describe("validateQuoteAddress", () => {
+  it("prices from country and postcode alone", () => {
+    expect(validateQuoteAddress({ country: "IT", zip: "20121" }, "sender")).toBeNull()
+    expect(toQuoteAddress({ country: "it", zip: " 20121 " })).toMatchObject({ country: "IT", zip: "20121", street: "", city: "" })
+  })
+
+  it("still needs a postcode, a supported country and the US state", () => {
+    expect(validateQuoteAddress({ country: "IT", zip: "" }, "sender")).toBe("Invalid sender postcode")
+    expect(validateQuoteAddress({ country: "US", zip: "98101" }, "sender")).toMatch(/inside the EU/)
+    expect(validateQuoteAddress({ country: "US", zip: "98101" }, "receiver")).toMatch(/state/)
+    expect(validateQuoteAddress({ country: "US", zip: "98101", state: "WA" }, "receiver")).toBeNull()
   })
 })

@@ -2,9 +2,10 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronRight, Loader2, Package, Search, Truck } from "lucide-react"
+import { ChevronRight, FilePen, Loader2, Package, Search, Truck } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
+import { draftRouteLabel, readShipmentDraft, type ShipmentDraft } from "@/components/dashboard/shipment-draft"
 import { ShipmentDetail } from "@/components/dashboard/shipment-detail"
 import { SHIPMENT_STATUS, formatMoney, shipmentRoute } from "@/components/dashboard/shipment-display"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,8 @@ function ShipmentsPageContent() {
   const searchParams = useSearchParams()
   const isMobile = useIsBelowLg()
   const { setMode } = useAppStore()
+  const userId = useAppStore((s) => s.user?.id ?? null)
+  const [draft, setDraft] = useState<ShipmentDraft | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +58,11 @@ function ShipmentsPageContent() {
     }
   }, [searchParams, setMode])
 
+  // Re-read after the wizard closes: it saves the draft as you type and clears it once booked.
+  useEffect(() => {
+    if (!wizardOpen) setDraft(readShipmentDraft(userId))
+  }, [wizardOpen, userId])
+
   const loadShipments = async () => {
     try {
       const response = await fetch("/api/shipments", { cache: "no-store" })
@@ -71,8 +79,20 @@ function ShipmentsPageContent() {
     }
   }
 
+  // The server re-reads undelivered parcels from the carrier on each load, so polling keeps statuses moving.
   useEffect(() => {
     loadShipments()
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") loadShipments()
+    }, 60_000)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadShipments()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
   }, [])
 
   const createShipment = async (payload: ShipmentCreatePayload) => {
@@ -179,6 +199,30 @@ function ShipmentsPageContent() {
             New Shipment
           </Button>
         </div>
+
+        {draft && (
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="mb-6 flex w-full items-center justify-between gap-3 rounded-2xl border border-dashed border-ship/40 bg-ship/5 p-4 text-left transition-colors hover:bg-ship/10"
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ship/10 text-ship">
+                <FilePen className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold text-foreground">Unfinished shipment</span>
+                <span className="block truncate text-sm text-muted-foreground">
+                  {draftRouteLabel(draft)} · saved {formatDealRelativeTime(draft.savedAt)}
+                </span>
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-ship">
+              Continue
+              <ChevronRight className="h-4 w-4" />
+            </span>
+          </button>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

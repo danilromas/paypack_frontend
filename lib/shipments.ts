@@ -247,6 +247,44 @@ export function validateShipmentAddress(address: unknown, label: "sender" | "rec
   return null
 }
 
+/**
+ * The wizard prices a route before anyone types a street: country and postcode are enough for carriers
+ * to quote (plus the state for the US). Everything else is optional here and checked again at booking.
+ */
+export function validateQuoteAddress(address: unknown, label: "sender" | "receiver"): string | null {
+  if (!address || typeof address !== "object") return `Missing ${label} address`
+  const a = address as Record<string, unknown>
+  for (const field of ["country", "zip"] as const) {
+    if (typeof a[field] !== "string" || !(a[field] as string).trim()) return `Invalid ${label} ${field === "zip" ? "postcode" : field}`
+  }
+  for (const field of ["city", "street", "phone", "email", "state"] as const) {
+    if (a[field] !== undefined && typeof a[field] !== "string") return `Invalid ${label} ${field}`
+  }
+  const country = (a.country as string).trim().toUpperCase()
+  if (!EU_COUNTRY_CODES.has(country) && !(label === "receiver" && NON_EU_DESTINATION_CODES.has(country))) {
+    return label === "sender"
+      ? "We only ship from inside the EU — unsupported sender country"
+      : "We only ship within the EU, to Switzerland and to the United States — unsupported receiver country"
+  }
+  if (needsState(country) && (typeof a.state !== "string" || !/^[A-Za-z]{2}$/.test(a.state.trim()))) {
+    return `Invalid ${label} state — use the two-letter code, e.g. WA`
+  }
+  return null
+}
+
+/** Fills the optional fields of a quote address so it can go through the booking-shaped helpers. */
+export function toQuoteAddress(address: Partial<ShipmentAddress>): ShipmentAddress {
+  return normalizeShipmentAddress({
+    country: address.country ?? "",
+    zip: address.zip ?? "",
+    city: address.city ?? "",
+    street: address.street ?? "",
+    phone: address.phone ?? "",
+    email: address.email ?? "",
+    ...(address.state ? { state: address.state } : {}),
+  })
+}
+
 /** YYYY-MM-DD, not in the past. Courier calendars (weekends, holidays) are checked by the carrier. */
 export function validatePickupDate(value: unknown, today: Date = new Date()): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Invalid pickup date"
