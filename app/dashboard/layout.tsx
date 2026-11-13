@@ -9,6 +9,7 @@ import {
   type DealImportPrefill,
 } from "@/components/dashboard/new-deal-modal"
 import { ProductTour } from "@/components/tour/product-tour"
+import { sectionForPath } from "@/components/dashboard/section-switcher"
 import { useAppStore } from "@/store/app-store"
 import type { Deal } from "@/types"
 
@@ -69,6 +70,31 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const isShipments = pathname.startsWith("/dashboard/shipments")
   const setUser = useAppStore((s) => s.setUser)
+  const mode = useAppStore((s) => s.mode)
+  const setMode = useAppStore((s) => s.setMode)
+  const modeRestored = useRef(false)
+
+  // Deal and Shipment pages set the section; shared pages (chats, wallet…) keep the last one, so
+  // "Dashboard" in the menu leads back to where you came from — also after a reload.
+  useEffect(() => {
+    const section = sectionForPath(pathname)
+    if (section) {
+      setMode(section)
+    } else if (!modeRestored.current) {
+      try {
+        const saved = localStorage.getItem("pp-section")
+        if (saved === "deal" || saved === "ship") setMode(saved)
+      } catch {}
+    }
+    modeRestored.current = true
+  }, [pathname, setMode])
+
+  useEffect(() => {
+    if (!modeRestored.current) return
+    try {
+      localStorage.setItem("pp-section", mode)
+    } catch {}
+  }, [mode])
   const setDeals = useAppStore((s) => s.setDeals)
   const setDealsError = useAppStore((s) => s.setDealsError)
   const refreshWallet = useAppStore((s) => s.refreshWallet)

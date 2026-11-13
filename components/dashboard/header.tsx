@@ -25,6 +25,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import Link from "next/link"
+import {
+  SECTION_HOME,
+  SectionSwitcher,
+  isNavItemActive,
+  sectionForPath,
+} from "@/components/dashboard/section-switcher"
 
 const notificationDotClass: Record<string, string> = {
   deal: "bg-success",
@@ -40,7 +46,8 @@ export function DashboardHeader() {
   // Derived from the URL rather than the stored mode, so the blue "ship" header can't stick around
   // after navigating from Shipments to any other page.
   const isShipSection = pathname.startsWith("/dashboard/shipments")
-  const { user, notifications, markNotificationRead, setTourPendingStart } = useAppStore()
+  const { user, mode: storedMode, notifications, markNotificationRead, setTourPendingStart } = useAppStore()
+  const mode = sectionForPath(pathname) ?? storedMode
   const unreadNotifications = notifications.filter((n) => !n.readAt).length
   const recentNotifications = notifications.slice(0, 5)
 
@@ -87,9 +94,16 @@ export function DashboardHeader() {
                 </SheetClose>
               </SheetTitle>
             </SheetHeader>
+            <div className="px-3 pt-4">
+              <SheetClose asChild>
+                <div>
+                  <SectionSwitcher />
+                </div>
+              </SheetClose>
+            </div>
             <nav className="space-y-1 px-3 py-4 text-sm">
               {[
-                { href: "/dashboard", label: "Dashboard" },
+                { href: SECTION_HOME[mode], label: "Dashboard" },
                 { href: "/dashboard/chats", label: "Chats" },
                 { href: "/dashboard/users", label: "Find users" },
                 { href: "/dashboard/support", label: "Support" },
@@ -102,9 +116,12 @@ export function DashboardHeader() {
                 <SheetClose key={item.href} asChild>
                   <Link
                     href={item.href}
+                    aria-current={isNavItemActive(item.href, pathname) ? "page" : undefined}
                     className={cn(
                       "block rounded-xl px-4 py-3 font-medium transition-colors",
-                      "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                      isNavItemActive(item.href, pathname)
+                        ? "bg-sidebar-accent font-semibold text-sidebar-foreground shadow-[inset_3px_0_0_var(--primary)]"
+                        : "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
                     )}
                   >
                     {item.label}

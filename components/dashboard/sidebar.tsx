@@ -19,6 +19,12 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RatingStars } from "@/components/dashboard/rating-stars";
+import {
+  SECTION_HOME,
+  SectionSwitcher,
+  isNavItemActive,
+  sectionForPath,
+} from "@/components/dashboard/section-switcher";
 
 interface RatingSummary {
   ratingAverage: number | null;
@@ -35,6 +41,8 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const user = useAppStore((s) => s.user);
+  const storedMode = useAppStore((s) => s.mode);
+  const mode = sectionForPath(pathname) ?? storedMode;
   const chatThreads = useAppStore((s) => s.chatThreads);
   const notifications = useAppStore((s) => s.notifications);
   const unreadChats = chatThreads.reduce((sum, t) => sum + t.unreadCount, 0);
@@ -65,7 +73,8 @@ export function DashboardSidebar() {
     : "?";
 
   const navItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    // "Dashboard" opens the home of the section you're in — the shipments board while shipping.
+    { href: SECTION_HOME[mode], icon: LayoutDashboard, label: "Dashboard" },
     { href: "/dashboard/chats", icon: MessageCircle, label: "Chats", badge: unreadChats || undefined },
     { href: "/dashboard/users", icon: Users, label: "Find users" },
     { href: "/dashboard/support", icon: HelpCircle, label: "Support" },
@@ -103,6 +112,7 @@ export function DashboardSidebar() {
             </div>
           </div>
         </Link>
+        <SectionSwitcher className="mt-4" />
       </div>
 
       {/* Profile */}
@@ -136,12 +146,9 @@ export function DashboardSidebar() {
       </Link>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
         {navItems.map((item) => {
-          const isActive =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
+          const isActive = isNavItemActive(item.href, pathname);
           return (
             <Link
               key={item.href}
@@ -149,7 +156,7 @@ export function DashboardSidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all",
                 isActive
-                  ? "bg-sidebar-accent text-primary"
+                  ? "bg-sidebar-accent font-semibold text-sidebar-foreground shadow-[inset_3px_0_0_var(--primary)]"
                   : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
               )}
             >
@@ -167,7 +174,7 @@ export function DashboardSidebar() {
 
       <div className="space-y-1 border-t border-sidebar-border px-4 py-3">
         {lowerNavItems.map((item) => {
-          const isActive = pathname.startsWith(item.href);
+          const isActive = isNavItemActive(item.href, pathname);
           return (
             <Link
               key={item.href}
@@ -175,7 +182,7 @@ export function DashboardSidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all",
                 isActive
-                  ? "bg-sidebar-accent text-primary"
+                  ? "bg-sidebar-accent font-semibold text-sidebar-foreground shadow-[inset_3px_0_0_var(--primary)]"
                   : "text-sidebar-muted hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
               )}
             >

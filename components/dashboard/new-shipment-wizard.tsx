@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   AlertCircle,
   ArrowRight,
   CalendarDays,
   Check,
   ChevronLeft,
+  Eye,
+  EyeOff,
   ChevronRight,
   FileText,
   Home,
@@ -37,13 +39,21 @@ import {
   type ShipmentCreatePayload,
 } from "@/lib/shipments"
 import { SERVICE_TIERS, type ServiceTier } from "@/lib/shipping-rates"
+import { useAppStore } from "@/store/app-store"
+import {
+  clearShipmentDraft,
+  isDraftWorthKeeping,
+  readShipmentDraft,
+  writeShipmentDraft,
+  type ShipmentDraft,
+} from "@/components/dashboard/shipment-draft"
 
-type WizardPhase = "route" | "package" | "compare" | "review"
-const PHASES: WizardPhase[] = ["route", "package", "compare", "review"]
+/** Price first (postcodes + box), then the addresses and contents, then pickup and booking. */
+type WizardPhase = "price" | "details" | "review"
+const PHASES: WizardPhase[] = ["price", "details", "review"]
 const PHASE_LABELS: Record<WizardPhase, string> = {
-  route: "Route",
-  package: "Package",
-  compare: "Compare",
+  price: "Price",
+  details: "Details",
   review: "Review",
 }
 
@@ -158,7 +168,7 @@ function PartyFields({
   value,
   onChange,
   countries,
-  countryPlaceholder,
+  onChangeLocation,
 }: {
   title: string
   hint: string
@@ -166,7 +176,8 @@ function PartyFields({
   value: Party
   onChange: (p: Party) => void
   countries: { code: string; name: string }[]
-  countryPlaceholder: string
+  /** Country and postcode were set on the price step; changing them means re-pricing there. */
+  onChangeLocation: () => void
 }) {
   const set = (field: keyof Party) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     onChange({ ...value, [field]: e.target.value })
@@ -183,8 +194,52 @@ function PartyFields({
         </div>
       </div>
       <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border px-4 py-2.5 text-sm">
+          <span className="min-w-0 truncate text-foreground">
+            {countries.find((c) => c.code === value.country)?.name ?? value.country} · {value.zip}
+            {value.state ? ` · ${value.state.toUpperCase()}` : ""}
+          </span>
+          <button type="button" onClick={onChangeLocation} className="shrink-0 text-xs font-medium text-ship hover:underline">
+            Change
+          </button>
+        </div>
         <input value={value.name} onChange={set("name")} placeholder="Full name" autoComplete="name" className={inputClass} />
-        <select value={value.country} onChange={set("country")} className={cn(inputClass, !value.country && "text-muted-foreground")}>
+        <input value={value.street} onChange={set("street")} placeholder="Street and house number" autoComplete="street-address" className={inputClass} />
+        <input value={value.city} onChange={set("city")} placeholder="City" autoComplete="address-level2" className={inputClass} />
+        <div className="grid gap-3">
+          <input value={value.phone} onChange={set("phone")} placeholder="Phone, e.g. +372 5555 1234" type="tel" autoComplete="tel" className={inputClass} />
+          <input value={value.email} onChange={set("email")} placeholder="Email" type="email" autoComplete="email" className={inputClass} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LocationFields({
+  title,
+  icon: Icon,
+  value,
+  onChange,
+  countries,
+  countryPlaceholder,
+}: {
+  title: string
+  icon: LucideIcon
+  value: Party
+  onChange: (p: Party) => void
+  countries: { code: string; name: string }[]
+  countryPlaceholder: string
+}) {
+  const set = (field: keyof Party) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    onChange({ ...value, [field]: e.target.value })
+  return (
+    <div className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
+      <div className="mb-3 flex items-center gap-2 font-semibold text-foreground">
+        <Icon className="h-4 w-4 text-ship" />
+        {title}
+      </div>
+      <div className="grid grid-cols-[3fr_2fr] gap-3">
+        <select value={value.country} onChange={set("country")} aria-label={`${title} country`} className={cn(inputClass, !value.country && "text-muted-foreground")}>
           <option value="">{countryPlaceholder}</option>
           {countries.map((c) => (
             <option key={c.code} value={c.code}>
@@ -192,26 +247,18 @@ function PartyFields({
             </option>
           ))}
         </select>
-        <input value={value.street} onChange={set("street")} placeholder="Street and house number" autoComplete="street-address" className={inputClass} />
-        <div className="grid grid-cols-[2fr_3fr] gap-3">
-          <input value={value.zip} onChange={set("zip")} placeholder="Postal code" autoComplete="postal-code" className={inputClass} />
-          <input value={value.city} onChange={set("city")} placeholder="City" autoComplete="address-level2" className={inputClass} />
-        </div>
-        {needsState(value.country) && (
-          <input
-            value={value.state ?? ""}
-            onChange={set("state")}
-            placeholder="State, 2 letters (e.g. WA)"
-            maxLength={2}
-            autoComplete="address-level1"
-            className={inputClass}
-          />
-        )}
-        <div className="grid gap-3">
-          <input value={value.phone} onChange={set("phone")} placeholder="Phone, e.g. +372 5555 1234" type="tel" autoComplete="tel" className={inputClass} />
-          <input value={value.email} onChange={set("email")} placeholder="Email" type="email" autoComplete="email" className={inputClass} />
-        </div>
+        <input value={value.zip} onChange={set("zip")} placeholder="Postcode" aria-label={`${title} postcode`} autoComplete="postal-code" className={inputClass} />
       </div>
+      {needsState(value.country) && (
+        <input
+          value={value.state ?? ""}
+          onChange={set("state")}
+          placeholder="State, 2 letters (e.g. WA)"
+          maxLength={2}
+          autoComplete="address-level1"
+          className={cn(inputClass, "mt-3")}
+        />
+      )}
     </div>
   )
 }
@@ -223,30 +270,37 @@ export function NewShipmentWizard({
   onClose: () => void
   onCreate: (payload: ShipmentCreatePayload) => Promise<void>
 }) {
+  const userId = useAppStore((s) => s.user?.id ?? null)
+  // Picks up where the last unfinished shipment stopped; read once, when the wizard opens.
+  const [draft] = useState<ShipmentDraft | null>(() => readShipmentDraft(userId))
+  const [draftNotice, setDraftNotice] = useState(draft !== null)
+  // A resumed draft reopens on the price step: prices are fetched live there, and the service picked
+  // last time stays selected if couriers still offer it. Everything after it is already filled in.
   const [step, setStep] = useState(1)
   const [bookingPassword, setBookingPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [accessGranted, setAccessGranted] = useState(false)
   const [accessChecking, setAccessChecking] = useState(false)
   const [accessError, setAccessError] = useState<string | null>(null)
-  const [sender, setSender] = useState<Party>(EMPTY_PARTY)
-  const [receiver, setReceiver] = useState<Party>(EMPTY_PARTY)
-  const [weightKg, setWeightKg] = useState<number | "">("")
-  const [lengthCm, setLengthCm] = useState<number | "">("")
-  const [widthCm, setWidthCm] = useState<number | "">("")
-  const [heightCm, setHeightCm] = useState<number | "">("")
-  const [contents, setContents] = useState("")
-  const [declaredValue, setDeclaredValue] = useState<number | "">("")
-  const [hsCode, setHsCode] = useState("")
-  const [originCountry, setOriginCountry] = useState("IT")
-  const [itemCount, setItemCount] = useState<number | "">(1)
-  const [exportReason, setExportReason] = useState<ExportReason>("commercial_goods")
-  const [senderVat, setSenderVat] = useState("")
-  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [sender, setSender] = useState<Party>(draft?.sender ?? EMPTY_PARTY)
+  const [receiver, setReceiver] = useState<Party>(draft?.receiver ?? EMPTY_PARTY)
+  const [weightKg, setWeightKg] = useState<number | "">(draft?.weightKg ?? "")
+  const [lengthCm, setLengthCm] = useState<number | "">(draft?.lengthCm ?? "")
+  const [widthCm, setWidthCm] = useState<number | "">(draft?.widthCm ?? "")
+  const [heightCm, setHeightCm] = useState<number | "">(draft?.heightCm ?? "")
+  const [contents, setContents] = useState(draft?.contents ?? "")
+  const [declaredValue, setDeclaredValue] = useState<number | "">(draft?.declaredValue ?? "")
+  const [hsCode, setHsCode] = useState(draft?.hsCode ?? "")
+  const [originCountry, setOriginCountry] = useState(draft?.originCountry ?? "IT")
+  const [itemCount, setItemCount] = useState<number | "">(draft?.itemCount ?? 1)
+  const [exportReason, setExportReason] = useState<ExportReason>(draft?.exportReason ?? "commercial_goods")
+  const [senderVat, setSenderVat] = useState(draft?.senderVat ?? "")
+  const [selectedKey, setSelectedKey] = useState<string | null>(draft?.selectedKey ?? null)
   const [points, setPoints] = useState<ServicePointSummary[]>([])
   const [pointsLoading, setPointsLoading] = useState(false)
   const [pointsError, setPointsError] = useState<string | null>(null)
   const [servicePointId, setServicePointId] = useState<string | null>(null)
-  const [pickupDate, setPickupDate] = useState("")
+  const [pickupDate, setPickupDate] = useState(draft?.pickupDate ?? "")
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [live, setLive] = useState(false)
   const [quotesLoading, setQuotesLoading] = useState(false)
@@ -256,7 +310,22 @@ export function NewShipmentWizard({
 
   const currentPhase = PHASES[step - 1]
 
-  const routeValid = partyValid(sender) && partyValid(receiver)
+  const locationValid = (p: Party) => p.country !== "" && p.zip.trim() !== ""
+  const routeLocated =
+    locationValid(sender) &&
+    locationValid(receiver) &&
+    (!needsState(receiver.country) || /^[A-Za-z]{2}$/.test((receiver.state ?? "").trim()))
+  const sizeValid =
+    typeof weightKg === "number" &&
+    weightKg > 0 &&
+    typeof lengthCm === "number" &&
+    lengthCm > 0 &&
+    typeof widthCm === "number" &&
+    widthCm > 0 &&
+    typeof heightCm === "number" &&
+    heightCm > 0
+  /** Enough to ask couriers for prices: two postcodes and a box. */
+  const quickValid = routeLocated && sizeValid
   const isCustoms = needsCustoms(receiver.country)
   const customsValid =
     !isCustoms ||
@@ -268,66 +337,136 @@ export function NewShipmentWizard({
       Number.isInteger(itemCount) &&
       itemCount >= 1 &&
       (senderVat.trim() === "" || /^[A-Za-z]{2}[A-Za-z0-9]{2,13}$/.test(senderVat.replace(/\s/g, ""))))
-  const packageValid =
-    customsValid &&
-    typeof weightKg === "number" &&
-    weightKg > 0 &&
-    typeof lengthCm === "number" &&
-    lengthCm > 0 &&
-    typeof widthCm === "number" &&
-    widthCm > 0 &&
-    typeof heightCm === "number" &&
-    heightCm > 0 &&
-    contents.trim() !== ""
+  const detailsValid = partyValid(sender) && partyValid(receiver) && contents.trim() !== "" && customsValid
+  const readyToBook = quickValid && detailsValid
 
-  // Re-price whenever the user lands on Compare — they may have gone back and changed the route or box.
+  // Prices follow the postcodes and the box: re-quote shortly after either changes.
+  const quoteInputs = JSON.stringify([
+    sender.country,
+    sender.zip.trim(),
+    receiver.country,
+    receiver.zip.trim(),
+    (receiver.state ?? "").trim().toUpperCase(),
+    weightKg,
+    lengthCm,
+    widthCm,
+    heightCm,
+  ])
   useEffect(() => {
-    if (currentPhase !== "compare" || !routeValid || !packageValid) return
+    if (currentPhase !== "price" || !accessGranted) return
+    if (!quickValid) {
+      setQuotes([])
+      setQuotesError(null)
+      setQuotesLoading(false)
+      return
+    }
     const controller = new AbortController()
     setQuotesLoading(true)
     setQuotesError(null)
-    fetch("/api/shipments/quote", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        senderName: sender.name.trim(),
-        receiverName: receiver.name.trim(),
-        senderAddress: toAddress(sender),
-        receiverAddress: toAddress(receiver),
-        weightKg,
-        lengthCm,
-        widthCm,
-        heightCm,
-        declaredValueEur: typeof declaredValue === "number" ? declaredValue : undefined,
-      }),
+    const quoteAddress = (p: Party) => ({
+      country: p.country,
+      zip: p.zip.trim(),
+      ...(needsState(p.country) ? { state: (p.state ?? "").trim().toUpperCase() } : {}),
     })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error ?? "Could not get prices")
-        setLive(Boolean(data.live))
-        setQuotes(data.quotes ?? [])
-        setSelectedKey((prev) => ((data.quotes ?? []) as Quote[]).some((q) => quoteKey(q) === prev) ? prev : null)
+    const timer = setTimeout(() => {
+      fetch("/api/shipments/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          senderAddress: quoteAddress(sender),
+          receiverAddress: quoteAddress(receiver),
+          weightKg,
+          lengthCm,
+          widthCm,
+          heightCm,
+          declaredValueEur: typeof declaredValue === "number" ? declaredValue : undefined,
+        }),
       })
-      .catch((err) => {
-        if (controller.signal.aborted) return
-        setQuotes([])
-        setQuotesError(err instanceof Error ? err.message : "Could not get prices")
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setQuotesLoading(false)
-      })
-    return () => controller.abort()
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(data.error ?? "Could not get prices")
+          setLive(Boolean(data.live))
+          setQuotes(data.quotes ?? [])
+          setSelectedKey((prev) => (((data.quotes ?? []) as Quote[]).some((q) => quoteKey(q) === prev) ? prev : null))
+        })
+        .catch((err) => {
+          if (controller.signal.aborted) return
+          setQuotes([])
+          setQuotesError(err instanceof Error ? err.message : "Could not get prices")
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setQuotesLoading(false)
+        })
+    }, 500)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPhase])
+  }, [currentPhase, quoteInputs, accessGranted])
+
+  // Keep the unfinished shipment in this browser; it's cleared once the shipment is booked.
+  const draftRef = useRef<Omit<ShipmentDraft, "v" | "savedAt"> | null>(null)
+  draftRef.current = {
+    step,
+    sender,
+    receiver,
+    weightKg,
+    lengthCm,
+    widthCm,
+    heightCm,
+    contents,
+    declaredValue,
+    hsCode,
+    originCountry,
+    itemCount,
+    exportReason,
+    senderVat,
+    selectedKey,
+    pickupDate,
+  }
+  const draftSignature = JSON.stringify(draftRef.current)
+  useEffect(() => {
+    if (!accessGranted) return
+    const timer = setTimeout(() => {
+      const current = draftRef.current
+      if (current && isDraftWorthKeeping(current)) {
+        writeShipmentDraft(userId, { v: 1, savedAt: new Date().toISOString(), ...current })
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [draftSignature, accessGranted, userId])
+
+  function startOver() {
+    clearShipmentDraft(userId)
+    setDraftNotice(false)
+    setStep(1)
+    setSender(EMPTY_PARTY)
+    setReceiver(EMPTY_PARTY)
+    setWeightKg("")
+    setLengthCm("")
+    setWidthCm("")
+    setHeightCm("")
+    setContents("")
+    setDeclaredValue("")
+    setHsCode("")
+    setOriginCountry("IT")
+    setItemCount(1)
+    setExportReason("commercial_goods")
+    setSenderVat("")
+    setSelectedKey(null)
+    setPickupDate("")
+    setServicePointId(null)
+    setError(null)
+  }
 
   const selectedQuote = quotes.find((q) => quoteKey(q) === selectedKey) ?? null
   const serviceTier = selectedQuote?.tier ?? null
   const isPoint = selectedQuote?.delivery === "point"
   const selectedPoint = points.find((p) => p.id === servicePointId) ?? null
   const tierInfo = SERVICE_TIERS.find((t) => t.id === serviceTier)
-  const phaseWidth = currentPhase === "route" ? "max-w-3xl" : "max-w-xl"
-  const route = { from: sender.city.trim() || "Sender", to: receiver.city.trim() || "Receiver" }
+  const phaseWidth = currentPhase === "review" ? "max-w-xl" : "max-w-3xl"
   const cheapestQuote = quotes.reduce<Quote | null>((best, q) => (!best || q.priceGross < best.priceGross ? q : best), null)
   // Eurosender reports days as "1" or "3-4" — compare on the upper bound.
   const etaDays = (q: Quote) => Number((q.estimatedDelivery ?? "").split("-").pop()) || Number.POSITIVE_INFINITY
@@ -391,9 +530,8 @@ export function NewShipmentWizard({
         : null
 
   function canAdvanceFrom(phase: WizardPhase) {
-    if (phase === "route") return routeValid
-    if (phase === "package") return packageValid
-    if (phase === "compare") return selectedQuote !== null && !quotesLoading
+    if (phase === "price") return quickValid && selectedQuote !== null && !quotesLoading
+    if (phase === "details") return detailsValid
     return true
   }
 
@@ -421,7 +559,7 @@ export function NewShipmentWizard({
   }
 
   async function handleCreate() {
-    if (!packageValid || !serviceTier || pickupError || (isPoint && !servicePointId)) return
+    if (!readyToBook || !serviceTier || pickupError || (isPoint && !servicePointId)) return
     setSubmitting(true)
     setError(null)
     const senderAddress = toAddress(sender)
@@ -455,6 +593,7 @@ export function NewShipmentWizard({
         delivery: isPoint ? "point" : "home",
         servicePointId: isPoint ? servicePointId : null,
       })
+      clearShipmentDraft(userId)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create shipment")
@@ -477,15 +616,26 @@ export function NewShipmentWizard({
           </div>
           <h3 className="font-semibold text-foreground">New shipments are invite-only for now</h3>
           <p className="mb-4 mt-1 text-sm text-muted-foreground">Enter the booking password to continue. Your existing shipments stay available as usual.</p>
-          <input
-            type="password"
-            value={bookingPassword}
-            onChange={(e) => setBookingPassword(e.target.value)}
-            placeholder="Booking password"
-            autoComplete="off"
-            autoFocus
-            className={inputClass}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={bookingPassword}
+              onChange={(e) => setBookingPassword(e.target.value)}
+              placeholder="Booking password"
+              autoComplete="off"
+              autoFocus
+              className={cn(inputClass, "pr-12")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              title={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           {accessError && (
             <div className="mt-3 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -545,33 +695,36 @@ export function NewShipmentWizard({
           </button>
         </div>
 
-        {/* Phase: Route */}
-        {currentPhase === "route" && (
-          <div className="mx-auto grid max-w-3xl gap-4 md:grid-cols-2">
-            <PartyFields
-              title="From"
-              hint="The courier collects here"
-              icon={MapPin}
-              value={sender}
-              onChange={setSender}
-              countries={EU_COUNTRIES}
-              countryPlaceholder="Country (EU only)"
-            />
-            <PartyFields
-              title="To"
-              hint="Delivered to the door"
-              icon={Home}
-              value={receiver}
-              onChange={setReceiver}
-              countries={DESTINATION_COUNTRIES}
-              countryPlaceholder="Country"
-            />
+        {draftNotice && (
+          <div className="mx-auto mb-4 flex max-w-3xl items-center justify-between gap-3 rounded-xl border border-ship/30 bg-ship/10 px-4 py-2.5 text-sm">
+            <span className="text-foreground">Continuing your unfinished shipment.</span>
+            <button type="button" onClick={startOver} className="shrink-0 text-xs font-medium text-ship hover:underline">
+              Start over
+            </button>
           </div>
         )}
 
-        {/* Phase: Package */}
-        {currentPhase === "package" && (
+        {/* Phase: Price — two postcodes and a box are enough to compare couriers */}
+        {currentPhase === "price" && (
           <div className={cn("mx-auto space-y-4", phaseWidth)}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <LocationFields
+                title="From"
+                icon={MapPin}
+                value={sender}
+                onChange={setSender}
+                countries={EU_COUNTRIES}
+                countryPlaceholder="Country (EU only)"
+              />
+              <LocationFields
+                title="To"
+                icon={Home}
+                value={receiver}
+                onChange={setReceiver}
+                countries={DESTINATION_COUNTRIES}
+                countryPlaceholder="Country"
+              />
+            </div>
             <div className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ship/10 text-ship">
@@ -632,6 +785,120 @@ export function NewShipmentWizard({
               </div>
             </div>
 
+            <div className="space-y-3">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <h3 className="font-semibold text-foreground">Choose a service</h3>
+              {!quotesLoading && quotes.length > 0 && (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                    live ? "bg-success/10 text-success" : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {live ? "Live prices" : "Estimate"}
+                </span>
+              )}
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              {quotesLoading
+                ? "Asking couriers for prices…"
+                : live
+                ? `To the door or a pickup point. VAT included${isCustoms ? "; import taxes and duties are paid by the recipient" : ""}.`
+                : "Internal estimate based on package size — not a live carrier rate."}
+            </p>
+            {quickValid && quotesLoading &&
+              [0, 1, 2].map((i) => <div key={i} className="h-[76px] animate-pulse rounded-2xl border border-border bg-card" />)}
+            {!quotesLoading && quotesError && (
+              <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{quotesError}</span>
+              </div>
+            )}
+            {!quickValid && (
+              <p className="rounded-2xl border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
+                Enter both postcodes and the box size — prices show up here.
+              </p>
+            )}
+            {quickValid && !quotesLoading && !quotesError && quotes.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">No carrier serves this route for this package.</p>
+            )}
+            {!quotesLoading &&
+              quotes.map((quote) => {
+                const tier = SERVICE_TIERS.find((t) => t.id === quote.tier)
+                const toPoint = quote.delivery === "point"
+                const TierIcon = toPoint ? MapPinned : TIER_ICONS[quote.tier]
+                const key = quoteKey(quote)
+                const selected = selectedKey === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setSelectedKey(key)}
+                    className={cn(
+                      "flex w-full items-center gap-4 rounded-2xl border-2 px-4 py-4 text-left transition-all sm:px-5",
+                      selected ? "border-ship bg-ship/10" : "border-border bg-card hover:border-ship/30",
+                    )}
+                  >
+                    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", selected ? "bg-ship text-ship-foreground" : "bg-ship/10 text-ship")}>
+                      <TierIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-foreground">{tier?.label ?? quote.tier}</span>
+                        {toPoint && (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pickup point</span>
+                        )}
+                        {quotes.length > 1 && cheapestQuote && key === quoteKey(cheapestQuote) && (
+                          <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-success">Cheapest</span>
+                        )}
+                        {quotes.length > 1 && fastestQuote && key === quoteKey(fastestQuote) && Number.isFinite(etaDays(quote)) && (
+                          <span className="rounded-full bg-ship/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ship">Fastest</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {[
+                          quote.carrierName,
+                          formatEta(quote.estimatedDelivery),
+                          toPoint ? "receiver collects from a locker or pickup point" : null,
+                          quote.dropOff ? "you drop it off" : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-lg font-bold text-foreground">
+                      {quote.priceGross.toFixed(2)} {quote.currency === "EUR" ? "€" : quote.currency}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Phase: Details — who sends, who receives, what's inside */}
+        {currentPhase === "details" && (
+          <div className={cn("mx-auto space-y-4", phaseWidth)}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <PartyFields
+                title="From"
+                hint="The courier collects here"
+                icon={MapPin}
+                value={sender}
+                onChange={setSender}
+                countries={EU_COUNTRIES}
+                onChangeLocation={() => setStep(1)}
+              />
+              <PartyFields
+                title="To"
+                hint={isPoint ? "Collects the parcel at a pickup point" : "Delivered to the door"}
+                icon={Home}
+                value={receiver}
+                onChange={setReceiver}
+                countries={DESTINATION_COUNTRIES}
+                onChangeLocation={() => setStep(1)}
+              />
+            </div>
             <div className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
               <div className="mb-4 flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ship/10 text-ship">
@@ -733,93 +1000,6 @@ export function NewShipmentWizard({
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Phase: Compare */}
-        {currentPhase === "compare" && (
-          <div className={cn("mx-auto space-y-3", phaseWidth)}>
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <h3 className="font-semibold text-foreground">Choose a service</h3>
-              {!quotesLoading && quotes.length > 0 && (
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-                    live ? "bg-success/10 text-success" : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {live ? "Live prices" : "Estimate"}
-                </span>
-              )}
-            </div>
-            <p className="mb-3 text-xs text-muted-foreground">
-              {quotesLoading
-                ? "Asking couriers for prices…"
-                : live
-                ? `${route.from} → ${route.to}, to the door or a pickup point. VAT included${isCustoms ? "; import taxes and duties are paid by the recipient" : ""}.`
-                : "Internal estimate based on package size — not a live carrier rate."}
-            </p>
-            {quotesLoading &&
-              [0, 1, 2].map((i) => <div key={i} className="h-[76px] animate-pulse rounded-2xl border border-border bg-card" />)}
-            {!quotesLoading && quotesError && (
-              <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{quotesError}</span>
-              </div>
-            )}
-            {!quotesLoading && !quotesError && quotes.length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">No carrier serves this route for this package.</p>
-            )}
-            {!quotesLoading &&
-              quotes.map((quote) => {
-                const tier = SERVICE_TIERS.find((t) => t.id === quote.tier)
-                const toPoint = quote.delivery === "point"
-                const TierIcon = toPoint ? MapPinned : TIER_ICONS[quote.tier]
-                const key = quoteKey(quote)
-                const selected = selectedKey === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSelectedKey(key)}
-                    className={cn(
-                      "flex w-full items-center gap-4 rounded-2xl border-2 px-4 py-4 text-left transition-all sm:px-5",
-                      selected ? "border-ship bg-ship/10" : "border-border bg-card hover:border-ship/30",
-                    )}
-                  >
-                    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", selected ? "bg-ship text-ship-foreground" : "bg-ship/10 text-ship")}>
-                      <TierIcon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-foreground">{tier?.label ?? quote.tier}</span>
-                        {toPoint && (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pickup point</span>
-                        )}
-                        {quotes.length > 1 && cheapestQuote && key === quoteKey(cheapestQuote) && (
-                          <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-success">Cheapest</span>
-                        )}
-                        {quotes.length > 1 && fastestQuote && key === quoteKey(fastestQuote) && Number.isFinite(etaDays(quote)) && (
-                          <span className="rounded-full bg-ship/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ship">Fastest</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {[
-                          quote.carrierName,
-                          formatEta(quote.estimatedDelivery),
-                          toPoint ? "receiver collects from a locker or pickup point" : null,
-                          quote.dropOff ? "you drop it off" : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-lg font-bold text-foreground">
-                      {quote.priceGross.toFixed(2)} {quote.currency === "EUR" ? "€" : quote.currency}
-                    </div>
-                  </button>
-                )
-              })}
           </div>
         )}
 
@@ -980,13 +1160,13 @@ export function NewShipmentWizard({
           <div className={cn("mx-auto mt-6 flex items-center justify-between gap-3", phaseWidth)}>
             <p className="text-xs text-muted-foreground">
               {!canAdvanceFrom(currentPhase) && !quotesLoading
-                ? currentPhase === "route"
-                  ? "Fill in both addresses with a valid phone and email."
-                  : currentPhase === "package"
-                    ? isCustoms
-                      ? "Add weight, dimensions, contents, value and the customs details."
-                      : "Add weight, all three dimensions and the contents."
-                    : "Pick a service to continue."
+                ? currentPhase === "price"
+                  ? quickValid
+                    ? "Pick a price to continue."
+                    : "Enter both postcodes and the box size."
+                  : isCustoms
+                    ? "Fill in both addresses with a valid phone and email, the contents and the customs details."
+                    : "Fill in both addresses with a valid phone and email, and the contents."
                 : `Step ${step} of ${PHASES.length}`}
             </p>
             <button

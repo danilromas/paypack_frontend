@@ -81,8 +81,11 @@ export function AuthPanel({
 
   function goToApp() {
     onSuccess?.()
-    const redirect = searchParams.get("redirect")
-    router.push(redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/dashboard")
+    // Everyone lands on the dashboard home. The exceptions are flows that only make sense where they
+    // started: a deal invite link and the embedded checkout widget.
+    const redirect = searchParams.get("redirect") ?? ""
+    const keepsPlace = ["/dashboard/deals/join/", "/checkout"].some((p) => redirect.startsWith(p))
+    router.push(keepsPlace ? redirect : "/dashboard")
   }
 
   async function onLogin(values: LoginValues) {

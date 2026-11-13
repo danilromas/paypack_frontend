@@ -318,21 +318,20 @@ export function pickTierQuotes(options: ShippingOption[], carrierCode?: string |
 }
 
 /** Live prices for each of our tiers that Sendcloud can serve on this route. */
+function quoteAddress(a: ShipmentAddress) {
+  return {
+    country_code: a.country.toUpperCase(),
+    postal_code: a.zip,
+    ...(a.city ? { city: a.city } : {}),
+    ...(a.street ? { address_line_1: a.street } : {}),
+  }
+}
+
 export async function getQuotes(input: ShipmentInput, carrierCode?: string | null): Promise<ServiceQuote[]> {
   const data = await request<{ data: ShippingOption[] | null }>("POST", "/shipping-options", {
-    from_address: {
-      country_code: input.sender.country.toUpperCase(),
-      postal_code: input.sender.zip,
-      city: input.sender.city,
-      address_line_1: input.sender.street,
-    },
-    to_address: {
-      country_code: input.receiver.country.toUpperCase(),
-      postal_code: input.receiver.zip,
-      city: input.receiver.city,
-      address_line_1: input.receiver.street,
-      ...stateCode(input.receiver),
-    },
+    // The wizard quotes from country and postcode alone, before the street is known — send only what we have.
+    from_address: quoteAddress(input.sender),
+    to_address: { ...quoteAddress(input.receiver), ...stateCode(input.receiver) },
     parcels: [toApiParcel(input.pkg)],
     calculate_quotes: true,
   })
@@ -524,7 +523,7 @@ const DELIVERED = new Set(["DELIVERED", "SHIPMENT_COLLECTED_BY_CUSTOMER"])
 export function mapParcelStatus(code: string | null): ShipmentStatus {
   if (!code) return "pending"
   const c = code.toUpperCase()
-  if (DELIVERED.has(c)) return "arrived"
+  if (DELIVERED.has(c) || c.endsWith("COLLECTED_BY_CUSTOMER")) return "arrived"
   if (
     c.startsWith("ANNOUNC") ||
     c.startsWith("BEING_ANNOUNCED") ||

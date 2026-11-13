@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth/session"
-import { validateShipmentAddress, normalizeShipmentAddress, type ShipmentAddress } from "@/lib/shipments"
+import { toQuoteAddress, validateQuoteAddress, type ShipmentAddress } from "@/lib/shipments"
 import { SERVICE_TIERS, estimateShippingCost, validatePackageDimensions } from "@/lib/shipping-rates"
 import { EurosenderError, getQuotes as getEurosenderQuotes } from "@/lib/eurosender"
 import { SendcloudError, getQuotes as getSendcloudQuotes } from "@/lib/sendcloud"
@@ -9,8 +9,8 @@ import { isLiveShippingEnabled, liveProviderFor, unsupportedRouteMessage } from 
 interface QuoteBody {
   senderName?: string
   receiverName?: string
-  senderAddress?: ShipmentAddress
-  receiverAddress?: ShipmentAddress
+  senderAddress?: Partial<ShipmentAddress>
+  receiverAddress?: Partial<ShipmentAddress>
   weightKg?: number
   lengthCm?: number
   widthCm?: number
@@ -54,18 +54,20 @@ export async function POST(req: Request) {
   }
 
   const addressError =
-    validateShipmentAddress(body.senderAddress, "sender") ?? validateShipmentAddress(body.receiverAddress, "receiver")
+    validateQuoteAddress(body.senderAddress, "sender") ?? validateQuoteAddress(body.receiverAddress, "receiver")
   if (addressError) return NextResponse.json({ error: addressError }, { status: 400 })
 
-  const sender = normalizeShipmentAddress(body.senderAddress!)
-  const receiverCountry = body.receiverAddress!.country
+  // Country and postcode are enough to price a route; the full addresses come later in the wizard.
+  const sender = toQuoteAddress(body.senderAddress!)
+  const receiver = toQuoteAddress(body.receiverAddress!)
+  const receiverCountry = receiver.country
   const provider = liveProviderFor(sender.country, receiverCountry)
   if (!provider) return NextResponse.json({ error: unsupportedRouteMessage(receiverCountry) }, { status: 400 })
 
   try {
     const input = {
       sender: { ...sender, name: body.senderName?.trim() || "Sender" },
-      receiver: { ...normalizeShipmentAddress(body.receiverAddress!), name: body.receiverName?.trim() || "Receiver" },
+      receiver: { ...receiver, name: body.receiverName?.trim() || "Receiver" },
       pkg: { ...pkg, valueEur: typeof body.declaredValueEur === "number" ? body.declaredValueEur : undefined },
     }
     const quotes = provider === "sendcloud" ? await getSendcloudQuotes(input) : await getEurosenderQuotes(input)

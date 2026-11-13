@@ -15,6 +15,7 @@ import {
 } from "@/lib/shipments"
 import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { isBookingPasswordValid } from "@/lib/shipment-access"
+import { refreshActiveShipments } from "@/lib/shipment-refresh"
 import { estimateShippingCost, generateTrackingNumber, getServiceTier } from "@/lib/shipping-rates"
 import { EurosenderError, createOrder } from "@/lib/eurosender"
 import { SendcloudError, createShipment as createSendcloudShipment, getServicePoint } from "@/lib/sendcloud"
@@ -33,7 +34,7 @@ export async function GET() {
       .where(eq(shipments.userId, user.id))
       .orderBy(desc(shipments.createdAt))
 
-    return NextResponse.json(rows.map(toShipment))
+    return NextResponse.json((await refreshActiveShipments(rows)).map(toShipment))
   } catch (error) {
     console.error("GET /api/shipments failed", error)
     return NextResponse.json({ error: "Failed to fetch shipments" }, { status: 500 })
