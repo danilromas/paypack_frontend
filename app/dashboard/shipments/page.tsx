@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronRight, FilePen, Loader2, Package, Search, Truck } from "lucide-react"
+import { ChevronRight, FilePen, Loader2, MapPinned, Package, PackageCheck, Search, Truck } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
 import { draftRouteLabel, readShipmentDraft, type ShipmentDraft } from "@/components/dashboard/shipment-draft"
@@ -21,8 +21,9 @@ type Filter = "all" | "active" | ShipmentStatus
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "active", label: "Active" },
-  { id: "pending", label: "Booked" },
+  { id: "pending", label: "Ready to ship" },
   { id: "in-transit", label: "In transit" },
+  { id: "ready-for-pickup", label: "Ready for pickup" },
   { id: "arrived", label: "Delivered" },
 ]
 
@@ -135,14 +136,8 @@ function ShipmentsPageContent() {
   }
 
   const stats = useMemo(() => {
-    const active = shipments.filter((s) => s.status !== "arrived")
-    const booked = shipments.filter((s) => s.status === "pending")
-    const inTransit = shipments.filter((s) => s.status === "in-transit")
-    const delivered = shipments.filter((s) => s.status === "arrived")
-    const spent = shipments
-      .filter((s) => s.provider !== "internal" && s.estimatedCurrency === "EUR")
-      .reduce((sum, s) => sum + s.estimatedCost, 0)
-    return { active, booked, inTransit, delivered, spent }
+    const count = (status: ShipmentStatus) => shipments.filter((s) => s.status === status).length
+    return { readyToShip: count("pending"), inTransit: count("in-transit"), readyForPickup: count("ready-for-pickup") }
   }, [shipments])
 
   const filteredShipments = useMemo(() => {
@@ -224,36 +219,63 @@ function ShipmentsPageContent() {
           </button>
         )}
 
-        {/* Stats */}
+        {/* Stats — where every parcel is right now, from draft to the receiver's pickup point */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {[
-            { label: "Active", value: stats.active.length, hint: `${stats.booked.length} awaiting pickup`, filter: "active" as Filter },
-            { label: "In transit", value: stats.inTransit.length, hint: "On the way now", filter: "in-transit" as Filter },
-            { label: "Delivered", value: stats.delivered.length, hint: "Arrived safely", filter: "arrived" as Filter },
+            {
+              label: "Unfinished",
+              value: draft ? 1 : 0,
+              hint: draft ? "Draft waiting to be booked" : "No drafts",
+              icon: FilePen,
+              onClick: () => draft && setWizardOpen(true),
+              active: false,
+            },
+            {
+              label: "Ready to ship",
+              value: stats.readyToShip,
+              hint: "Booked, waiting for the courier",
+              icon: PackageCheck,
+              onClick: () => setFilter("pending"),
+              active: filter === "pending",
+            },
+            {
+              label: "In transit",
+              value: stats.inTransit,
+              hint: "On the way now",
+              icon: Truck,
+              onClick: () => setFilter("in-transit"),
+              active: filter === "in-transit",
+            },
+            {
+              label: "Ready for pickup",
+              value: stats.readyForPickup,
+              hint: "Waiting at a locker or shop",
+              icon: MapPinned,
+              onClick: () => setFilter("ready-for-pickup"),
+              active: filter === "ready-for-pickup",
+            },
           ].map((card) => (
             <button
               key={card.label}
               type="button"
-              onClick={() => setFilter(card.filter)}
+              onClick={card.onClick}
               className={cn(
                 "rounded-2xl border bg-card p-5 text-left transition-colors hover:border-ship/30",
-                filter === card.filter ? "border-ship/40" : "border-border",
+                card.active ? "border-ship/40 ring-1 ring-ship/20" : "border-border",
               )}
             >
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</span>
+                <card.icon className="h-4 w-4 shrink-0 text-ship" />
+              </div>
               <div className="mt-2 text-2xl font-bold text-foreground">{card.value}</div>
               <div className="mt-1 text-xs text-muted-foreground">{card.hint}</div>
             </button>
           ))}
-          <div className="rounded-2xl border border-border bg-card p-5">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Spent</div>
-            <div className="mt-2 text-2xl font-bold text-foreground">{formatMoney(stats.spent, "EUR")}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Courier bookings, VAT incl.</div>
-          </div>
         </div>
 
-        {/* Search & filters */}
-        <div className="mt-6 flex flex-col gap-3 lg:mt-8 lg:flex-row lg:items-center">
+        {/* Search & filters — their own band, set apart from the cards above and the list below */}
+        <div className="mt-10 flex flex-col gap-3 rounded-2xl border border-border bg-card/60 p-3 lg:flex-row lg:items-center">
           <div className="relative w-full lg:max-w-xs">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -264,7 +286,7 @@ function ShipmentsPageContent() {
               className="w-full rounded-xl border border-border bg-card py-3 pl-12 pr-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ship/30"
             />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:overflow-visible lg:pb-0">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible lg:pb-0">
             {FILTERS.map((f) => (
               <button
                 key={f.id}
@@ -299,7 +321,7 @@ function ShipmentsPageContent() {
           <div className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
         )}
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* List */}
           <div className="lg:col-span-2">
             <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">

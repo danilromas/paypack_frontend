@@ -5,7 +5,14 @@ import { shipments } from "@/db/schema"
 import { notifyUser } from "@/lib/notifications"
 import type { ShipmentStatus } from "@/lib/shipments"
 
-const STATUS_RANK = { pending: 0, "in-transit": 1, arrived: 2 } as const
+const STATUS_RANK = { pending: 0, "in-transit": 1, "ready-for-pickup": 2, arrived: 3 } as const
+
+const STATUS_TEXT: Record<ShipmentStatus, string> = {
+  pending: "ready to ship",
+  "in-transit": "in transit",
+  "ready-for-pickup": "ready for pickup",
+  arrived: "delivered",
+}
 
 type ShipmentRow = typeof shipments.$inferSelect
 
@@ -43,7 +50,7 @@ export async function applyCarrierSnapshot(row: ShipmentRow, snapshot: CarrierSn
       await notifyUser(tx, {
         userId: row.userId,
         type: "shipment",
-        title: `Shipment ${result[0].trackingNumber} is now ${nextStatus}`,
+        title: `Shipment ${result[0].trackingNumber} is now ${STATUS_TEXT[nextStatus as ShipmentStatus] ?? nextStatus}`,
         description: snapshot.lastMessage ?? `${row.senderLocation} → ${row.receiverLocation}`,
         relatedHref: "/dashboard/shipments/",
       })

@@ -1,7 +1,8 @@
 import type { shipments } from "@/db/schema"
 import { validatePackageDimensions, type ServiceTier } from "@/lib/shipping-rates"
 
-export type ShipmentStatus = "arrived" | "in-transit" | "pending"
+/** pending = booked, waiting for the courier; ready-for-pickup = waiting at a locker / pickup point. */
+export type ShipmentStatus = "arrived" | "ready-for-pickup" | "in-transit" | "pending"
 export type ShipmentProvider = "internal" | "eurosender" | "sendcloud"
 
 /** Structured postal address + contact for one side of a shipment. Country is ISO 3166-1 alpha-2. */
@@ -85,6 +86,50 @@ export function needsState(country: string | null | undefined): boolean {
 export const DESTINATION_COUNTRIES = [...EU_COUNTRIES, ...NON_EU_DESTINATIONS].sort((a, b) => a.name.localeCompare(b.name))
 
 const NON_EU_DESTINATION_CODES = new Set(NON_EU_DESTINATIONS.map((c) => c.code))
+
+/**
+ * Postcode shapes per country. Carriers reject (or silently mis-route) a postcode that doesn't fit, and a
+ * wrong one is why pickup point searches come back empty — so we catch typos before asking anyone.
+ */
+const POSTCODE_PATTERNS: Record<string, { re: RegExp; example: string }> = {
+  AT: { re: /^\d{4}$/, example: "1010" },
+  BE: { re: /^\d{4}$/, example: "1000" },
+  BG: { re: /^\d{4}$/, example: "1000" },
+  HR: { re: /^\d{5}$/, example: "10000" },
+  CY: { re: /^\d{4}$/, example: "1010" },
+  CZ: { re: /^\d{3} ?\d{2}$/, example: "110 00" },
+  DK: { re: /^\d{4}$/, example: "1050" },
+  EE: { re: /^\d{5}$/, example: "10111" },
+  FI: { re: /^\d{5}$/, example: "00100" },
+  FR: { re: /^\d{5}$/, example: "75001" },
+  DE: { re: /^\d{5}$/, example: "10115" },
+  GR: { re: /^\d{3} ?\d{2}$/, example: "105 57" },
+  HU: { re: /^\d{4}$/, example: "1011" },
+  IE: { re: /^[A-Z]\d[\dW] ?[A-Z\d]{4}$/i, example: "D02 X285" },
+  IT: { re: /^\d{5}$/, example: "20121" },
+  LV: { re: /^(LV-?)?\d{4}$/i, example: "LV-1050" },
+  LT: { re: /^(LT-?)?\d{5}$/i, example: "LT-01100" },
+  LU: { re: /^(L-?)?\d{4}$/i, example: "1009" },
+  MT: { re: /^[A-Z]{3} ?\d{2,4}$/i, example: "VLT 1117" },
+  NL: { re: /^\d{4} ?[A-Z]{2}$/i, example: "1012 AB" },
+  PL: { re: /^\d{2}-?\d{3}$/, example: "00-001" },
+  PT: { re: /^\d{4}-?\d{3}$/, example: "1000-001" },
+  RO: { re: /^\d{6}$/, example: "010011" },
+  SK: { re: /^\d{3} ?\d{2}$/, example: "811 01" },
+  SI: { re: /^\d{4}$/, example: "1000" },
+  ES: { re: /^\d{5}$/, example: "28001" },
+  SE: { re: /^\d{3} ?\d{2}$/, example: "111 22" },
+  CH: { re: /^\d{4}$/, example: "8001" },
+  US: { re: /^\d{5}(-\d{4})?$/, example: "98101" },
+}
+
+/** Null when the postcode fits the country's format (or we don't know the format). */
+export function postcodeError(country: string | null | undefined, zip: string | null | undefined): string | null {
+  const pattern = POSTCODE_PATTERNS[(country ?? "").trim().toUpperCase()]
+  const value = (zip ?? "").trim()
+  if (!pattern || !value) return null
+  return pattern.re.test(value) ? null : `This doesn't look like a postcode there — e.g. ${pattern.example}`
+}
 
 /** True when parcels to this country cross an EU customs border. */
 export function needsCustoms(country: string | null | undefined): boolean {
@@ -242,6 +287,8 @@ export function validateShipmentAddress(address: unknown, label: "sender" | "rec
   if (needsState(country) && (typeof a.state !== "string" || !/^[A-Za-z]{2}$/.test(a.state.trim()))) {
     return `Invalid ${label} state — use the two-letter code, e.g. WA`
   }
+  const zipError = postcodeError(country, a.zip as string)
+  if (zipError) return `Invalid ${label} postcode. ${zipError}`
   if (!/^\S+@\S+\.\S+$/.test((a.email as string).trim())) return `Invalid ${label} email`
   if (!/^\+?[\d\s()-]{6,20}$/.test((a.phone as string).trim())) return `Invalid ${label} phone`
   return null
@@ -269,6 +316,8 @@ export function validateQuoteAddress(address: unknown, label: "sender" | "receiv
   if (needsState(country) && (typeof a.state !== "string" || !/^[A-Za-z]{2}$/.test(a.state.trim()))) {
     return `Invalid ${label} state — use the two-letter code, e.g. WA`
   }
+  const zipError = postcodeError(country, a.zip as string)
+  if (zipError) return `Invalid ${label} postcode. ${zipError}`
   return null
 }
 

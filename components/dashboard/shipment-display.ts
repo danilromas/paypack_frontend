@@ -1,14 +1,20 @@
-import { CheckCircle2, Package, Truck, type LucideIcon } from "lucide-react"
+import { CheckCircle2, MapPinned, Package, Truck, type LucideIcon } from "lucide-react"
 import type { Shipment, ShipmentAddress, ShipmentStatus } from "@/lib/shipments"
 
-export const SHIPMENT_STEPS: { status: ShipmentStatus; label: string }[] = [
-  { status: "pending", label: "Booked" },
-  { status: "in-transit", label: "In transit" },
-  { status: "arrived", label: "Delivered" },
-]
+const STEP_LABELS: Record<ShipmentStatus, string> = {
+  pending: "Ready to ship",
+  "in-transit": "In transit",
+  "ready-for-pickup": "Ready for pickup",
+  arrived: "Delivered",
+}
 
-export function shipmentStepIndex(status: ShipmentStatus) {
-  return SHIPMENT_STEPS.findIndex((s) => s.status === status)
+/** Timeline for one shipment; the pickup step only appears for locker / pickup point deliveries. */
+export function shipmentSteps(s: Pick<Shipment, "status" | "receiverAddress">): { status: ShipmentStatus; label: string }[] {
+  const viaPoint = Boolean(s.receiverAddress?.servicePoint) || s.status === "ready-for-pickup"
+  const order: ShipmentStatus[] = viaPoint
+    ? ["pending", "in-transit", "ready-for-pickup", "arrived"]
+    : ["pending", "in-transit", "arrived"]
+  return order.map((status) => ({ status, label: STEP_LABELS[status] }))
 }
 
 export const SHIPMENT_STATUS: Record<
@@ -16,7 +22,7 @@ export const SHIPMENT_STATUS: Record<
   { label: string; icon: LucideIcon; pill: string; iconBg: string }
 > = {
   pending: {
-    label: "Booked",
+    label: "Ready to ship",
     icon: Package,
     pill: "border border-warning/20 bg-warning/20 text-warning-foreground",
     iconBg: "bg-warning/15 text-warning-foreground",
@@ -26,6 +32,12 @@ export const SHIPMENT_STATUS: Record<
     icon: Truck,
     pill: "border border-ship/20 bg-ship/10 text-ship",
     iconBg: "bg-ship/10 text-ship",
+  },
+  "ready-for-pickup": {
+    label: "Ready for pickup",
+    icon: MapPinned,
+    pill: "border border-primary/20 bg-primary/10 text-primary",
+    iconBg: "bg-primary/10 text-primary",
   },
   arrived: {
     label: "Delivered",

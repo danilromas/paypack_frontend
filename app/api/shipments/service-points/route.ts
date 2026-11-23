@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth/session"
 import { SendcloudError, findServicePoints, isSendcloudEnabled } from "@/lib/sendcloud"
+import { postcodeError } from "@/lib/shipments"
 
 /**
  * Lockers and pickup points of one carrier near the receiver, for the wizard's pickup point step:
@@ -20,12 +21,25 @@ export async function GET(req: Request) {
   const country = q.get("country")?.trim() ?? ""
   const zip = q.get("zip")?.trim() ?? ""
   const city = q.get("city")?.trim() ?? ""
-  if (!/^[a-z0-9_]{2,40}$/.test(carrier) || !/^[A-Za-z]{2}$/.test(country) || !zip || !city) {
-    return NextResponse.json({ error: "Carrier, country, postal code and city are required" }, { status: 400 })
+  if (!/^[a-z0-9_]{2,40}$/.test(carrier) || !/^[A-Za-z]{2}$/.test(country) || !zip) {
+    return NextResponse.json({ error: "Carrier, country and postal code are required" }, { status: 400 })
+  }
+  const zipError = postcodeError(country, zip)
+  if (zipError) {
+    return NextResponse.json({ error: `The receiver's postcode looks wrong. ${zipError}` }, { status: 400 })
   }
 
   try {
-    const points = await findServicePoints({ country, zip, city, street: q.get("street")?.trim() || undefined }, carrier)
+    const street = q.get("street")?.trim() || undefined
+    // A misspelt street or city makes the carrier find nothing (or reject the search). Fall back to the
+    // postcode alone, which is what decides the neighbourhood anyway.
+    let points = await findServicePoints({ country, zip, city: city || undefined, street }, carrier).catch((error) => {
+      if (error instanceof SendcloudError && error.status < 500) return []
+      throw error
+    })
+    if (points.length === 0 && (city || street)) {
+      points = await findServicePoints({ country, zip }, carrier)
+    }
     return NextResponse.json({ points })
   } catch (error) {
     if (error instanceof SendcloudError) {

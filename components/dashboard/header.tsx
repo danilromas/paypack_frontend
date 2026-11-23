@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Compass, Menu } from "lucide-react"
+import { Bell, Compass, LogOut, Menu } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { usePathname, useRouter } from "next/navigation"
 import {
@@ -51,6 +51,11 @@ export function DashboardHeader() {
   const unreadNotifications = notifications.filter((n) => !n.readAt).length
   const recentNotifications = notifications.slice(0, 5)
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {})
+    router.push("/")
+  }
+
   function openNotification(id: string, href: string | null) {
     markNotificationRead(id).catch(() => {})
     if (href) router.push(href)
@@ -81,7 +86,7 @@ export function DashboardHeader() {
               <Menu className="h-5 w-5" />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 p-0">
+          <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0">
             <SheetHeader className="border-b border-border bg-sidebar px-6 py-4 text-left">
               <SheetTitle className="text-sm font-semibold text-sidebar-foreground">
                 <SheetClose asChild>
@@ -101,7 +106,7 @@ export function DashboardHeader() {
                 </div>
               </SheetClose>
             </div>
-            <nav className="space-y-1 px-3 py-4 text-sm">
+            <nav className="flex-1 space-y-1 px-3 py-4 text-sm">
               {[
                 { href: SECTION_HOME[mode], label: "Dashboard" },
                 { href: "/dashboard/chats", label: "Chats" },
@@ -129,6 +134,18 @@ export function DashboardHeader() {
                 </SheetClose>
               ))}
             </nav>
+            <div className="border-t border-sidebar-border px-3 py-3">
+              <SheetClose asChild>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-sidebar-muted transition-colors hover:bg-sidebar-accent/60 hover:text-destructive"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Log Out
+                </button>
+              </SheetClose>
+            </div>
           </SheetContent>
         </Sheet>
       </div>

@@ -31,6 +31,7 @@ import {
   ORIGIN_COUNTRIES,
   formatShipmentAddress,
   needsCustoms,
+  postcodeError,
   needsState,
   type DeliveryMode,
   type ExportReason,
@@ -232,6 +233,7 @@ function LocationFields({
 }) {
   const set = (field: keyof Party) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     onChange({ ...value, [field]: e.target.value })
+  const zipError = postcodeError(value.country, value.zip)
   return (
     <div className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
       <div className="mb-3 flex items-center gap-2 font-semibold text-foreground">
@@ -247,8 +249,17 @@ function LocationFields({
             </option>
           ))}
         </select>
-        <input value={value.zip} onChange={set("zip")} placeholder="Postcode" aria-label={`${title} postcode`} autoComplete="postal-code" className={inputClass} />
+        <input
+          value={value.zip}
+          onChange={set("zip")}
+          placeholder="Postcode"
+          aria-label={`${title} postcode`}
+          aria-invalid={zipError ? true : undefined}
+          autoComplete="postal-code"
+          className={cn(inputClass, zipError && "border-destructive/60 focus:ring-destructive/30")}
+        />
       </div>
+      {zipError && <p className="mt-2 text-xs text-destructive">{zipError}</p>}
       {needsState(value.country) && (
         <input
           value={value.state ?? ""}
@@ -310,7 +321,7 @@ export function NewShipmentWizard({
 
   const currentPhase = PHASES[step - 1]
 
-  const locationValid = (p: Party) => p.country !== "" && p.zip.trim() !== ""
+  const locationValid = (p: Party) => p.country !== "" && p.zip.trim() !== "" && postcodeError(p.country, p.zip) === null
   const routeLocated =
     locationValid(sender) &&
     locationValid(receiver) &&
@@ -1163,7 +1174,7 @@ export function NewShipmentWizard({
                 ? currentPhase === "price"
                   ? quickValid
                     ? "Pick a price to continue."
-                    : "Enter both postcodes and the box size."
+                    : "Enter both postcodes (in the local format) and the box size."
                   : isCustoms
                     ? "Fill in both addresses with a valid phone and email, the contents and the customs details."
                     : "Fill in both addresses with a valid phone and email, and the contents."
