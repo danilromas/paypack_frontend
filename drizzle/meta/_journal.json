@@ -106,6 +106,13 @@
       "when": 1793003264690,
       "tag": "0014_sendcloud_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795463004465,
+      "tag": "0015_ready_for_pickup_status",
+      "breakpoints": true
     }
   ]
 }

@@ -328,10 +328,11 @@ export function mapTrackingStatus(status: EurosenderTrackingStatus | null): Ship
   switch (status) {
     case "Delivered":
       return "arrived"
+    case "AvailableForPickup":
+      return "ready-for-pickup"
     case "InTransit":
     case "OutForDelivery":
     case "AttemptFail":
-    case "AvailableForPickup":
     case "Exception":
       return "in-transit"
     default:

@@ -9,6 +9,7 @@ import {
   validateShipmentAddress,
   validateShipmentCreatePayload,
   validateQuoteAddress,
+  postcodeError,
   toQuoteAddress,
 } from "../lib/shipments"
 
@@ -189,5 +190,25 @@ describe("validateQuoteAddress", () => {
     expect(validateQuoteAddress({ country: "US", zip: "98101" }, "sender")).toMatch(/inside the EU/)
     expect(validateQuoteAddress({ country: "US", zip: "98101" }, "receiver")).toMatch(/state/)
     expect(validateQuoteAddress({ country: "US", zip: "98101", state: "WA" }, "receiver")).toBeNull()
+  })
+})
+
+describe("postcodeError", () => {
+  it("accepts local postcode formats", () => {
+    for (const [country, zip] of [["IT", "20121"], ["NL", "1012 AB"], ["PL", "00-001"], ["PT", "1000-001"], ["IE", "D02 X285"], ["US", "98101-1234"], ["CH", "8001"]]) {
+      expect(postcodeError(country, zip)).toBeNull()
+    }
+  })
+
+  it("flags postcodes that can't exist in that country", () => {
+    expect(postcodeError("IT", "2012")).toMatch(/20121/)
+    expect(postcodeError("DE", "ABCDE")).not.toBeNull()
+    expect(validateQuoteAddress({ country: "IT", zip: "123" }, "receiver")).toMatch(/Invalid receiver postcode/)
+  })
+})
+
+describe("ready for pickup", () => {
+  it("maps locker and shop arrivals from both brokers", () => {
+    expect(mapTrackingStatus("AvailableForPickup")).toBe("ready-for-pickup")
   })
 })

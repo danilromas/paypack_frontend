@@ -324,7 +324,7 @@ export const shipments = pgTable("shipments", {
 }, (table) => [
   check("shipments_provider_check", sql`${table.provider} in ('internal', 'eurosender', 'sendcloud')`),
   uniqueIndex("shipments_provider_order_code_idx").on(table.providerOrderCode),
-  check("shipments_status_check", sql`${table.status} in ('arrived', 'in-transit', 'pending')`),
+  check("shipments_status_check", sql`${table.status} in ('arrived', 'ready-for-pickup', 'in-transit', 'pending')`),
   check("shipments_tier_check", sql`${table.serviceTier} in ('economy', 'standard', 'express')`),
   index("shipments_user_id_idx").on(table.userId),
 ])

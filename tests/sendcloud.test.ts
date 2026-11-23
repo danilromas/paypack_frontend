@@ -279,3 +279,10 @@ describe("toServicePoint", () => {
     })
   })
 })
+
+describe("mapParcelStatus pickup points", () => {
+  it("treats a parcel waiting at a locker or shop as ready for pickup", () => {
+    expect(mapParcelStatus("AWAITING_CUSTOMER_PICKUP")).toBe("ready-for-pickup")
+    expect(mapParcelStatus("DELIVERED")).toBe("arrived")
+  })
+})

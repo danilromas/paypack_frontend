@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ArrowLeftRight, ExternalLink, Handshake, Package } from "lucide-react"
+import { ArrowLeftRight, ArrowUpRight, Handshake, Package, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAppStore } from "@/store/app-store"
 import type { AppMode } from "@/types"
@@ -25,35 +25,42 @@ export function isNavItemActive(href: string, pathname: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
+const tileBase =
+  "group relative flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+const tileIdle = "text-sidebar-muted hover:bg-sidebar/70 hover:text-sidebar-foreground"
+
+function TileContent({ icon: Icon, label, iconClass }: { icon: LucideIcon; label: string; iconClass?: string }) {
+  return (
+    <>
+      <Icon className={cn("h-5 w-5 transition-transform group-hover:-translate-y-0.5", iconClass)} />
+      <span className="truncate">{label}</span>
+    </>
+  )
+}
+
 /** Deal / Shipment / Transfer — the three things PayPack does, always one click away. */
 export function SectionSwitcher({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
   const pathname = usePathname()
   const storedMode = useAppStore((s) => s.mode)
   const mode = sectionForPath(pathname) ?? storedMode
 
-  const base =
-    "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors"
-  const idle = "text-sidebar-muted hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-
   return (
-    <div className={cn("flex gap-1 rounded-2xl bg-sidebar-accent/40 p-1", className)}>
+    <nav aria-label="Sections" className={cn("flex gap-1 rounded-2xl border border-sidebar-border bg-sidebar-accent/50 p-1", className)}>
       <Link
         href={SECTION_HOME.deal}
         onClick={onNavigate}
         aria-current={mode === "deal" ? "page" : undefined}
-        className={cn(base, mode === "deal" ? "bg-primary text-primary-foreground shadow-sm" : idle)}
+        className={cn(tileBase, mode === "deal" ? "bg-primary text-primary-foreground shadow-md shadow-primary/25" : tileIdle)}
       >
-        <Handshake className="h-4 w-4" />
-        Deal
+        <TileContent icon={Handshake} label="Deal" iconClass={mode === "deal" ? undefined : "text-primary"} />
       </Link>
       <Link
         href={SECTION_HOME.ship}
         onClick={onNavigate}
         aria-current={mode === "ship" ? "page" : undefined}
-        className={cn(base, mode === "ship" ? "bg-ship text-ship-foreground shadow-sm" : idle)}
+        className={cn(tileBase, mode === "ship" ? "bg-ship text-ship-foreground shadow-md shadow-ship/30" : tileIdle)}
       >
-        <Package className="h-4 w-4" />
-        Shipment
+        <TileContent icon={Package} label="Shipment" iconClass={mode === "ship" ? undefined : "text-ship"} />
       </Link>
       <a
         href="https://awallet.tech"
@@ -61,14 +68,11 @@ export function SectionSwitcher({ className, onNavigate }: { className?: string;
         rel="noreferrer"
         onClick={onNavigate}
         title="Money transfer via aWallet (opens in a new tab)"
-        className={cn(base, idle)}
+        className={cn(tileBase, tileIdle)}
       >
-        <span className="flex items-center gap-0.5">
-          <ArrowLeftRight className="h-4 w-4" />
-          <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-        </span>
-        Transfer
+        <ArrowUpRight className="absolute right-1.5 top-1.5 h-3 w-3 opacity-50" />
+        <TileContent icon={ArrowLeftRight} label="Transfer" iconClass="text-[#1b74e4]" />
       </a>
-    </div>
+    </nav>
   )
 }

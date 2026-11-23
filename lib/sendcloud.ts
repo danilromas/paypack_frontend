@@ -475,7 +475,7 @@ export function toServicePoint(p: ApiServicePoint): ServicePointSummary {
 
 /** Lockers and pickup points of one carrier closest to an address, nearest first. */
 export async function findServicePoints(
-  near: { country: string; zip: string; city: string; street?: string },
+  near: { country: string; zip: string; city?: string; street?: string },
   carrierCode: string,
   limit = 10,
 ): Promise<ServicePointSummary[]> {
@@ -483,9 +483,9 @@ export async function findServicePoints(
     country_code: near.country.toUpperCase(),
     carrier_code: carrierCode,
     address_postal_code: near.zip,
-    address_city: near.city,
     limit: String(limit),
   })
+  if (near.city) params.set("address_city", near.city)
   if (near.street) params.set("address_street", near.street)
   const res = await request<{ data?: { results?: ApiServicePoint[] } }>("GET", `/service-points?${params}`)
   return (res.data?.results ?? []).map(toServicePoint)
@@ -524,6 +524,10 @@ export function mapParcelStatus(code: string | null): ShipmentStatus {
   if (!code) return "pending"
   const c = code.toUpperCase()
   if (DELIVERED.has(c) || c.endsWith("COLLECTED_BY_CUSTOMER")) return "arrived"
+  // Sitting in a locker or shop until the receiver collects it.
+  if (c.includes("AWAITING_CUSTOMER_PICKUP") || c.includes("READY_FOR_PICKUP") || c.includes("AT_SERVICE_POINT")) {
+    return "ready-for-pickup"
+  }
   if (
     c.startsWith("ANNOUNC") ||
     c.startsWith("BEING_ANNOUNCED") ||

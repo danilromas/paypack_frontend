@@ -22,12 +22,11 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   SHIPMENT_STATUS,
-  SHIPMENT_STEPS,
+  shipmentSteps,
   formatDateTime,
   formatDay,
   formatMoney,
   shipmentRoute,
-  shipmentStepIndex,
 } from "@/components/dashboard/shipment-display"
 
 const fieldClass =
@@ -130,7 +129,8 @@ export function ShipmentDetail({
   const isCarrier = s.provider !== "internal"
   const brokerName = s.provider === "sendcloud" ? "Sendcloud" : "Eurosender"
   const status = SHIPMENT_STATUS[s.status]
-  const activeStep = shipmentStepIndex(s.status)
+  const steps = shipmentSteps(s)
+  const activeStep = steps.findIndex((step) => step.status === s.status)
   const route = shipmentRoute(s)
   const tier = getServiceTier(s.serviceTier)
   const canCancel = s.status === "pending"
@@ -211,7 +211,7 @@ export function ShipmentDetail({
 
         {/* Progress */}
         <div className="mb-6 flex justify-between gap-1 md:mb-8">
-          {SHIPMENT_STEPS.map((step, i) => (
+          {steps.map((step, i) => (
             <div key={step.status} className="flex flex-1 flex-col items-center gap-2">
               <div className="relative flex w-full items-center justify-center">
                 {i > 0 && (
