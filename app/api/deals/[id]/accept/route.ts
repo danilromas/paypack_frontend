@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, walletTransactions } from "@/db/schema"
 import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { getParticipantRole, getOtherParticipantUserId, getDealForViewer } from "@/lib/deals-access"
-import { getWalletSummary } from "@/lib/wallet"
+import { getAvailableBalance, lockWallet } from "@/lib/wallet"
 import { notifyOtherParticipants } from "@/lib/notifications"
 import { CRYPTO_COINS, PAYMENT_METHODS } from "@/lib/payments"
 
@@ -21,8 +22,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     // The buyer picks how they pay at this step (not at deal creation) — recorded on the deal.
-    const body = (await req.json().catch(() => ({}))) as { paymentMethod?: unknown; paymentCryptoCoin?: unknown }
+    const body = (await req.json().catch(() => ({}))) as {
+      paymentMethod?: unknown
+      paymentCryptoCoin?: unknown
+      expectedAmount?: unknown
+    }
+    const expectedAmount =
+      typeof body.expectedAmount === "number" && Number.isFinite(body.expectedAmount) ? body.expectedAmount : null
     const paymentMethod = PAYMENT_METHODS.find((m) => m.value === body.paymentMethod)?.value ?? null
     const paymentCryptoCoin =
       paymentMethod === "crypto" ? (CRYPTO_COINS.find((c) => c.value === body.paymentCryptoCoin)?.value ?? null) : null
@@ -53,15 +61,20 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
 
     const amount = Number(deal.price) + Number(deal.shippingPrice)
-    const wallet = await getWalletSummary(user.id)
-    if (wallet.available < amount) {
+    // The buyer confirms the amount they saw; if the terms moved since, make them look again.
+    if (expectedAmount !== null && Math.abs(expectedAmount - amount) > 0.004) {
       return NextResponse.json(
-        { error: `Insufficient balance — top up at least ${(amount - wallet.available).toFixed(2)} ${deal.currency} first` },
-        { status: 400 },
+        { error: `The deal amount changed to ${amount.toFixed(2)} ${deal.currency} — review it before paying` },
+        { status: 409 },
       )
     }
 
     const updated = await db.transaction(async (tx) => {
+      // Balance check and hold happen under the buyer's wallet lock, in one transaction.
+      await lockWallet(tx, user.id)
+      const available = await getAvailableBalance(tx, user.id)
+      if (available < amount) return { shortBy: amount - available } as const
+
       const rows = await tx
         .update(deals)
         .set({
@@ -69,7 +82,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
           updatedAt: new Date(),
           ...(paymentMethod ? { paymentMethod, paymentCryptoCoin } : {}),
         })
-        .where(and(eq(deals.id, id), eq(deals.status, "pending")))
+        .where(
+          and(
+            eq(deals.id, id),
+            eq(deals.status, "pending"),
+            // Pay exactly the amount checked above, even if an edit landed in between.
+            eq(deals.price, deal.price),
+            eq(deals.shippingPrice, deal.shippingPrice),
+          ),
+        )
         .returning()
       const dealRow = rows[0]
       if (!dealRow) return null
@@ -87,12 +108,18 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         type: "deal",
         title: `"${dealRow.title}" is now in escrow`,
         description: "The buyer paid into escrow — ship when ready.",
-        relatedHref: "/dashboard/",
+        relatedHref: "/dashboard/deals",
       })
 
       return dealRow
     })
 
+    if (updated && "shortBy" in updated) {
+      return NextResponse.json(
+        { error: `Insufficient balance — top up at least ${updated.shortBy.toFixed(2)} ${deal.currency} first` },
+        { status: 400 },
+      )
+    }
     if (!updated) {
       return NextResponse.json(
         { error: "Deal isn't awaiting acceptance (already accepted, cancelled, or not found)" },

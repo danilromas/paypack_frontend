@@ -15,6 +15,63 @@ import { useAppStore } from "@/store/app-store"
 import { cn, formatDealRelativeTime } from "@/lib/utils"
 import type { Shipment, ShipmentCreatePayload, ShipmentEditPayload, ShipmentStatus } from "@/lib/shipments"
 import { SERVICE_TIERS, getServiceTier } from "@/lib/shipping-rates"
+import type { BillingStatus, MoneyByCurrency } from "@/lib/shipment-billing"
+
+interface ShipperBilling {
+  canBookShipments: boolean
+  totals: Record<BillingStatus, MoneyByCurrency>
+}
+
+function moneyTotals(totals: MoneyByCurrency) {
+  const parts = Object.entries(totals).map(([currency, amount]) => formatMoney(amount, currency))
+  return parts.length ? parts.join(" + ") : formatMoney(0, "EUR")
+}
+
+/** Shown to shipping accounts: what their labels cost so far and what is invoiced and due. */
+function ShipperBillingBanner({ refreshKey }: { refreshKey: number }) {
+  const [billing, setBilling] = useState<ShipperBilling | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/shipments/billing", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: ShipperBilling | null) => {
+        if (!cancelled) setBilling(data)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
+
+  if (!billing) return null
+  const hasAny = Object.values(billing.totals).some((t) => Object.keys(t).length > 0)
+  if (!billing.canBookShipments && !hasAny) return null
+
+  return (
+    <div className="mb-6 rounded-2xl border border-ship/30 bg-ship/5 p-4 text-sm">
+      <div className="font-semibold text-foreground">Shipping account</div>
+      <p className="mt-1 text-muted-foreground">
+        {billing.canBookShipments
+          ? "You book labels without a password. PayPack pays the carrier and invoices you for your labels."
+          : "Your shipping account is off — earlier labels stay on your bill."}
+      </p>
+      <dl className="mt-3 grid grid-cols-3 gap-3">
+        <div>
+          <dt className="text-xs text-muted-foreground">Not yet invoiced</dt>
+          <dd className="font-semibold text-foreground">{moneyTotals(billing.totals.unbilled)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Invoiced, to pay</dt>
+          <dd className="font-semibold text-foreground">{moneyTotals(billing.totals.invoiced)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Paid</dt>
+          <dd className="font-semibold text-foreground">{moneyTotals(billing.totals.paid)}</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
 
 type Filter = "all" | "active" | ShipmentStatus
 
@@ -194,6 +251,8 @@ function ShipmentsPageContent() {
             New Shipment
           </Button>
         </div>
+
+        <ShipperBillingBanner refreshKey={shipments.length} />
 
         {draft && (
           <button

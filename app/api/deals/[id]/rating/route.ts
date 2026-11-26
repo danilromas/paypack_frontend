@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { isUniqueViolation } from "@/lib/db-errors"
+import { isUuid } from "@/lib/ids"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, ratings } from "@/db/schema"
@@ -15,6 +17,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const role = await getParticipantRole(id, user.id)
     if (!role) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })
@@ -78,6 +81,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       { status: 201 },
     )
   } catch (error) {
+    // Double-click / two tabs: the unique (deal, rater) index catches the second insert.
+    if (isUniqueViolation(error)) {
+      return NextResponse.json({ error: "You already rated this deal" }, { status: 409 })
+    }
     console.error("POST /api/deals/[id]/rating failed", error)
     return NextResponse.json({ error: "Failed to submit rating" }, { status: 500 })
   }

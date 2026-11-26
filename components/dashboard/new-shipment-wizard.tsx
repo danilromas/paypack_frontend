@@ -290,7 +290,9 @@ export function NewShipmentWizard({
   const [step, setStep] = useState(1)
   const [bookingPassword, setBookingPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [accessGranted, setAccessGranted] = useState(false)
+  // Shipping accounts book on their own bill and skip the shared booking password entirely.
+  const isShipper = useAppStore((s) => s.user?.canBookShipments === true)
+  const [accessGranted, setAccessGranted] = useState(isShipper)
   const [accessChecking, setAccessChecking] = useState(false)
   const [accessError, setAccessError] = useState<string | null>(null)
   const [sender, setSender] = useState<Party>(draft?.sender ?? EMPTY_PARTY)
@@ -546,6 +548,22 @@ export function NewShipmentWizard({
     return true
   }
 
+  // The store's user may load after the wizard opens (or be stale) — ask the server once.
+  useEffect(() => {
+    if (accessGranted) return
+    let cancelled = false
+    fetch("/api/shipments/access", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { granted?: boolean } | null) => {
+        if (!cancelled && data?.granted) setAccessGranted(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function checkAccess(e: React.FormEvent) {
     e.preventDefault()
     setAccessChecking(true)
@@ -577,7 +595,7 @@ export function NewShipmentWizard({
     const receiverAddress = toAddress(receiver)
     try {
       await onCreate({
-        bookingPassword,
+        bookingPassword: isShipper ? undefined : bookingPassword,
         senderName: sender.name.trim(),
         senderLocation: formatShipmentAddress(senderAddress),
         receiverName: receiver.name.trim(),

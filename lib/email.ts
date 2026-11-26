@@ -26,6 +26,11 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
 
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) {
+    if (process.env.NODE_ENV === "production") {
+      // Never write a live reset link into production logs — anyone with log access could use it.
+      console.error("[email] No SMTP_HOST/RESEND_API_KEY configured — password reset email NOT sent")
+      return
+    }
     console.log(`[email] No SMTP_HOST/RESEND_API_KEY configured — password reset link for ${to}:\n${resetUrl}`)
     return
   }

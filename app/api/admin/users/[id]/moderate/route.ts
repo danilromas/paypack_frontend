@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { getCurrentUser } from "@/lib/auth/session"
 import { MODERATION_ACTIONS, moderateUser, type ModerationAction } from "@/lib/admin-users"
 
@@ -13,6 +14,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const body = (await req.json().catch(() => ({}))) as { action?: unknown; reason?: unknown }
     const action = body.action as ModerationAction
     if (!MODERATION_ACTIONS.includes(action)) {

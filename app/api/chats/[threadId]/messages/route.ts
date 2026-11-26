@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { db } from "@/lib/db"
 import { chatMessages } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/session"
@@ -19,6 +20,7 @@ export async function GET(req: Request, context: { params: Promise<{ threadId: s
 
   try {
     const { threadId } = await context.params
+    if (!isUuid(threadId)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const dealId = await getMembershipDealId(threadId, user.id)
     if (!dealId) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })
@@ -46,6 +48,7 @@ export async function POST(req: Request, context: { params: Promise<{ threadId: 
 
   try {
     const { threadId } = await context.params
+    if (!isUuid(threadId)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const dealId = await getMembershipDealId(threadId, user.id)
     if (!dealId) {
       return NextResponse.json({ error: "Chat not found" }, { status: 404 })

@@ -240,8 +240,13 @@ export interface Shipment {
   senderAddress: ShipmentAddress | null
   receiverAddress: ShipmentAddress | null
   dealId?: string | null
+  /** Shipper-account invoicing: "none" when PayPack doesn't bill this label back. */
+  billingStatus: ShipmentBillingStatus
+  invoiceRef: string | null
   createdAt: string
 }
+
+export type ShipmentBillingStatus = "none" | "unbilled" | "invoiced" | "paid"
 
 const SERVICE_TIER_VALUES: ServiceTier[] = ["economy", "standard", "express"]
 
@@ -469,6 +474,8 @@ export function toShipment(row: ShipmentRow): Shipment {
     senderAddress: row.senderAddress ?? null,
     receiverAddress: row.receiverAddress ?? null,
     dealId: row.dealId ?? undefined,
+    billingStatus: (row.billingStatus ?? "none") as ShipmentBillingStatus,
+    invoiceRef: row.invoiceRef ?? null,
     createdAt: row.createdAt.toISOString(),
   }
 }

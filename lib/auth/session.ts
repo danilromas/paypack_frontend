@@ -24,6 +24,8 @@ export interface SessionUser {
   avatarUrl: string | null
   role: string
   status: UserStatus
+  /** Shipper account: books labels without the shared password and is invoiced for them. */
+  canBookShipments: boolean
 }
 
 export type UserStatus = "active" | "restricted" | "suspended"
@@ -56,6 +58,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     avatarUrl: user.avatarUrl,
     role: user.role,
     status: user.status as UserStatus,
+    canBookShipments: user.canBookShipments,
   }
 }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { and, eq, ne } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, disputes, disputeEvents } from "@/db/schema"
@@ -15,6 +16,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const role = await getParticipantRole(id, user.id)
     if (!role) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })

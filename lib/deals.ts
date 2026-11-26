@@ -38,13 +38,39 @@ export interface DealEditPayload {
   currency: string
 }
 
+export const DEAL_CURRENCIES = ["EUR", "USD", "GBP"] as const
+/** Comfortably below numeric(12,2)'s 10^10 ceiling, so a typo can't overflow the column. */
+export const MAX_DEAL_AMOUNT = 1_000_000
+
+function isAmount(value: unknown, { allowZero }: { allowZero: boolean }): boolean {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    (allowZero ? value >= 0 : value > 0) &&
+    value <= MAX_DEAL_AMOUNT
+  )
+}
+
+/** Only http(s) links may be stored for images/sources — never javascript: or data: URLs. */
+export function isSafeHttpUrl(value: unknown): boolean {
+  if (typeof value !== "string") return false
+  try {
+    const url = new URL(value)
+    return url.protocol === "https:" || url.protocol === "http:"
+  } catch {
+    return false
+  }
+}
+
 function validateCommonFields(payload: Partial<DealEditPayload>): string | null {
   if (!payload.title || typeof payload.title !== "string" || !payload.title.trim()) return "Invalid title"
+  if (payload.title.length > 200) return "Title is too long (200 characters max)"
   if (payload.description !== undefined && typeof payload.description !== "string") return "Invalid description"
-  if (payload.imageUrl !== undefined && payload.imageUrl !== null && typeof payload.imageUrl !== "string") return "Invalid imageUrl"
-  if (typeof payload.price !== "number" || Number.isNaN(payload.price) || payload.price < 0) return "Invalid price"
-  if (typeof payload.shippingPrice !== "number" || Number.isNaN(payload.shippingPrice) || payload.shippingPrice < 0) return "Invalid shippingPrice"
-  if (!payload.currency || typeof payload.currency !== "string") return "Invalid currency"
+  if (typeof payload.description === "string" && payload.description.length > 5000) return "Description is too long"
+  if (payload.imageUrl !== undefined && payload.imageUrl !== null && !isSafeHttpUrl(payload.imageUrl)) return "Invalid imageUrl"
+  if (!isAmount(payload.price, { allowZero: false })) return "Invalid price"
+  if (!isAmount(payload.shippingPrice, { allowZero: true })) return "Invalid shippingPrice"
+  if (!payload.currency || !(DEAL_CURRENCIES as readonly string[]).includes(payload.currency)) return "Unsupported currency"
   if (containsCyrillic(payload.title) || containsCyrillic(payload.description)) return LATIN_ONLY_MESSAGE
   return null
 }
@@ -54,6 +80,12 @@ export function validateDealCreatePayload(payload: Partial<DealCreatePayload>): 
   if (commonError) return commonError
   if (payload.role !== "buyer" && payload.role !== "seller") return "Invalid role"
   if (payload.counterparty === undefined || typeof payload.counterparty !== "string") return "Invalid counterparty"
+  if (payload.counterparty.length > 200) return "Invalid counterparty"
+  if (payload.sourceUrl != null && !isSafeHttpUrl(payload.sourceUrl)) return "Invalid sourceUrl"
+  if (payload.counterpartyAvatar != null && !isSafeHttpUrl(payload.counterpartyAvatar)) return "Invalid counterpartyAvatar"
+  for (const dim of [payload.boxLengthCm, payload.boxWidthCm, payload.boxHeightCm]) {
+    if (dim != null && !(typeof dim === "number" && Number.isFinite(dim) && dim > 0 && dim <= 500)) return "Invalid box size"
+  }
   if (containsCyrillic(payload.counterparty)) return LATIN_ONLY_MESSAGE
   return null
 }

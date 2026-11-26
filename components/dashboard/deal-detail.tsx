@@ -129,7 +129,10 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
   }
 
   async function handleConfirmPay() {
+    if (!deal) return
     await runAction("accept", {
+      // The server refuses to charge if the deal's amount no longer matches what the buyer saw here.
+      expectedAmount: Math.round((deal.price + deal.shippingPrice) * 100) / 100,
       paymentMethod,
       paymentCryptoCoin: paymentMethod === "crypto" ? cryptoCoin : undefined,
     })

@@ -113,6 +113,13 @@
       "when": 1795463004465,
       "tag": "0015_ready_for_pickup_status",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795730649845,
+      "tag": "0016_shipper_accounts",
+      "breakpoints": true
     }
   ]
 }

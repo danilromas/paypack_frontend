@@ -15,7 +15,7 @@ function normalizePayload(body: Record<string, unknown>): DealCreatePayload {
       typeof body.shippingPrice === "number"
         ? body.shippingPrice
         : Number(body.shippingPrice),
-    currency: typeof body.currency === "string" ? body.currency : "EUR",
+    currency: typeof body.currency === "string" ? body.currency.trim().toUpperCase() : "EUR",
     role: body.role as DealCreatePayload["role"],
     counterparty: typeof body.counterparty === "string" ? body.counterparty : "",
     counterpartyAvatar:

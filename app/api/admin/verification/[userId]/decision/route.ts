@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { kycVerifications, riskFlags } from "@/db/schema"
+import { kycVerifications, riskFlags, users } from "@/db/schema"
+import { isUuid } from "@/lib/ids"
 import { getCurrentUser } from "@/lib/auth/session"
 import { notifyUser } from "@/lib/notifications"
 
@@ -18,6 +19,9 @@ export async function POST(req: Request, context: { params: Promise<{ userId: st
 
   try {
     const { userId } = await context.params
+    if (!isUuid(userId)) return NextResponse.json({ error: "User not found" }, { status: 404 })
+    const target = (await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1))[0]
+    if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 })
     const body = (await req.json()) as { action?: unknown }
     const action = body.action as (typeof ACTIONS)[number]
     if (!ACTIONS.includes(action)) {
@@ -48,10 +52,10 @@ export async function POST(req: Request, context: { params: Promise<{ userId: st
         const existingFlag = await tx
           .select({ id: riskFlags.id })
           .from(riskFlags)
-          .where(and(eq(riskFlags.userId, userId), eq(riskFlags.label, "Restricted by admin")))
+          .where(and(eq(riskFlags.userId, userId), eq(riskFlags.label, "Verification rejected")))
           .limit(1)
         if (!existingFlag[0]) {
-          await tx.insert(riskFlags).values({ userId, label: "Restricted by admin", source: "admin" })
+          await tx.insert(riskFlags).values({ userId, label: "Verification rejected", source: "admin" })
         }
       }
 
@@ -59,7 +63,7 @@ export async function POST(req: Request, context: { params: Promise<{ userId: st
         action === "approved"
           ? "Your verification was approved"
           : action === "rejected"
-            ? "Your account has been restricted"
+            ? "Your verification was not approved"
             : "More information needed for verification"
 
       await notifyUser(tx, {

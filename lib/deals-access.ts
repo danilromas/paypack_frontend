@@ -60,7 +60,7 @@ export async function searchUsers(viewerUserId: string, query: string): Promise<
           WHERE dp1.user_id = ${viewerUserId} AND dp2.user_id = u.id
         ) AS "sharedDealsCount"
       FROM users u
-      WHERE u.id <> ${viewerUserId} AND u.name ILIKE ${pattern}
+      WHERE u.id <> ${viewerUserId} AND u.status <> 'suspended' AND u.name ILIKE ${pattern}
     ) found
     WHERE ${globalSearch} OR found."sharedDealsCount" > 0
     ORDER BY found."sharedDealsCount" DESC, found.name

@@ -13,12 +13,16 @@ export async function POST() {
   }
 
   try {
-    await db.transaction(async (tx) => {
+    const outcome = await db.transaction(async (tx) => {
       const existing = await tx
-        .select({ userId: kycVerifications.userId })
+        .select({ userId: kycVerifications.userId, status: kycVerifications.status })
         .from(kycVerifications)
         .where(eq(kycVerifications.userId, user.id))
         .limit(1)
+
+      // Re-submitting must never undo an approval, and a pending request is already in the queue.
+      if (existing[0]?.status === "approved") return "already-approved" as const
+      if (existing[0]?.status === "pending") return "already-pending" as const
 
       if (existing[0]) {
         await tx
@@ -41,8 +45,12 @@ export async function POST() {
           await tx.insert(riskFlags).values({ userId: user.id, label: "New account", source: "system" })
         }
       }
+      return "submitted" as const
     })
 
+    if (outcome === "already-approved") {
+      return NextResponse.json({ error: "Your account is already verified" }, { status: 409 })
+    }
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error("POST /api/kyc/submit failed", error)

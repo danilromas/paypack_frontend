@@ -100,9 +100,10 @@ export function NewDealModal({
         SHIPPING_ESTIMATE_TIER,
       )
     : 0
-  const fee = Math.round(price * 0.03 * 100) / 100
-  const total = Math.round((price + shippingEstimate + fee) * 100) / 100
-  const sellerReceives = Math.round((price + shippingEstimate - fee) * 100) / 100
+  // No platform fee is charged yet: the buyer pays exactly price + shipping into escrow and the
+  // seller receives exactly that on completion — show the same numbers the ledger will book.
+  const total = Math.round((price + shippingEstimate) * 100) / 100
+  const sellerReceives = total
 
   const hasCyrillic = [itemTitle, itemDetailDesc, sellerName, description].some(containsCyrillic)
   const detailsValid = itemTitle.trim().length > 0 && price > 0 && !hasCyrillic
@@ -788,8 +789,8 @@ export function NewDealModal({
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Fee (3%):</span>
-                <span className="font-medium text-foreground">{fee} {currency}</span>
+                <span className="text-muted-foreground">PayPack fee:</span>
+                <span className="font-medium text-foreground">0.00 {currency}</span>
               </div>
               <div className="border-t border-border pt-3">
                 <div className="flex justify-between font-semibold">

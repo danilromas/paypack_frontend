@@ -19,7 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card } from "@/components/ui/card"
-import { History, Loader2, Search, ShieldAlert, UserCog, Users } from "lucide-react"
+import Link from "next/link"
+import { History, Loader2, Package, Search, ShieldAlert, UserCog, Users } from "lucide-react"
 import { formatDealDateTime } from "@/lib/utils"
 import type { AdminUserDTO, ModerationAction, ModerationEventDTO } from "@/lib/admin-users"
 import type { UserStatus } from "@/lib/auth/session"
@@ -42,6 +43,8 @@ const ACTION_LABELS: Record<ModerationAction, string> = {
   reinstate: "Reinstated",
   make_admin: "Made admin",
   remove_admin: "Admin removed",
+  enable_shipping: "Shipping account enabled",
+  disable_shipping: "Shipping account disabled",
 }
 
 export default function AdminUsersPage() {
@@ -186,6 +189,7 @@ export default function AdminUsersPage() {
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <Badge variant="outline" className="uppercase">{u.role}</Badge>
+                    {u.canBookShipments ? <Badge variant="secondary">Shipper</Badge> : null}
                     <span>KYC: {u.kycStatus}</span>
                     <span>• {u.dealsCount} deals</span>
                   </div>
@@ -231,7 +235,10 @@ export default function AdminUsersPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="uppercase">{u.role}</Badge>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className="uppercase">{u.role}</Badge>
+                            {u.canBookShipments ? <Badge variant="secondary">Shipper</Badge> : null}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className={s.className}>
@@ -265,6 +272,7 @@ export default function AdminUsersPage() {
                   <span>{active.name}</span>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="uppercase">{active.role}</Badge>
+                    {active.canBookShipments ? <Badge variant="secondary">Shipper</Badge> : null}
                     <Badge variant="secondary" className={statusBadge(active.status).className}>
                       {statusBadge(active.status).text}
                     </Badge>
@@ -336,6 +344,27 @@ export default function AdminUsersPage() {
                     Restricted: can sign in, but can&apos;t open deals or move money. Suspended: can&apos;t sign in.
                   </p>
                 </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-border bg-card/60 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Package className="h-4 w-4 text-primary" />
+                  Shipping account
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  A shipping account books labels without the booking password. PayPack pays the carrier and
+                  every label lands on this user&apos;s bill under{" "}
+                  <Link href="/admin/shipping-billing" className="text-primary hover:underline">Shipping billing</Link>.
+                </p>
+                {active.canBookShipments ? (
+                  <Button variant="outline" className="w-full rounded-xl" disabled={busy} onClick={() => moderate("disable_shipping")}>
+                    Disable shipping account
+                  </Button>
+                ) : (
+                  <Button className="w-full rounded-xl bg-primary" disabled={busy} onClick={() => moderate("enable_shipping")}>
+                    Enable shipping account
+                  </Button>
+                )}
               </div>
 
               {error ? <p className="text-sm text-destructive">{error}</p> : null}

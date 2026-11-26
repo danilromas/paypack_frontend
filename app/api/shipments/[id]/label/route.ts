@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { shipments } from "@/db/schema"
@@ -17,6 +18,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   }
 
   const { id } = await context.params
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
   const rows = await db
     .select()
     .from(shipments)

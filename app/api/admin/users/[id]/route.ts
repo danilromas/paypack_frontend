@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { getCurrentUser } from "@/lib/auth/session"
 import { listModerationEvents } from "@/lib/admin-users"
 
@@ -14,6 +15,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     return NextResponse.json({ events: await listModerationEvents(id) })
   } catch (error) {
     console.error("GET /api/admin/users/[id] failed", error)

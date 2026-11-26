@@ -1,7 +1,28 @@
 import "server-only"
+import type { PgTransaction } from "drizzle-orm/pg-core"
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { deals, walletTransactions } from "@/db/schema"
+import { dealParticipants, deals, walletTransactions } from "@/db/schema"
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Tx = PgTransaction<any, any, any>
+
+/**
+ * Serialises every balance-changing operation of one user for the rest of the transaction, so two
+ * concurrent withdrawals/escrow payments can't both pass the same balance check.
+ */
+export async function lockWallet(tx: Tx, userId: string) {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`wallet:${userId}`}, 0))`)
+}
+
+/** The user's spendable balance, read inside the given transaction (call lockWallet first). */
+export async function getAvailableBalance(tx: Tx, userId: string): Promise<number> {
+  const [row] = await tx
+    .select({ total: sql<string>`coalesce(sum(${walletTransactions.amount}), 0)` })
+    .from(walletTransactions)
+    .where(and(eq(walletTransactions.userId, userId), eq(walletTransactions.status, "completed")))
+  return Number(row.total)
+}
 
 export type WalletTxType = "topup" | "withdrawal" | "payout" | "escrow_hold" | "refund"
 export type WalletTxStatus = "pending" | "processing" | "completed" | "failed"
@@ -64,13 +85,16 @@ export async function getWalletSummary(userId: string): Promise<WalletSummary> {
       ),
     // Not yet a real transaction (no payout row exists until the buyer confirms receipt) — genuinely
     // has to be computed live from the seller's in-flight deals.
+    // Seller side via deal_participants — covers deals the user created *and* ones they joined
+    // by invite link or received through the checkout widget.
     db
       .select({ total: sql<string>`coalesce(sum(${deals.price} + ${deals.shippingPrice}), 0)` })
       .from(deals)
+      .innerJoin(dealParticipants, eq(dealParticipants.dealId, deals.id))
       .where(
         and(
-          eq(deals.userId, userId),
-          eq(deals.role, "seller"),
+          eq(dealParticipants.userId, userId),
+          eq(dealParticipants.role, "seller"),
           inArray(deals.status, SELLER_PENDING_STATUSES),
         ),
       ),
@@ -99,8 +123,11 @@ export function validateAmount(amount: unknown): string | null {
   if (typeof amount !== "number" || Number.isNaN(amount) || !Number.isFinite(amount)) {
     return "Invalid amount"
   }
-  if (amount <= 0) {
-    return "Amount must be greater than zero"
+  if (amount < 0.01) {
+    return "Amount must be at least 0.01"
+  }
+  if (Math.round(amount * 100) / 100 !== amount) {
+    return "Amount can have at most 2 decimals"
   }
   if (amount > 1_000_000) {
     return "Amount is too large"

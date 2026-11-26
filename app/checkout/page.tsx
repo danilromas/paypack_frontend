@@ -7,8 +7,6 @@ import { AlertTriangle, CheckCircle2, Loader2, Lock, ShieldCheck, Star } from "l
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 
-// Same platform fee the in-app deal form shows.
-const FEE_RATE = 0.03
 
 interface Seller {
   id: string
@@ -87,8 +85,8 @@ function CheckoutContent() {
       .finally(() => setLoading(false))
   }, [invalid, item.sellerId])
 
-  const fee = round2(item.price * FEE_RATE)
-  const total = round2(item.price + item.shippingPrice + fee)
+  // No platform fee yet — the escrow holds exactly item + shipping.
+  const total = round2(item.price + item.shippingPrice)
   const money = (n: number) => `${n.toFixed(2)} ${item.currency}`
   const here = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/checkout"
 
@@ -110,6 +108,8 @@ function CheckoutContent() {
       if (window.opener && origin) {
         window.opener.postMessage({ type: "paypack:deal_created", dealId: data.dealId }, origin)
       }
+    } catch {
+      setError("Network error — check your connection and try again")
     } finally {
       setSubmitting(false)
     }
@@ -204,8 +204,8 @@ function CheckoutContent() {
             <dd>{money(item.shippingPrice)}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-muted-foreground">PayPack protection (3%)</dt>
-            <dd>{money(fee)}</dd>
+            <dt className="text-muted-foreground">PayPack protection</dt>
+            <dd>{money(0)}</dd>
           </div>
           <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
             <dt>Total</dt>
