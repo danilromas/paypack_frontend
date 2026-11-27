@@ -8,7 +8,92 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatDealDateTime } from "@/lib/utils"
-import type { BillingOverviewDTO, BillingStatus, MoneyByCurrency } from "@/lib/shipment-billing"
+import type { BillingOverviewDTO, BillingStatus, MoneyByCurrency, ShipperSummaryDTO } from "@/lib/shipment-billing"
+
+/** Credit limit + markup editor for one shipping account. */
+function TermsForm({ shipper, onSaved }: { shipper: ShipperSummaryDTO; onSaved: (text: string) => void }) {
+  const [limit, setLimit] = useState(shipper.creditLimit === null ? "" : String(shipper.creditLimit))
+  const [markup, setMarkup] = useState(String(shipper.markupPct))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/shipping-billing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "terms",
+          userId: shipper.userId,
+          creditLimit: limit.trim() === "" ? null : Number(limit),
+          markupPct: markup.trim() === "" ? 0 : Number(markup),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? "Could not save")
+        return
+      }
+      onSaved(`Terms saved for ${shipper.name}.`)
+    } catch {
+      setError("Network error — try again")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const usedPct = shipper.creditLimit ? Math.min(100, (shipper.outstanding / shipper.creditLimit) * 100) : 0
+  return (
+    <div className="space-y-2 rounded-xl border border-border/60 p-3">
+      {shipper.creditLimit !== null ? (
+        <div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Credit used</span>
+            <span>
+              {shipper.outstanding.toFixed(2)} / {shipper.creditLimit.toFixed(2)} EUR
+            </span>
+          </div>
+          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div
+              className={`h-full rounded-full ${usedPct >= 90 ? "bg-destructive" : usedPct >= 70 ? "bg-warning" : "bg-primary"}`}
+              style={{ width: `${usedPct}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground">No credit limit — unpaid: {shipper.outstanding.toFixed(2)} EUR</div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-muted-foreground">
+          Credit limit, EUR
+          <input
+            value={limit}
+            onChange={(e) => setLimit(e.target.value)}
+            inputMode="decimal"
+            placeholder="No limit"
+            className="mt-1 w-full rounded-lg border border-border bg-secondary px-2 py-1.5 text-sm text-foreground"
+          />
+        </label>
+        <label className="text-xs text-muted-foreground">
+          Markup, %
+          <input
+            value={markup}
+            onChange={(e) => setMarkup(e.target.value)}
+            inputMode="decimal"
+            className="mt-1 w-full rounded-lg border border-border bg-secondary px-2 py-1.5 text-sm text-foreground"
+          />
+        </label>
+      </div>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      <Button variant="outline" size="sm" className="w-full rounded-xl" disabled={saving} onClick={save}>
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save terms"}
+      </Button>
+      <p className="text-[11px] text-muted-foreground">Markup applies to labels booked from now on.</p>
+    </div>
+  )
+}
 
 function money(totals: MoneyByCurrency): string {
   const parts = Object.entries(totals).map(([currency, amount]) => `${amount.toFixed(2)} ${currency}`)
@@ -138,6 +223,14 @@ export default function AdminShippingBillingPage() {
                     <dd className="font-semibold">{money(s.totals.paid)}</dd>
                   </div>
                 </dl>
+                <TermsForm
+                  key={`${s.userId}:${s.creditLimit}:${s.markupPct}`}
+                  shipper={s}
+                  onSaved={(text) => {
+                    setMessage({ kind: "ok", text })
+                    void load()
+                  }}
+                />
                 <div className="flex gap-2">
                   <Button
                     className="flex-1 rounded-xl bg-primary"
@@ -309,6 +402,11 @@ export default function AdminShippingBillingPage() {
                     </TableCell>
                     <TableCell className="font-semibold">
                       {l.amount.toFixed(2)} {l.currency}
+                      {l.amount !== l.carrierCost ? (
+                        <div className="text-[11px] font-normal text-muted-foreground">
+                          carrier {l.carrierCost.toFixed(2)}
+                        </div>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={STATUS_BADGE[l.billingStatus].className}>

@@ -120,6 +120,20 @@
       "when": 1795730649845,
       "tag": "0016_shipper_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795766929972,
+      "tag": "0017_shipper_terms",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795766934309,
+      "tag": "0018_enable_sergey_shipper",
+      "breakpoints": true
     }
   ]
 }

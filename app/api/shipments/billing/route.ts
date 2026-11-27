@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   try {
-    return NextResponse.json({ canBookShipments: user.canBookShipments, totals: await getShipperBalance(user.id) })
+    return NextResponse.json({ canBookShipments: user.canBookShipments, ...(await getShipperBalance(user.id)) })
   } catch (error) {
     console.error("GET /api/shipments/billing failed", error)
     return NextResponse.json({ error: "Failed to load billing" }, { status: 500 })

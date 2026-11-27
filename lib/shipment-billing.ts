@@ -26,7 +26,10 @@ export interface BillableShipmentDTO {
   provider: string
   route: string
   status: string
+  /** Billed to the shipper (cost + markup). */
   amount: number
+  /** What the carrier charged PayPack. */
+  carrierCost: number
   currency: string
   billingStatus: BillingStatus
   invoiceRef: string | null
@@ -40,6 +43,10 @@ export interface ShipperSummaryDTO {
   name: string
   email: string
   canBookShipments: boolean
+  creditLimit: number | null
+  markupPct: number
+  /** Unbilled + invoiced (not yet paid), summed across currencies — what the credit limit is checked against. */
+  outstanding: number
   /** Totals per billing status, per currency (labels can be priced in more than one). */
   totals: Record<BillingStatus, MoneyByCurrency>
   labelCount: number
@@ -63,6 +70,13 @@ export interface BillingOverviewDTO {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100
+
+/** What a label is billed at: carrier cost plus markup (older rows without it bill at cost). */
+const billed = sql<string>`coalesce(${shipments.billedAmount}, ${shipments.estimatedCost})`
+
+export function applyMarkup(cost: number, markupPct: number): number {
+  return round2(cost * (1 + Math.max(0, markupPct) / 100))
+}
 
 function addMoney(bucket: MoneyByCurrency, currency: string, amount: number) {
   bucket[currency] = round2((bucket[currency] ?? 0) + amount)
@@ -94,7 +108,8 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
         senderLocation: shipments.senderLocation,
         receiverLocation: shipments.receiverLocation,
         status: shipments.status,
-        amount: shipments.estimatedCost,
+        amount: billed,
+        carrierCost: shipments.estimatedCost,
         currency: shipments.estimatedCurrency,
         billingStatus: shipments.billingStatus,
         invoiceRef: shipments.invoiceRef,
@@ -108,7 +123,14 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
       .orderBy(desc(shipments.createdAt))
       .limit(1000),
     db
-      .select({ id: users.id, name: users.name, email: users.email, canBookShipments: users.canBookShipments })
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        canBookShipments: users.canBookShipments,
+        creditLimit: users.shippingCreditLimit,
+        markupPct: users.shippingMarkupPct,
+      })
       .from(users)
       .where(
         sql`${users.canBookShipments} = true OR EXISTS (SELECT 1 FROM shipments s WHERE s.user_id = ${users.id} AND s.billing_status <> 'none')`,
@@ -120,7 +142,7 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
         userId: shipments.userId,
         billingStatus: shipments.billingStatus,
         currency: shipments.estimatedCurrency,
-        total: sql<string>`sum(${shipments.estimatedCost})`,
+        total: sql<string>`sum(${billed})`,
         count: sql<number>`count(*)::int`,
       })
       .from(shipments)
@@ -133,7 +155,7 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
         userName: users.name,
         billingStatus: shipments.billingStatus,
         currency: shipments.estimatedCurrency,
-        total: sql<string>`sum(${shipments.estimatedCost})`,
+        total: sql<string>`sum(${billed})`,
         count: sql<number>`count(*)::int`,
         invoicedAt: sql<Date | null>`max(${shipments.invoicedAt})`,
         paidAt: sql<Date | null>`max(${shipments.paidAt})`,
@@ -151,6 +173,9 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
       name: u.name,
       email: u.email,
       canBookShipments: u.canBookShipments,
+      creditLimit: u.creditLimit === null ? null : Number(u.creditLimit),
+      markupPct: Number(u.markupPct),
+      outstanding: 0,
       totals: { unbilled: {}, invoiced: {}, paid: {} },
       labelCount: 0,
     })
@@ -161,6 +186,7 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
     if (!summary || !bucket) continue
     addMoney(bucket, t.currency, Number(t.total))
     summary.labelCount += Number(t.count)
+    if (t.billingStatus !== "paid") summary.outstanding = round2(summary.outstanding + Number(t.total))
   }
 
   const invoices = new Map<string, InvoiceSummaryDTO>()
@@ -203,6 +229,7 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
       route: `${r.senderLocation} → ${r.receiverLocation}`,
       status: r.status,
       amount: Number(r.amount),
+      carrierCost: Number(r.carrierCost),
       currency: r.currency,
       billingStatus: r.billingStatus as BillingStatus,
       invoiceRef: r.invoiceRef,
@@ -215,11 +242,12 @@ export async function getBillingOverview(filters: { userId?: string; status?: st
 
 /** The shipper's own view: what they owe PayPack for labels, and their open invoices. */
 export async function getShipperBalance(userId: string) {
+  const terms = await getShipperTerms(userId)
   const rows = await db
     .select({
       billingStatus: shipments.billingStatus,
       currency: shipments.estimatedCurrency,
-      total: sql<string>`sum(${shipments.estimatedCost})`,
+      total: sql<string>`sum(${billed})`,
     })
     .from(shipments)
     .where(and(eq(shipments.userId, userId), ne(shipments.billingStatus, "none")))
@@ -229,7 +257,74 @@ export async function getShipperBalance(userId: string) {
     const bucket = totals[r.billingStatus as BillingStatus]
     if (bucket) addMoney(bucket, r.currency, Number(r.total))
   }
-  return totals
+  const outstanding = round2(
+    [...Object.values(totals.unbilled), ...Object.values(totals.invoiced)].reduce((a, b) => a + b, 0),
+  )
+  return { totals, creditLimit: terms.creditLimit, outstanding }
+}
+
+export interface ShipperTerms {
+  creditLimit: number | null
+  markupPct: number
+}
+
+export async function getShipperTerms(userId: string): Promise<ShipperTerms> {
+  const row = (
+    await db
+      .select({ creditLimit: users.shippingCreditLimit, markupPct: users.shippingMarkupPct })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+  )[0]
+  return {
+    creditLimit: row?.creditLimit == null ? null : Number(row.creditLimit),
+    markupPct: row ? Number(row.markupPct) : 0,
+  }
+}
+
+/** Unpaid (unbilled + invoiced) label total, all currencies summed — what the credit limit guards. */
+export async function getOutstanding(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<string>`coalesce(sum(${billed}), 0)` })
+    .from(shipments)
+    .where(and(eq(shipments.userId, userId), inArray(shipments.billingStatus, ["unbilled", "invoiced"])))
+  return Number(row.total)
+}
+
+export type CreditCheck = { ok: true; terms: ShipperTerms } | { ok: false; error: string }
+
+/**
+ * Refuses a booking that would push the shipper's unpaid labels past their credit limit. The price is
+ * an estimate (the carrier's final price is only known after booking), so the limit can be overshot by
+ * at most one label.
+ */
+export async function checkShipperCredit(userId: string, estimatedCharge: number): Promise<CreditCheck> {
+  const terms = await getShipperTerms(userId)
+  if (terms.creditLimit === null) return { ok: true, terms }
+  const outstanding = await getOutstanding(userId)
+  if (outstanding + estimatedCharge > terms.creditLimit) {
+    return {
+      ok: false,
+      error:
+        `This label would exceed your shipping credit limit of ${terms.creditLimit.toFixed(2)} EUR ` +
+        `(${outstanding.toFixed(2)} EUR not yet paid). Pay your open invoice or contact PayPack to raise the limit.`,
+    }
+  }
+  return { ok: true, terms }
+}
+
+/** Admin: set a shipper's credit limit (null = unlimited) and markup percentage. */
+export async function updateShipperTerms(userId: string, terms: ShipperTerms): Promise<boolean> {
+  const rows = await db
+    .update(users)
+    .set({
+      shippingCreditLimit: terms.creditLimit === null ? null : terms.creditLimit.toFixed(2),
+      shippingMarkupPct: terms.markupPct.toFixed(2),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+    .returning({ id: users.id })
+  return rows.length > 0
 }
 
 /** Human-friendly invoice number: PP-SHIP-YYYYMMDD-XXXXXX. */
@@ -242,9 +337,9 @@ export type BillingActionResult =
   | { ok: true; invoiceRef: string; count: number; totals: MoneyByCurrency }
   | { ok: false; status: number; error: string }
 
-function sumRows(rows: { estimatedCost: string; estimatedCurrency: string }[]): MoneyByCurrency {
+function sumRows(rows: { amount: string; estimatedCurrency: string }[]): MoneyByCurrency {
   const totals: MoneyByCurrency = {}
-  for (const r of rows) addMoney(totals, r.estimatedCurrency, Number(r.estimatedCost))
+  for (const r of rows) addMoney(totals, r.estimatedCurrency, Number(r.amount))
   return totals
 }
 
@@ -258,7 +353,7 @@ export async function createInvoice(userId: string, shipmentIds?: string[]): Pro
       .update(shipments)
       .set({ billingStatus: "invoiced", invoiceRef, invoicedAt: new Date() })
       .where(and(...conditions))
-      .returning({ estimatedCost: shipments.estimatedCost, estimatedCurrency: shipments.estimatedCurrency })
+      .returning({ amount: billed, estimatedCurrency: shipments.estimatedCurrency })
     if (rows.length === 0) {
       return { ok: false, status: 409, error: "Nothing unbilled to invoice for this account" } as const
     }
@@ -284,7 +379,7 @@ export async function markInvoicePaid(invoiceRef: string): Promise<BillingAction
       .where(and(eq(shipments.invoiceRef, invoiceRef), eq(shipments.billingStatus, "invoiced")))
       .returning({
         userId: shipments.userId,
-        estimatedCost: shipments.estimatedCost,
+        amount: billed,
         estimatedCurrency: shipments.estimatedCurrency,
       })
     if (rows.length === 0) return { ok: false, status: 409, error: "No open invoice with that number" } as const
@@ -307,7 +402,7 @@ export async function voidInvoice(invoiceRef: string): Promise<BillingActionResu
     .update(shipments)
     .set({ billingStatus: "unbilled", invoiceRef: null, invoicedAt: null })
     .where(and(eq(shipments.invoiceRef, invoiceRef), eq(shipments.billingStatus, "invoiced")))
-    .returning({ estimatedCost: shipments.estimatedCost, estimatedCurrency: shipments.estimatedCurrency })
+    .returning({ amount: billed, estimatedCurrency: shipments.estimatedCurrency })
   if (rows.length === 0) return { ok: false, status: 409, error: "No open invoice with that number" }
   return { ok: true, invoiceRef, count: rows.length, totals: sumRows(rows) }
 }
@@ -322,7 +417,7 @@ export async function invoiceCsv(invoiceRef: string): Promise<string | null> {
     .orderBy(shipments.createdAt)
   if (rows.length === 0) return null
   return toCsv(
-    ["invoice", "customer", "customer_email", "booked_on", "tracking", "carrier", "from", "to", "weight_kg", "amount", "currency", "status"],
+    ["invoice", "customer", "customer_email", "booked_on", "tracking", "carrier", "from", "to", "weight_kg", "carrier_cost", "amount", "currency", "status"],
     rows.map(({ s, userName, userEmail }) => [
       invoiceRef,
       userName,
@@ -334,6 +429,7 @@ export async function invoiceCsv(invoiceRef: string): Promise<string | null> {
       s.receiverLocation,
       Number(s.weightKg),
       Number(s.estimatedCost).toFixed(2),
+      Number(s.billedAmount ?? s.estimatedCost).toFixed(2),
       s.estimatedCurrency,
       s.billingStatus,
     ]),

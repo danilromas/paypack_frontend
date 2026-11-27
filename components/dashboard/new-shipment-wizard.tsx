@@ -36,6 +36,7 @@ import {
   type DeliveryMode,
   type ExportReason,
   type ServicePointSummary,
+  type SavedParty,
   type ShipmentAddress,
   type ShipmentCreatePayload,
 } from "@/lib/shipments"
@@ -223,6 +224,7 @@ function LocationFields({
   onChange,
   countries,
   countryPlaceholder,
+  saved = [],
 }: {
   title: string
   icon: LucideIcon
@@ -230,7 +232,10 @@ function LocationFields({
   onChange: (p: Party) => void
   countries: { code: string; name: string }[]
   countryPlaceholder: string
+  /** Address book entries; picking one fills in the whole party, not just the location. */
+  saved?: SavedParty[]
 }) {
+  const usable = saved.filter((p) => countries.some((c) => c.code === p.country))
   const set = (field: keyof Party) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     onChange({ ...value, [field]: e.target.value })
   const zipError = postcodeError(value.country, value.zip)
@@ -240,6 +245,24 @@ function LocationFields({
         <Icon className="h-4 w-4 text-ship" />
         {title}
       </div>
+      {usable.length > 0 && (
+        <select
+          value=""
+          onChange={(e) => {
+            const picked = usable[Number(e.target.value)]
+            if (picked) onChange({ ...EMPTY_PARTY, ...picked, state: picked.state ?? undefined })
+          }}
+          aria-label={`${title}: saved addresses`}
+          className={cn(inputClass, "mb-3 text-sm text-muted-foreground")}
+        >
+          <option value="">Saved addresses…</option>
+          {usable.map((p, i) => (
+            <option key={i} value={i}>
+              {p.name} — {p.street}, {p.zip} {p.city}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="grid grid-cols-[3fr_2fr] gap-3">
         <select value={value.country} onChange={set("country")} aria-label={`${title} country`} className={cn(inputClass, !value.country && "text-muted-foreground")}>
           <option value="">{countryPlaceholder}</option>
@@ -295,6 +318,22 @@ export function NewShipmentWizard({
   const [accessGranted, setAccessGranted] = useState(isShipper)
   const [accessChecking, setAccessChecking] = useState(false)
   const [accessError, setAccessError] = useState<string | null>(null)
+  const [savedParties, setSavedParties] = useState<{ senders: SavedParty[]; receivers: SavedParty[] }>({
+    senders: [],
+    receivers: [],
+  })
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/shipments/addresses", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setSavedParties({ senders: data.senders ?? [], receivers: data.receivers ?? [] })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [sender, setSender] = useState<Party>(draft?.sender ?? EMPTY_PARTY)
   const [receiver, setReceiver] = useState<Party>(draft?.receiver ?? EMPTY_PARTY)
   const [weightKg, setWeightKg] = useState<number | "">(draft?.weightKg ?? "")
@@ -596,6 +635,7 @@ export function NewShipmentWizard({
     try {
       await onCreate({
         bookingPassword: isShipper ? undefined : bookingPassword,
+        quotedPrice: selectedQuote?.priceGross ?? null,
         senderName: sender.name.trim(),
         senderLocation: formatShipmentAddress(senderAddress),
         receiverName: receiver.name.trim(),
@@ -744,6 +784,7 @@ export function NewShipmentWizard({
                 onChange={setSender}
                 countries={EU_COUNTRIES}
                 countryPlaceholder="Country (EU only)"
+                saved={savedParties.senders}
               />
               <LocationFields
                 title="To"
@@ -752,6 +793,7 @@ export function NewShipmentWizard({
                 onChange={setReceiver}
                 countries={DESTINATION_COUNTRIES}
                 countryPlaceholder="Country"
+                saved={savedParties.receivers}
               />
             </div>
             <div className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">

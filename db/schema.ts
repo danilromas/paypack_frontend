@@ -29,6 +29,10 @@ export const users = pgTable("users", {
   // Trusted "shipper" accounts book carrier labels without the shared booking password; PayPack pays
   // the carrier and later invoices the account for those labels (see shipments.billing_status).
   canBookShipments: boolean("can_book_shipments").notNull().default(false),
+  // Shipper terms: bookings stop once unpaid labels would exceed the credit limit (null = no limit),
+  // and every label is billed at carrier cost plus this markup.
+  shippingCreditLimit: numeric("shipping_credit_limit", { precision: 10, scale: 2 }),
+  shippingMarkupPct: numeric("shipping_markup_pct", { precision: 5, scale: 2 }).notNull().default("0"),
   // Admin sanctions: "restricted" can sign in but can't move money or open deals; "suspended" can't sign in.
   status: text("status").notNull().default("active"),
   statusReason: text("status_reason"),
@@ -326,6 +330,8 @@ export const shipments = pgTable("shipments", {
   // Invoicing of labels PayPack paid for on behalf of a shipper account: "none" = not billable
   // (internal estimate, or booked with the shared password), then unbilled → invoiced → paid.
   billingStatus: text("billing_status").notNull().default("none"),
+  // What the shipper is invoiced for this label: carrier cost plus their markup at booking time.
+  billedAmount: numeric("billed_amount", { precision: 10, scale: 2 }),
   invoiceRef: text("invoice_ref"),
   invoicedAt: timestamp("invoiced_at", { withTimezone: true }),
   paidAt: timestamp("paid_at", { withTimezone: true }),

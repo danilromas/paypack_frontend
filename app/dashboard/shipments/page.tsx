@@ -5,7 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronRight, FilePen, Loader2, MapPinned, Package, PackageCheck, Search, Truck } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { NewShipmentWizard } from "@/components/dashboard/new-shipment-wizard"
-import { draftRouteLabel, readShipmentDraft, type ShipmentDraft } from "@/components/dashboard/shipment-draft"
+import {
+  draftFromShipment,
+  draftRouteLabel,
+  readShipmentDraft,
+  writeShipmentDraft,
+  type ShipmentDraft,
+} from "@/components/dashboard/shipment-draft"
 import { ShipmentDetail } from "@/components/dashboard/shipment-detail"
 import { SHIPMENT_STATUS, formatMoney, shipmentRoute } from "@/components/dashboard/shipment-display"
 import { Button } from "@/components/ui/button"
@@ -20,6 +26,8 @@ import type { BillingStatus, MoneyByCurrency } from "@/lib/shipment-billing"
 interface ShipperBilling {
   canBookShipments: boolean
   totals: Record<BillingStatus, MoneyByCurrency>
+  creditLimit: number | null
+  outstanding: number
 }
 
 function moneyTotals(totals: MoneyByCurrency) {
@@ -69,6 +77,15 @@ function ShipperBillingBanner({ refreshKey }: { refreshKey: number }) {
           <dd className="font-semibold text-foreground">{moneyTotals(billing.totals.paid)}</dd>
         </div>
       </dl>
+      {billing.creditLimit !== null ? (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Credit limit {formatMoney(billing.creditLimit, "EUR")} · available{" "}
+          <span className="font-semibold text-foreground">
+            {formatMoney(Math.max(0, billing.creditLimit - billing.outstanding), "EUR")}
+          </span>
+          {billing.outstanding >= billing.creditLimit ? " — pay your open invoice to book more labels." : ""}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -221,11 +238,19 @@ function ShipmentsPageContent() {
     if (isMobile) setSheetOpen(true)
   }
 
+  const repeatShipment = (s: Shipment) => {
+    if (draft && !window.confirm("Replace your unfinished shipment with a copy of this one?")) return
+    writeShipmentDraft(userId, draftFromShipment(s))
+    setSheetOpen(false)
+    setWizardOpen(true)
+  }
+
   const detailProps = {
     shipment: selected,
     onAdvance: advanceShipment,
     onUpdate: updateShipment,
     onDelete: deleteShipment,
+    onRepeat: repeatShipment,
   }
 
   return (

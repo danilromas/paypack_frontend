@@ -2,7 +2,7 @@
  * Turns an existing user into a shipper account: they book carrier labels without the shared
  * booking password, and each label is recorded as "unbilled" so PayPack can invoice them for it
  * (Admin → Shipping billing). Pass --off to switch it back off.
- * CLI: npm run make-shipper -- someone@example.com [--off]
+ * CLI: npm run make-shipper -- someone@example.com [--off] [--limit=200|none]
  */
 import { Pool } from "pg"
 
@@ -29,9 +29,19 @@ const pool = new Pool({
   ssl: isRemoteHost ? { rejectUnauthorized: false } : false,
 })
 
+// --limit=200 sets the credit limit in EUR (--limit=none removes it); without it the limit is unchanged.
+const limitArg = process.argv.find((a) => a.startsWith("--limit="))?.slice("--limit=".length)
+const limit = limitArg === undefined ? undefined : limitArg === "none" ? null : Number(limitArg)
+if (limit !== undefined && limit !== null && !(Number.isFinite(limit) && limit >= 0)) {
+  console.error("--limit must be a number of EUR or 'none'")
+  process.exit(1)
+}
+
 const result = await pool.query(
-  `UPDATE users SET can_book_shipments = $2, updated_at = now() WHERE email = $1 RETURNING id, email`,
-  [email, enable],
+  limit === undefined
+    ? `UPDATE users SET can_book_shipments = $2, updated_at = now() WHERE lower(email) = $1 RETURNING id, email, shipping_credit_limit`
+    : `UPDATE users SET can_book_shipments = $2, shipping_credit_limit = $3, updated_at = now() WHERE lower(email) = $1 RETURNING id, email, shipping_credit_limit`,
+  limit === undefined ? [email, enable] : [email, enable, limit],
 )
 
 if (!result.rows[0]) {
@@ -45,5 +55,6 @@ await pool.query(
   [result.rows[0].id, enable ? "enable_shipping" : "disable_shipping"],
 )
 
-console.log(`${result.rows[0].email}: shipper account ${enable ? "enabled" : "disabled"}.`)
+const limitText = result.rows[0].shipping_credit_limit === null ? "no credit limit" : `credit limit ${result.rows[0].shipping_credit_limit} EUR`
+console.log(`${result.rows[0].email}: shipper account ${enable ? "enabled" : "disabled"} (${limitText}).`)
 await pool.end()

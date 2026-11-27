@@ -11,6 +11,7 @@ import {
   Package,
   Pencil,
   RefreshCw,
+  Repeat,
   Trash2,
   Truck,
 } from "lucide-react"
@@ -85,12 +86,15 @@ export function ShipmentDetail({
   onAdvance,
   onUpdate,
   onDelete,
+  onRepeat,
   showHeading = true,
 }: {
   shipment: Shipment | null
   onAdvance: (id: string) => Promise<Shipment>
   onUpdate: (id: string, payload: ShipmentEditPayload) => Promise<void>
   onDelete: (id: string) => Promise<void>
+  /** Opens the wizard pre-filled with this shipment's people, addresses and box. */
+  onRepeat?: (shipment: Shipment) => void
   showHeading?: boolean
 }) {
   const [busy, setBusy] = useState<"advance" | "delete" | "save" | null>(null)
@@ -377,6 +381,12 @@ export function ShipmentDetail({
             Created {formatDateTime(s.createdAt)}
           </span>
           <div className="flex items-center gap-1">
+            {onRepeat && (
+              <Button variant="ghost" size="sm" className="h-8 rounded-lg text-xs" onClick={() => onRepeat(s)}>
+                <Repeat className="mr-1 h-3.5 w-3.5" />
+                Send again
+              </Button>
+            )}
             {!isCarrier && s.status === "pending" && (
               <Button
                 variant="ghost"

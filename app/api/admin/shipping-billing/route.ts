@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth/session"
 import { isUuid } from "@/lib/ids"
-import { createInvoice, getBillingOverview, invoiceCsv, markInvoicePaid, voidInvoice } from "@/lib/shipment-billing"
+import {
+  createInvoice,
+  getBillingOverview,
+  invoiceCsv,
+  markInvoicePaid,
+  updateShipperTerms,
+  voidInvoice,
+} from "@/lib/shipment-billing"
 
 const INVOICE_REF_RE = /^PP-SHIP-\d{8}-[0-9A-F]{6}$/
 
@@ -58,6 +65,23 @@ export async function POST(req: Request) {
       userId?: unknown
       shipmentIds?: unknown
       invoiceRef?: unknown
+    }
+
+    if (body.action === "terms") {
+      if (!isUuid(body.userId)) return NextResponse.json({ error: "Invalid user" }, { status: 400 })
+      const { creditLimit, markupPct } = body as { creditLimit?: unknown; markupPct?: unknown }
+      const limitOk =
+        creditLimit === null ||
+        (typeof creditLimit === "number" && Number.isFinite(creditLimit) && creditLimit >= 0 && creditLimit <= 100_000)
+      const markupOk = typeof markupPct === "number" && Number.isFinite(markupPct) && markupPct >= 0 && markupPct <= 100
+      if (!limitOk) return NextResponse.json({ error: "Credit limit must be empty or 0–100000" }, { status: 400 })
+      if (!markupOk) return NextResponse.json({ error: "Markup must be between 0 and 100 %" }, { status: 400 })
+      const saved = await updateShipperTerms(body.userId, {
+        creditLimit: creditLimit as number | null,
+        markupPct: markupPct as number,
+      })
+      if (!saved) return NextResponse.json({ error: "User not found" }, { status: 404 })
+      return NextResponse.json({ ok: true })
     }
 
     let result

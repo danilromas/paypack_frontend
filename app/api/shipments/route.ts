@@ -16,6 +16,7 @@ import {
 import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { isBookingPasswordValid } from "@/lib/shipment-access"
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit"
+import { applyMarkup, checkShipperCredit } from "@/lib/shipment-billing"
 import { refreshActiveShipments } from "@/lib/shipment-refresh"
 import { estimateShippingCost, generateTrackingNumber, getServiceTier } from "@/lib/shipping-rates"
 import { EurosenderError, cancelOrder, createOrder } from "@/lib/eurosender"
@@ -113,6 +114,16 @@ export async function POST(req: Request) {
       status: "pending",
     }
 
+    // Shipper accounts book on credit: refuse up front once unpaid labels would pass their limit.
+    let markupPct = 0
+    if (isShipper) {
+      const quoted = typeof body.quotedPrice === "number" && Number.isFinite(body.quotedPrice) ? body.quotedPrice : 0
+      const credit = await checkShipperCredit(user.id, Math.max(quoted, estimateShippingCost(pkg, tier)))
+      if (!credit.ok) return NextResponse.json({ error: credit.error }, { status: 402 })
+      markupPct = credit.terms.markupPct
+    }
+    const billedFor = (cost: number) => (isShipper ? applyMarkup(cost, markupPct).toFixed(2) : null)
+
     if (isLiveShippingEnabled()) {
       const addressError =
         validateShipmentAddress(senderAddress, "sender") ?? validateShipmentAddress(receiverAddress, "receiver")
@@ -165,6 +176,7 @@ export async function POST(req: Request) {
             trackingNumber: booked.trackingNumber ?? booked.shipmentId,
             // Sendcloud doesn't echo the price on the shipment; store the server-side quote we booked against.
             estimatedCost: (booked.priceGross ?? estimateShippingCost(pkg, tier)).toFixed(2),
+            billedAmount: billedFor(booked.priceGross ?? estimateShippingCost(pkg, tier)),
             estimatedCurrency: booked.currency ?? "EUR",
           })
           .returning(),
@@ -190,6 +202,7 @@ export async function POST(req: Request) {
           // Carrier tracking numbers often arrive later (via webhook); show the order code until then.
           trackingNumber: order.trackingNumber ?? order.orderCode,
           estimatedCost: (order.priceGross ?? estimateShippingCost(pkg, tier)).toFixed(2),
+          billedAmount: billedFor(order.priceGross ?? estimateShippingCost(pkg, tier)),
           estimatedCurrency: order.currency ?? "EUR",
         })
         .returning(),
