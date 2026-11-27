@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
-import { and, eq } from "drizzle-orm"
+import { isUuid } from "@/lib/ids"
+import { and, eq, ne, notExists, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { deals } from "@/db/schema"
+import { dealParticipants, deals } from "@/db/schema"
 import { validateDealEditPayload, type DealEditPayload } from "@/lib/deals"
 import { getCurrentUser } from "@/lib/auth/session"
 import { getDealForViewer } from "@/lib/deals-access"
+import { notifyOtherParticipants } from "@/lib/notifications"
 
 function normalizePayload(body: Record<string, unknown>): DealEditPayload {
   return {
@@ -16,7 +18,7 @@ function normalizePayload(body: Record<string, unknown>): DealEditPayload {
       typeof body.shippingPrice === "number"
         ? body.shippingPrice
         : Number(body.shippingPrice),
-    currency: typeof body.currency === "string" ? body.currency : "EUR",
+    currency: typeof body.currency === "string" ? body.currency.trim().toUpperCase() : "EUR",
   }
 }
 
@@ -31,6 +33,7 @@ export async function GET(
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const deal = await getDealForViewer(id, user.id)
     if (!deal) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })
@@ -59,6 +62,7 @@ export async function PUT(
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const raw = (await req.json()) as Record<string, unknown>
     const payload = normalizePayload(raw)
     const validationError = validateDealEditPayload(payload)
@@ -77,12 +81,25 @@ export async function PUT(
         currency: payload.currency,
         updatedAt: new Date(),
       })
-      .where(and(eq(deals.id, id), eq(deals.userId, user.id), eq(deals.status, "pending")))
+      .where(
+        and(
+          eq(deals.id, id),
+          eq(deals.userId, user.id),
+          eq(deals.status, "pending"),
+          // Terms are locked once the other side has joined: they agreed to what they saw.
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(dealParticipants)
+              .where(and(eq(dealParticipants.dealId, deals.id), ne(dealParticipants.userId, user.id))),
+          ),
+        ),
+      )
       .returning({ id: deals.id })
 
     if (!rows[0]) {
       return NextResponse.json(
-        { error: "Deal not found, not yours, or no longer editable" },
+        { error: "Deal not found, not yours, or no longer editable (the other side already joined)" },
         { status: 404 },
       )
     }
@@ -106,10 +123,23 @@ export async function DELETE(
 
   try {
     const { id } = await context.params
-    const rows = await db
-      .delete(deals)
-      .where(and(eq(deals.id, id), eq(deals.userId, user.id), eq(deals.status, "pending")))
-      .returning({ id: deals.id })
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    const rows = await db.transaction(async (tx) => {
+      const deleted = await tx
+        .select({ title: deals.title })
+        .from(deals)
+        .where(and(eq(deals.id, id), eq(deals.userId, user.id), eq(deals.status, "pending")))
+        .limit(1)
+        .for("update")
+      if (!deleted[0]) return []
+      // Participants cascade away with the deal, so tell the other side first.
+      await notifyOtherParticipants(tx, id, user.id, {
+        type: "deal",
+        title: `"${deleted[0].title}" was deleted by its creator`,
+        relatedHref: "/dashboard/deals",
+      })
+      return tx.delete(deals).where(eq(deals.id, id)).returning({ id: deals.id })
+    })
 
     if (!rows[0]) {
       return NextResponse.json(

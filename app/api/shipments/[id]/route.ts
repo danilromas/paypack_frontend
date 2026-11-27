@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { shipments } from "@/db/schema"
@@ -19,6 +20,7 @@ export async function GET(
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const rows = await db
       .select()
       .from(shipments)
@@ -48,6 +50,7 @@ export async function PUT(
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const body = (await req.json()) as Partial<ShipmentEditPayload>
     const validationError = validateShipmentEditPayload(body)
     if (validationError) {
@@ -107,6 +110,7 @@ export async function DELETE(
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
     const existing = await db
       .select()
@@ -114,6 +118,12 @@ export async function DELETE(
       .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
       .limit(1)
     const shipment = existing[0]
+    if (shipment && (shipment.billingStatus === "invoiced" || shipment.billingStatus === "paid")) {
+      return NextResponse.json(
+        { error: "This label is already on an invoice — contact PayPack support to cancel it" },
+        { status: 409 },
+      )
+    }
     if (shipment && shipment.provider !== "internal" && shipment.providerOrderCode) {
       if (shipment.status !== "pending") {
         return NextResponse.json({ error: "Shipment is already with the carrier and can't be cancelled" }, { status: 409 })

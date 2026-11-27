@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { paymentMethods } from "@/db/schema"
@@ -12,6 +13,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
     const updated = await db.transaction(async (tx) => {
       const rows = await tx

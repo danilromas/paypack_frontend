@@ -37,6 +37,11 @@ export interface ShipmentAddress {
   servicePoint?: ServicePointSummary | null
 }
 
+/** A sender or receiver from the user's earlier shipments (address book entry). */
+export interface SavedParty extends Omit<ShipmentAddress, "servicePoint"> {
+  name: string
+}
+
 /** Senders are always inside the EU. ISO 3166-1 alpha-2 codes. */
 export const EU_COUNTRIES: { code: string; name: string }[] = [
   { code: "AT", name: "Austria" },
@@ -192,6 +197,8 @@ export interface ShipmentCreatePayload {
   contents?: string | null
   /** Declared value in EUR, used for the carrier's liability cover. */
   declaredValueEur?: number | null
+  /** The price the wizard showed for the chosen service; only used to check a shipper's credit limit. */
+  quotedPrice?: number | null
   /** Required when the receiver is outside the EU (see needsCustoms). */
   customs?: CustomsDetails | null
   /** Checked against SHIPMENT_BOOKING_PASSWORD while booking is invite-only; never stored. */
@@ -240,8 +247,13 @@ export interface Shipment {
   senderAddress: ShipmentAddress | null
   receiverAddress: ShipmentAddress | null
   dealId?: string | null
+  /** Shipper-account invoicing: "none" when PayPack doesn't bill this label back. */
+  billingStatus: ShipmentBillingStatus
+  invoiceRef: string | null
   createdAt: string
 }
+
+export type ShipmentBillingStatus = "none" | "unbilled" | "invoiced" | "paid"
 
 const SERVICE_TIER_VALUES: ServiceTier[] = ["economy", "standard", "express"]
 
@@ -469,6 +481,8 @@ export function toShipment(row: ShipmentRow): Shipment {
     senderAddress: row.senderAddress ?? null,
     receiverAddress: row.receiverAddress ?? null,
     dealId: row.dealId ?? undefined,
+    billingStatus: (row.billingStatus ?? "none") as ShipmentBillingStatus,
+    invoiceRef: row.invoiceRef ?? null,
     createdAt: row.createdAt.toISOString(),
   }
 }

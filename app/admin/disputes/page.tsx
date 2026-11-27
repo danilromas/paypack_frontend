@@ -42,6 +42,7 @@ export default function AdminDisputesPage() {
   const [loading, setLoading] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [deciding, setDeciding] = useState(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -68,9 +69,18 @@ export default function AdminDisputesPage() {
     })
   }, [disputes, query, status])
 
-  async function decide(action: "needs-info" | "resolved") {
+  async function decide(action: "needs-info" | "refund_buyer" | "release_to_seller") {
     if (!active) return
+    if (action !== "needs-info") {
+      const money = `${active.amount.toFixed(2)} ${active.currency}`
+      const question =
+        action === "refund_buyer"
+          ? `Refund ${money} to the buyer and cancel the deal? This can't be undone.`
+          : `Release ${money} to the seller and complete the deal? This can't be undone.`
+      if (!window.confirm(question)) return
+    }
     setDeciding(true)
+    setDecisionError(null)
     try {
       const res = await fetch(`/api/admin/disputes/${active.id}/decision`, {
         method: "POST",
@@ -80,7 +90,12 @@ export default function AdminDisputesPage() {
       if (res.ok) {
         setActiveId(null)
         await load()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setDecisionError(data.error ?? "Failed to update dispute")
       }
+    } catch {
+      setDecisionError("Network error — try again")
     } finally {
       setDeciding(false)
     }
@@ -264,7 +279,11 @@ export default function AdminDisputesPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
                     <div className="text-sm font-medium">Decision</div>
-                    <div className="text-xs text-muted-foreground">Update dispute status.</div>
+                    <div className="text-xs text-muted-foreground">
+                      Resolving settles the escrow: refund the buyer (deal cancelled) or release the funds to the seller
+                      (deal completed).
+                    </div>
+                    {decisionError ? <div className="text-xs text-destructive">{decisionError}</div> : null}
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                     <Button
@@ -276,11 +295,19 @@ export default function AdminDisputesPage() {
                       Request more info
                     </Button>
                     <Button
+                      variant="outline"
+                      className="rounded-xl"
+                      disabled={deciding || active.status === "resolved"}
+                      onClick={() => decide("refund_buyer")}
+                    >
+                      Refund buyer
+                    </Button>
+                    <Button
                       className="rounded-xl bg-primary"
                       disabled={deciding || active.status === "resolved"}
-                      onClick={() => decide("resolved")}
+                      onClick={() => decide("release_to_seller")}
                     >
-                      Approve & resolve
+                      Release to seller
                     </Button>
                   </div>
                 </div>

@@ -19,7 +19,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
   }
 
-  const raw = await req.json()
+  const raw = await req.json().catch(() => null)
   const parsed = profileUpdateSchema.safeParse(raw)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 })
@@ -40,5 +40,7 @@ export async function PUT(req: Request) {
     bio: row.bio,
     avatarUrl: row.avatarUrl,
     role: row.role,
+    status: row.status,
+    canBookShipments: row.canBookShipments,
   })
 }

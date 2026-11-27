@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "make-admin": "node --env-file=.env scripts/make-admin.mjs"
+    "make-admin": "node --env-file=.env scripts/make-admin.mjs",
+    "make-shipper": "node --env-file=.env scripts/make-shipper.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

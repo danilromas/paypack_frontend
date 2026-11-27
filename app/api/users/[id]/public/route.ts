@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { getCurrentUser } from "@/lib/auth/session"
 import { getPublicProfile } from "@/lib/ratings"
 
@@ -12,6 +13,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     // Any signed-in user may view a public profile (per client request: users must be able to find
     // each other). The DTO only carries name/avatar/KYC/rating/deal count — never email or phone.
     if (!UUID_RE.test(id)) {

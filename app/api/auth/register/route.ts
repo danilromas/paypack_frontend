@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server"
-import { and, eq, isNull } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
-import { users, dealParticipants } from "@/db/schema"
+import { users } from "@/db/schema"
 import { registerSchema } from "@/lib/auth/schemas"
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit"
+import { isUniqueViolation } from "@/lib/db-errors"
 import { hashPassword, signSession, sessionCookieOptions, SESSION_COOKIE } from "@/lib/auth/session"
 
 export async function POST(req: Request) {
+  const limit = rateLimit(`register-ip:${clientIp(req)}`, 10, 60 * 60 * 1000)
+  if (!limit.ok) return tooManyRequests(limit)
+
   try {
     const raw = await req.json()
     const parsed = registerSchema.safeParse(raw)
@@ -26,15 +31,9 @@ export async function POST(req: Request) {
       .returning()
     const user = inserted[0]
 
-    // Claim any pending deal invites sent to this email before they had an account.
-    try {
-      await db
-        .update(dealParticipants)
-        .set({ userId: user.id, joinedAt: new Date() })
-        .where(and(eq(dealParticipants.invitedEmail, user.email), isNull(dealParticipants.userId)))
-    } catch (claimError) {
-      console.error("Failed to claim pending invites for new user", claimError)
-    }
+    // Deal invites are claimed only through the invite link (POST /api/deals/[id]/join). We used to
+    // attach pending email invites here, but the email isn't verified, so anyone registering with a
+    // stranger's address could take their place in a deal.
 
     const token = await signSession({
       sub: user.id,
@@ -53,6 +52,9 @@ export async function POST(req: Request) {
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions())
     return response
   } catch (error) {
+    if (isUniqueViolation(error)) {
+      return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 })
+    }
     console.error("register failed", error)
     return NextResponse.json({ error: "Failed to create account" }, { status: 500 })
   }

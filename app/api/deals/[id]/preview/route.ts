@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { getCurrentUser } from "@/lib/auth/session"
 import { getDealPreviewForInvite } from "@/lib/deals-access"
 
@@ -14,6 +15,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
   }
 
   const { id } = await context.params
+  if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
   const preview = await getDealPreviewForInvite(id)
   if (!preview) {
     return NextResponse.json({ error: "Invite not found" }, { status: 404 })

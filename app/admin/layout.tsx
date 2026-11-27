@@ -3,6 +3,7 @@ import Link from "next/link"
 import {
   ArrowLeft,
   LayoutDashboard,
+  Package,
   Receipt,
   Scale,
   ShieldCheck,
@@ -14,6 +15,7 @@ const navItems = [
   { href: "/admin/transactions", label: "Transactions", icon: Receipt },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/disputes", label: "Disputes", icon: Scale },
+  { href: "/admin/shipping-billing", label: "Shipping billing", icon: Package },
   { href: "/admin/verification", label: "Verification", icon: ShieldCheck },
 ]
 

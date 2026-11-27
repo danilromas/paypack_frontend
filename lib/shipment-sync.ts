@@ -29,24 +29,28 @@ export interface CarrierSnapshot {
 
 /** Stores a carrier snapshot and notifies the owner when the status moves forward. */
 export async function applyCarrierSnapshot(row: ShipmentRow, snapshot: CarrierSnapshot): Promise<ShipmentRow> {
-  const current = row.status as keyof typeof STATUS_RANK
-  // Never move backwards — carriers occasionally re-emit older events.
-  const nextStatus = STATUS_RANK[snapshot.status] > STATUS_RANK[current] ? snapshot.status : current
-
+  // Never move backwards — carriers occasionally re-emit older events (checked on the fresh row below).
   return db.transaction(async (tx) => {
+    // Re-read under a row lock: a webhook and a list refresh can sync the same shipment at once, and
+    // the row we were handed may be stale — deciding from it could move the status backwards.
+    const fresh = (await tx.select().from(shipments).where(eq(shipments.id, row.id)).limit(1).for("update"))[0] ?? row
+    const freshStatus = fresh.status as keyof typeof STATUS_RANK
+    const nextStatus =
+      STATUS_RANK[snapshot.status] > (STATUS_RANK[freshStatus] ?? -1) ? snapshot.status : freshStatus
+
     const result = await tx
       .update(shipments)
       .set({
         status: nextStatus,
-        trackingNumber: snapshot.trackingNumber ?? row.trackingNumber,
-        trackingUrl: snapshot.trackingUrl ?? row.trackingUrl,
-        labelUrl: snapshot.labelUrl ?? row.labelUrl,
-        carrierName: snapshot.carrierName ?? row.carrierName,
+        trackingNumber: snapshot.trackingNumber ?? fresh.trackingNumber,
+        trackingUrl: snapshot.trackingUrl ?? fresh.trackingUrl,
+        labelUrl: snapshot.labelUrl ?? fresh.labelUrl,
+        carrierName: snapshot.carrierName ?? fresh.carrierName,
       })
       .where(eq(shipments.id, row.id))
       .returning()
 
-    if (nextStatus !== row.status) {
+    if (nextStatus !== fresh.status) {
       await notifyUser(tx, {
         userId: row.userId,
         type: "shipment",

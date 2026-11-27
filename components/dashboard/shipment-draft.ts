@@ -1,4 +1,4 @@
-import type { ExportReason, ShipmentAddress } from "@/lib/shipments"
+import type { ExportReason, Shipment, ShipmentAddress } from "@/lib/shipments"
 
 /**
  * An unfinished shipment, kept in this browser so closing the wizard (or the tab) loses nothing.
@@ -59,6 +59,46 @@ export function clearShipmentDraft(userId: string | null | undefined) {
   try {
     localStorage.removeItem(keyFor(userId))
   } catch {}
+}
+
+function partyFrom(name: string, address: ShipmentAddress | null): ShipmentDraft["sender"] {
+  return {
+    name,
+    country: address?.country ?? "",
+    zip: address?.zip ?? "",
+    city: address?.city ?? "",
+    street: address?.street ?? "",
+    phone: address?.phone ?? "",
+    email: address?.email ?? "",
+    state: address?.state ?? null,
+  }
+}
+
+/**
+ * A fresh draft that books the same parcel again: same people, addresses and box. Price, service,
+ * pickup date and contents are chosen anew (old quotes and dates are stale; a pickup point is not reused).
+ */
+export function draftFromShipment(s: Shipment): ShipmentDraft {
+  return {
+    v: 1,
+    savedAt: new Date().toISOString(),
+    step: 1,
+    sender: partyFrom(s.senderName, s.senderAddress),
+    receiver: partyFrom(s.receiverName, s.receiverAddress),
+    weightKg: s.weightKg,
+    lengthCm: s.lengthCm,
+    widthCm: s.widthCm,
+    heightCm: s.heightCm,
+    contents: "",
+    declaredValue: "",
+    hsCode: "",
+    originCountry: "",
+    itemCount: "",
+    exportReason: "commercial_goods",
+    senderVat: "",
+    selectedKey: null,
+    pickupDate: "",
+  }
 }
 
 /** Whether a draft holds anything worth resuming (a postcode, a name, a box…). */

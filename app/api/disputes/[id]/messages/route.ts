@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { disputes, disputeEvents, deals } from "@/db/schema"
@@ -18,6 +19,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const body = (await req.json()) as { text?: unknown }
     const text = typeof body.text === "string" ? body.text.trim() : ""
     const validationError = validateDisputeMessage(text)

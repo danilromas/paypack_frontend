@@ -33,7 +33,7 @@ export async function GET(req: Request) {
       currency: params.get("currency") ?? undefined,
       from: params.get("from") ?? undefined,
       to: params.get("to") ?? undefined,
-      page: csv ? 1 : Number(params.get("page") ?? 1) || 1,
+      page: csv ? 1 : Math.max(1, Math.floor(Number(params.get("page") ?? 1)) || 1),
     }
 
     if (csv) {

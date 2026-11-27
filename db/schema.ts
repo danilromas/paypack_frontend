@@ -26,6 +26,13 @@ export const users = pgTable("users", {
   sessionVersion: integer("session_version").notNull().default(0),
   loginAlertsEnabled: boolean("login_alerts_enabled").notNull().default(true),
   requireWithdrawalConfirmation: boolean("require_withdrawal_confirmation").notNull().default(false),
+  // Trusted "shipper" accounts book carrier labels without the shared booking password; PayPack pays
+  // the carrier and later invoices the account for those labels (see shipments.billing_status).
+  canBookShipments: boolean("can_book_shipments").notNull().default(false),
+  // Shipper terms: bookings stop once unpaid labels would exceed the credit limit (null = no limit),
+  // and every label is billed at carrier cost plus this markup.
+  shippingCreditLimit: numeric("shipping_credit_limit", { precision: 10, scale: 2 }),
+  shippingMarkupPct: numeric("shipping_markup_pct", { precision: 5, scale: 2 }).notNull().default("0"),
   // Admin sanctions: "restricted" can sign in but can't move money or open deals; "suspended" can't sign in.
   status: text("status").notNull().default("active"),
   statusReason: text("status_reason"),
@@ -47,7 +54,7 @@ export const userModerationEvents = pgTable("user_moderation_events", {
 }, (table) => [
   check(
     "user_moderation_action_check",
-    sql`${table.action} in ('restrict', 'suspend', 'reinstate', 'make_admin', 'remove_admin')`,
+    sql`${table.action} in ('restrict', 'suspend', 'reinstate', 'make_admin', 'remove_admin', 'enable_shipping', 'disable_shipping')`,
   ),
   index("user_moderation_events_user_idx").on(table.userId, table.createdAt.desc()),
 ])
@@ -297,7 +304,7 @@ export interface ShipmentAddressColumn {
 export const shipments = pgTable("shipments", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id),
-  dealId: uuid("deal_id").references(() => deals.id),
+  dealId: uuid("deal_id").references(() => deals.id, { onDelete: "set null" }),
   senderName: text("sender_name").notNull(),
   senderLocation: text("sender_location").notNull(),
   receiverName: text("receiver_name").notNull(),
@@ -320,8 +327,18 @@ export const shipments = pgTable("shipments", {
   pickupDate: date("pickup_date", { mode: "string" }),
   senderAddress: jsonb("sender_address").$type<ShipmentAddressColumn>(),
   receiverAddress: jsonb("receiver_address").$type<ShipmentAddressColumn>(),
+  // Invoicing of labels PayPack paid for on behalf of a shipper account: "none" = not billable
+  // (internal estimate, or booked with the shared password), then unbilled → invoiced → paid.
+  billingStatus: text("billing_status").notNull().default("none"),
+  // What the shipper is invoiced for this label: carrier cost plus their markup at booking time.
+  billedAmount: numeric("billed_amount", { precision: 10, scale: 2 }),
+  invoiceRef: text("invoice_ref"),
+  invoicedAt: timestamp("invoiced_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  check("shipments_billing_status_check", sql`${table.billingStatus} in ('none', 'unbilled', 'invoiced', 'paid')`),
+  index("shipments_billing_idx").on(table.userId, table.billingStatus),
   check("shipments_provider_check", sql`${table.provider} in ('internal', 'eurosender', 'sendcloud')`),
   uniqueIndex("shipments_provider_order_code_idx").on(table.providerOrderCode),
   check("shipments_status_check", sql`${table.status} in ('arrived', 'ready-for-pickup', 'in-transit', 'pending')`),

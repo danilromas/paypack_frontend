@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { and, eq, inArray } from "drizzle-orm"
+import { isUuid } from "@/lib/ids"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, dealParticipants, walletTransactions } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/session"
@@ -15,19 +16,27 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const role = await getParticipantRole(id, user.id)
     if (!role) {
       return NextResponse.json({ error: "Deal not found" }, { status: 404 })
     }
 
     const updated = await db.transaction(async (tx) => {
-      const existingRows = await tx.select({ status: deals.status }).from(deals).where(eq(deals.id, id)).limit(1)
+      // FOR UPDATE: a concurrent accept can't slip in between reading the status and cancelling,
+      // which would cancel a paid deal without refunding the buyer.
+      const existingRows = await tx
+        .select({ status: deals.status })
+        .from(deals)
+        .where(eq(deals.id, id))
+        .limit(1)
+        .for("update")
       const wasInEscrow = existingRows[0]?.status === "escrow"
 
       const rows = await tx
         .update(deals)
         .set({ status: "cancelled", updatedAt: new Date() })
-        .where(and(eq(deals.id, id), inArray(deals.status, ["pending", "escrow"])))
+        .where(and(eq(deals.id, id), eq(deals.status, wasInEscrow ? "escrow" : "pending")))
         .returning()
       const deal = rows[0]
       if (!deal) return null

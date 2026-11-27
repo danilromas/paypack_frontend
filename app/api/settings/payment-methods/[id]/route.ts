@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { paymentMethods } from "@/db/schema"
@@ -12,6 +13,7 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const rows = await db
       .delete(paymentMethods)
       .where(and(eq(paymentMethods.id, id), eq(paymentMethods.userId, user.id)))

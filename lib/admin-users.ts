@@ -6,7 +6,15 @@ import { notifyUser } from "@/lib/notifications"
 import type { KycStatus } from "@/lib/kyc"
 import type { UserStatus } from "@/lib/auth/session"
 
-export const MODERATION_ACTIONS = ["restrict", "suspend", "reinstate", "make_admin", "remove_admin"] as const
+export const MODERATION_ACTIONS = [
+  "restrict",
+  "suspend",
+  "reinstate",
+  "make_admin",
+  "remove_admin",
+  "enable_shipping",
+  "disable_shipping",
+] as const
 export type ModerationAction = (typeof MODERATION_ACTIONS)[number]
 
 export interface AdminUserDTO {
@@ -16,6 +24,7 @@ export interface AdminUserDTO {
   role: "user" | "admin"
   status: UserStatus
   statusReason: string | null
+  canBookShipments: boolean
   kycStatus: KycStatus
   dealsCount: number
   createdAt: string
@@ -55,6 +64,7 @@ export async function listUsersForAdmin(filters: AdminUserFilters): Promise<Admi
       role: users.role,
       status: users.status,
       statusReason: users.statusReason,
+      canBookShipments: users.canBookShipments,
       createdAt: users.createdAt,
       kycStatus: kycVerifications.status,
       dealsCount: sql<number>`(select count(*)::int from ${dealParticipants} where ${dealParticipants.userId} = ${users.id})`,
@@ -72,6 +82,7 @@ export async function listUsersForAdmin(filters: AdminUserFilters): Promise<Admi
     role: r.role as AdminUserDTO["role"],
     status: r.status as UserStatus,
     statusReason: r.statusReason,
+    canBookShipments: r.canBookShipments,
     kycStatus: (r.kycStatus ?? "unverified") as KycStatus,
     dealsCount: Number(r.dealsCount),
     createdAt: r.createdAt.toISOString(),
@@ -108,6 +119,8 @@ const NOTIFICATION_TITLES: Record<ModerationAction, string> = {
   reinstate: "Your account access has been restored",
   make_admin: "You were granted admin access",
   remove_admin: "Your admin access was removed",
+  enable_shipping: "Shipping account enabled — book labels without a password; PayPack invoices you for them",
+  disable_shipping: "Your shipping account was disabled",
 }
 
 export type ModerateResult = { ok: true } | { ok: false; status: number; error: string }
@@ -122,7 +135,8 @@ export async function moderateUser(
   action: ModerationAction,
   reason: string,
 ): Promise<ModerateResult> {
-  if (adminUserId === targetUserId) {
+  const isShippingToggle = action === "enable_shipping" || action === "disable_shipping"
+  if (adminUserId === targetUserId && !isShippingToggle) {
     return { ok: false, status: 400, error: "You can't change your own account" }
   }
   if ((action === "restrict" || action === "suspend") && !reason.trim()) {
@@ -149,6 +163,13 @@ export async function moderateUser(
         break
       case "remove_admin":
         await tx.update(users).set({ role: "user", ...bumpSession, updatedAt: new Date() }).where(eq(users.id, target.id))
+        break
+      case "enable_shipping":
+        await tx.update(users).set({ canBookShipments: true, updatedAt: new Date() }).where(eq(users.id, target.id))
+        break
+      case "disable_shipping":
+        // Labels already booked stay on the account's bill; only new bookings need the password again.
+        await tx.update(users).set({ canBookShipments: false, updatedAt: new Date() }).where(eq(users.id, target.id))
         break
     }
 

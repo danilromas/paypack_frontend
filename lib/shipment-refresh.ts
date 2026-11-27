@@ -37,6 +37,10 @@ export async function refreshActiveShipments(rows: ShipmentRow[], now = Date.now
   if (due.length === 0) return rows
 
   for (const r of due) lastSync.set(r.id, now)
+  // Forget entries that are long past their interval, so the map can't grow without bound.
+  if (lastSync.size > 5000) {
+    for (const [id, at] of lastSync) if (now - at >= MIN_INTERVAL_MS) lastSync.delete(id)
+  }
 
   const updated = new Map<string, ShipmentRow>()
   const work = Promise.all(

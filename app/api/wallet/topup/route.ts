@@ -4,6 +4,8 @@ import { walletTransactions } from "@/db/schema"
 import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { toWalletTransaction, validateAmount } from "@/lib/wallet"
 
+const DEMO_TOPUP_MAX = 10_000
+
 export async function POST(req: Request) {
   const user = await getCurrentUser()
   if (!user) {
@@ -14,6 +16,12 @@ export async function POST(req: Request) {
     return NextResponse.json(restricted, { status: 403 })
   }
 
+  // Top-ups are a demo ledger with no payment provider behind them: they mint balance out of thin
+  // air. Set WALLET_DEMO_TOPUP=off to close them once real money is involved.
+  if (process.env.WALLET_DEMO_TOPUP === "off") {
+    return NextResponse.json({ error: "Top-ups are disabled until card payments go live" }, { status: 403 })
+  }
+
   try {
     const body = (await req.json()) as { amount?: unknown }
     const validationError = validateAmount(body.amount)
@@ -21,6 +29,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
     const amount = body.amount as number
+    if (amount > DEMO_TOPUP_MAX) {
+      return NextResponse.json({ error: `Demo top-ups are limited to ${DEMO_TOPUP_MAX} at a time` }, { status: 400 })
+    }
 
     const inserted = await db
       .insert(walletTransactions)

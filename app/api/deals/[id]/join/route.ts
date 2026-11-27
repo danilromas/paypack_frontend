@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isUuid } from "@/lib/ids"
 import { db } from "@/lib/db"
 import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { joinDealByLink, getDealForViewer } from "@/lib/deals-access"
@@ -16,6 +17,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
 
   try {
     const { id } = await context.params
+    if (!isUuid(id)) return NextResponse.json({ error: "Not found" }, { status: 404 })
     const result = await db.transaction((tx) => joinDealByLink(tx, id, user.id))
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 409 })
