@@ -12,15 +12,27 @@ export const SECTION_HOME: Record<AppMode, string> = {
   ship: "/dashboard/shipments",
 }
 
+/**
+ * The site runs with `trailingSlash: true`, so the same page can be reported as "/dashboard" or
+ * "/dashboard/" depending on how it was reached. Compare paths without the trailing slash.
+ */
+export function normalizePath(pathname: string | null | undefined): string {
+  if (!pathname) return "/"
+  return pathname.length > 1 ? pathname.replace(/\/+$/, "") || "/" : pathname
+}
+
 /** The section a page belongs to, or null for shared pages (chats, wallet…) that keep the current one. */
-export function sectionForPath(pathname: string): AppMode | null {
+export function sectionForPath(rawPathname: string | null | undefined): AppMode | null {
+  const pathname = normalizePath(rawPathname)
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/deals")) return "deal"
   if (pathname.startsWith("/dashboard/shipments")) return "ship"
   return null
 }
 
 /** Whether a menu link points at the page being viewed. "Dashboard" follows the current section. */
-export function isNavItemActive(href: string, pathname: string): boolean {
+export function isNavItemActive(rawHref: string, rawPathname: string | null | undefined): boolean {
+  const href = normalizePath(rawHref)
+  const pathname = normalizePath(rawPathname)
   if (href === "/dashboard") return pathname === "/dashboard" || pathname.startsWith("/dashboard/deals")
   return pathname === href || pathname.startsWith(`${href}/`)
 }

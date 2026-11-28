@@ -6,6 +6,8 @@ import { deals } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/session"
 import { getParticipantRole, getDealForViewer } from "@/lib/deals-access"
 import { notifyOtherParticipants } from "@/lib/notifications"
+import { logDealEvent } from "@/lib/deal-events"
+import { BUYER_PROTECTION_DAYS } from "@/lib/deals"
 
 /** Seller marks a paid-for deal as shipped, optionally with tracking info the buyer can see. */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -26,22 +28,32 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const carrier = typeof raw.carrier === "string" && raw.carrier.trim() ? raw.carrier.trim() : null
     const trackingNumber =
       typeof raw.trackingNumber === "string" && raw.trackingNumber.trim() ? raw.trackingNumber.trim() : null
+    if ((carrier && carrier.length > 60) || (trackingNumber && trackingNumber.length > 80)) {
+      return NextResponse.json({ error: "Carrier or tracking number is too long" }, { status: 400 })
+    }
 
     const updated = await db.transaction(async (tx) => {
       const rows = await tx
         .update(deals)
-        .set({ status: "shipped", carrier, trackingNumber, updatedAt: new Date() })
+        .set({ status: "shipped", carrier, trackingNumber, shippedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(deals.id, id), eq(deals.status, "escrow")))
         .returning()
       const deal = rows[0]
       if (!deal) return null
 
-      const trackingSuffix = trackingNumber ? ` — ${[carrier, trackingNumber].filter(Boolean).join(" ")}` : ""
+      const tracking = [carrier, trackingNumber].filter(Boolean).join(" ")
+      await logDealEvent(tx, {
+        dealId: deal.id,
+        actorUserId: user.id,
+        type: "shipped",
+        message: tracking ? `Shipped — ${tracking}` : "Shipped",
+      })
+
       await notifyOtherParticipants(tx, deal.id, user.id, {
         type: "deal",
         title: `"${deal.title}" has shipped`,
-        description: trackingNumber ? `Tracking${trackingSuffix}` : "",
-        relatedHref: "/dashboard/deals",
+        description: `${tracking ? `Tracking: ${tracking}. ` : ""}Confirm receipt once it arrives — you have ${BUYER_PROTECTION_DAYS} days to confirm or open a dispute.`,
+        relatedHref: "/dashboard/deals/",
       })
 
       return deal

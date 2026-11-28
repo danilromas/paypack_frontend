@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { AlertTriangle, CheckCircle2, ChevronRight, Coins, Copy, FileText, Loader2, MessageCircle, Star, Truck, User } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronRight, Coins, Copy, FileText, Loader2, MessageCircle, Package, PackageCheck, Star, User, Wallet } from "lucide-react"
 import { useAppStore } from "@/store/app-store"
 import { cn, formatDealDateTime, formatDealRelativeTime } from "@/lib/utils"
 import {
@@ -25,16 +25,44 @@ import {
   type PaymentMethod,
   type CryptoCoin,
 } from "@/lib/payments"
+import { DEAL_CARRIERS, releaseAvailableAt, validateDeliveryAddress, type DeliveryAddress } from "@/lib/deals"
+import { writeShipmentDraft, readShipmentDraft } from "@/components/dashboard/shipment-draft"
+import {
+  DealTimeline,
+  DeliveryAddressForm,
+  DeliveryCard,
+  EMPTY_DELIVERY,
+  ShippingStatusCard,
+  readLastDelivery,
+  writeLastDelivery,
+} from "@/components/dashboard/deal-lifecycle"
 
-const progressSteps = ["Created", "Escrow", "Shipped", "Completed"]
+const progressSteps = ["Created", "Paid", "Shipped", "Delivered", "Completed"]
 
-const progressStepIndex: Record<string, number> = {
-  pending: 0,
-  escrow: 1,
-  shipped: 2,
-  completed: 3,
-  disputed: 2,
-  cancelled: 0,
+function progressIndex(deal: { status: string; deliveredAt?: string; shippedAt?: string; paidAt?: string }): number {
+  switch (deal.status) {
+    case "completed":
+      return 4
+    case "shipped":
+      return deal.deliveredAt ? 3 : 2
+    case "escrow":
+      return 1
+    case "disputed":
+      return deal.deliveredAt ? 3 : deal.shippedAt ? 2 : 1
+    default:
+      return 0
+  }
+}
+
+type DealAction = "accept" | "ship" | "confirm-receipt" | "cancel" | "delivered" | "release"
+
+const STATUS_TONE: Record<string, string> = {
+  pending: "bg-warning/15 text-warning",
+  escrow: "bg-primary/15 text-primary",
+  shipped: "bg-ship/15 text-ship",
+  completed: "bg-success/15 text-success",
+  disputed: "bg-destructive/15 text-destructive",
+  cancelled: "bg-muted text-muted-foreground",
 }
 
 interface ConfettiPiece {
@@ -57,14 +85,23 @@ function buildConfetti(count = 14): ConfettiPiece[] {
 
 export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {}) {
   const router = useRouter()
-  const { selectedDealId, deals, updateDeal, refreshWallet, chatThreads } = useAppStore()
+  const { selectedDealId, deals, updateDeal, refreshWallet, chatThreads, wallet } = useAppStore()
+  const viewerId = useAppStore((s) => s.user?.id ?? null)
+  const viewerName = useAppStore((s) => s.user?.name ?? "")
   const deal = deals.find((d) => d.id === selectedDealId) ?? deals[0]
-  const [acting, setActing] = useState<"accept" | "ship" | "confirm-receipt" | "cancel" | null>(null)
+  const [acting, setActing] = useState<DealAction | null>(null)
+  const [delivery, setDelivery] = useState<DeliveryAddress>(EMPTY_DELIVERY)
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false)
+  const [addressError, setAddressError] = useState<string | null>(null)
+  const [savingAddress, setSavingAddress] = useState(false)
+  const [toppingUp, setToppingUp] = useState(false)
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [inviteCopied, setInviteCopied] = useState(false)
   const [shipDialogOpen, setShipDialogOpen] = useState(false)
   const [carrier, setCarrier] = useState("")
   const [trackingNumber, setTrackingNumber] = useState("")
+  const [shipError, setShipError] = useState<string | null>(null)
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeReason, setDisputeReason] = useState("")
   const [disputing, setDisputing] = useState(false)
@@ -102,8 +139,8 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
     return `${origin}/dashboard/deals/join/${deal.id}`
   }, [deal])
 
-  async function runAction(action: "accept" | "ship" | "confirm-receipt" | "cancel", body?: Record<string, unknown>) {
-    if (!deal) return
+  async function runAction(action: DealAction, body?: Record<string, unknown>): Promise<boolean> {
+    if (!deal) return false
     setActing(action)
     setActionError(null)
     try {
@@ -114,29 +151,133 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setActionError(data.error ?? "Something went wrong")
-        return
+        return false
       }
       updateDeal(data)
       await refreshWallet()
-      if (action === "confirm-receipt") {
-        const name = data.counterpartyName ?? data.counterparty ?? "the seller"
+      if (action === "confirm-receipt" || action === "release") {
+        const name = action === "release" ? "You have" : `${data.counterpartyName ?? data.counterparty ?? "The seller"} has`
         setCelebration({ name, pieces: buildConfetti() })
         setTimeout(() => setCelebration(null), 3500)
       }
+      return true
+    } catch {
+      setActionError("Network error — check your connection and try again")
+      return false
     } finally {
       setActing(null)
     }
   }
 
+  function openPayDialog(open: boolean) {
+    setPayDialogOpen(open)
+    setActionError(null)
+    if (open && !delivery.street) {
+      setDelivery(readLastDelivery(viewerId) ?? { ...EMPTY_DELIVERY, name: viewerName })
+    }
+  }
+
   async function handleConfirmPay() {
     if (!deal) return
-    await runAction("accept", {
+    const trimmed = Object.fromEntries(Object.entries(delivery).map(([k, v]) => [k, v.trim()])) as unknown as DeliveryAddress
+    const addressProblem = validateDeliveryAddress(trimmed)
+    if (addressProblem) {
+      setActionError(addressProblem)
+      return
+    }
+    const ok = await runAction("accept", {
       // The server refuses to charge if the deal's amount no longer matches what the buyer saw here.
       expectedAmount: Math.round((deal.price + deal.shippingPrice) * 100) / 100,
       paymentMethod,
       paymentCryptoCoin: paymentMethod === "crypto" ? cryptoCoin : undefined,
+      delivery: trimmed,
     })
-    setPayDialogOpen(false)
+    if (ok) {
+      writeLastDelivery(viewerId, trimmed)
+      setPayDialogOpen(false)
+    }
+  }
+
+  /** No payment provider yet: the wallet is a demo ledger, so the buyer can add the missing amount here. */
+  async function handleTopUpShortfall(amount: number) {
+    setToppingUp(true)
+    setActionError(null)
+    try {
+      const res = await fetch("/api/wallet/topup/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) setActionError(data.error ?? "Top-up failed")
+      await refreshWallet()
+    } finally {
+      setToppingUp(false)
+    }
+  }
+
+  function openAddressDialog() {
+    if (!deal?.delivery) return
+    setDelivery({ ...deal.delivery })
+    setAddressError(null)
+    setAddressDialogOpen(true)
+  }
+
+  async function handleSaveAddress() {
+    if (!deal) return
+    const problem = validateDeliveryAddress(delivery)
+    if (problem) {
+      setAddressError(problem)
+      return
+    }
+    setSavingAddress(true)
+    setAddressError(null)
+    try {
+      const res = await fetch(`/api/deals/${deal.id}/delivery/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ delivery }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAddressError(data.error ?? "Could not save the address")
+        return
+      }
+      updateDeal(data)
+      writeLastDelivery(viewerId, delivery)
+      setAddressDialogOpen(false)
+    } finally {
+      setSavingAddress(false)
+    }
+  }
+
+  /** Opens the Shipments wizard with the buyer's address and the deal's box already filled in. */
+  function handleBookLabel() {
+    if (!deal?.delivery) return
+    const existing = readShipmentDraft(viewerId)
+    if (existing && !window.confirm("Replace your unfinished shipment draft with this deal's parcel?")) return
+    const d = deal.delivery
+    writeShipmentDraft(viewerId, {
+      v: 1,
+      savedAt: new Date().toISOString(),
+      step: 1,
+      sender: { name: viewerName, country: "", zip: "", city: "", street: "", phone: "", email: "", state: null },
+      receiver: { name: d.name, country: d.country, zip: d.postcode, city: d.city, street: d.street, phone: d.phone, email: "", state: null },
+      weightKg: "",
+      lengthCm: deal.boxLengthCm ?? "",
+      widthCm: deal.boxWidthCm ?? "",
+      heightCm: deal.boxHeightCm ?? "",
+      contents: deal.title.slice(0, 100),
+      declaredValue: deal.price,
+      hsCode: "",
+      originCountry: "",
+      itemCount: 1,
+      exportReason: "commercial_goods",
+      senderVat: "",
+      selectedKey: null,
+      pickupDate: "",
+    })
+    router.push("/dashboard/shipments/?new=1")
   }
 
   async function handleCopyInviteLink() {
@@ -151,10 +292,16 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
   }
 
   async function handleConfirmShip() {
-    await runAction("ship", {
+    setShipError(null)
+    if (carrier && carrier !== "Other" && !trackingNumber.trim()) {
+      setShipError("Add the tracking number so the buyer can follow the parcel")
+      return
+    }
+    const ok = await runAction("ship", {
       carrier: carrier.trim() || undefined,
       trackingNumber: trackingNumber.trim() || undefined,
     })
+    if (!ok) return
     setShipDialogOpen(false)
     setCarrier("")
     setTrackingNumber("")
@@ -175,7 +322,7 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
         setDisputeError(data.error ?? "Failed to open dispute")
         return
       }
-      updateDeal({ ...deal, status: "disputed" })
+      updateDeal(data.deal ?? { ...deal, status: "disputed" })
       setDisputeOpen(false)
       setDisputeReason("")
     } finally {
@@ -220,11 +367,16 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
     )
   }
 
-  const activeStep = progressStepIndex[deal.status] ?? 0
+  const activeStep = progressIndex(deal)
+  const total = Math.round((deal.price + deal.shippingPrice) * 100) / 100
+  const available = wallet?.available ?? null
+  const shortfall = available !== null ? Math.max(0, Math.ceil((total - available) * 100) / 100) : 0
+  const releaseAt = releaseAvailableAt(deal.shippedAt)
+  const canRelease = deal.status === "shipped" && deal.myRole === "seller" && releaseAt !== null && releaseAt.getTime() <= Date.now()
   const counterpartyLabel = deal.counterpartyName ?? deal.counterparty
 
   // One clear primary action at a time — whoever's turn it is to move the deal forward.
-  let primaryAction: { label: string; action: "accept" | "ship" | "confirm-receipt"; hint: string } | null = null
+  let primaryAction: { label: string; action: DealAction; hint: string } | null = null
   if (deal.status === "pending" && deal.myRole === "buyer" && deal.counterpartyJoined) {
     primaryAction = {
       label: `Accept & Pay ${deal.price + deal.shippingPrice} ${deal.currency} into Escrow`,
@@ -235,9 +387,15 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
     primaryAction = { label: "Mark as Shipped", action: "ship", hint: "Let the buyer know their item is on its way." }
   } else if (deal.status === "shipped" && deal.myRole === "buyer") {
     primaryAction = {
-      label: "Confirm Receipt",
+      label: "Item received — release payment",
       action: "confirm-receipt",
-      hint: "This releases the funds to the seller — only confirm once you've received the item.",
+      hint: "This releases the funds to the seller — only confirm once you've checked the item. Something wrong? Open a dispute instead.",
+    }
+  } else if (canRelease) {
+    primaryAction = {
+      label: `Release ${total} ${deal.currency} to my wallet`,
+      action: "release",
+      hint: "Buyer protection has ended without a confirmation or dispute.",
     }
   }
 
@@ -252,7 +410,13 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
         ? "Waiting for the seller to ship."
         : deal.status === "shipped" && deal.myRole === "seller"
           ? "Waiting for the buyer to confirm receipt."
-          : null
+          : deal.status === "disputed"
+            ? "A dispute is open — PayPack support is reviewing it. Follow it in Support."
+            : deal.status === "completed"
+              ? "Deal completed — the payment was released to the seller."
+              : deal.status === "cancelled"
+                ? "This deal was cancelled."
+                : null
 
   const canDispute = deal.status === "escrow" || deal.status === "shipped"
   const canCancel = deal.status === "pending" || deal.status === "escrow"
@@ -277,8 +441,13 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
               <Badge variant="secondary" className="text-[10px]">
                 #{deal.id.slice(0, 8)}
               </Badge>
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-secondary-foreground">
-                {deal.status}
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                  STATUS_TONE[deal.status] ?? "bg-secondary text-secondary-foreground",
+                )}
+              >
+                {deal.status === "escrow" ? "paid · in escrow" : deal.status}
               </span>
               <span>You&apos;re the {deal.myRole}</span>
             </div>
@@ -356,6 +525,14 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
               </div>
               <span className="text-center text-[9px] text-muted-foreground sm:text-[10px]">
                 {step}
+                {(() => {
+                  const at = [deal.createdAt, deal.paidAt, deal.shippedAt, deal.deliveredAt, deal.completedAt][i]
+                  return at && i <= activeStep ? (
+                    <span className="block text-[9px] text-muted-foreground/70">
+                      {new Date(at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </span>
+                  ) : null
+                })()}
               </span>
             </div>
           ))}
@@ -382,20 +559,27 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
           </div>
         )}
 
-        {/* Shipping status — visible to both sides once the seller adds it */}
-        {(deal.carrier || deal.trackingNumber) && (
-          <div className="pp-animate-slide-in mb-6 flex items-center gap-3 rounded-2xl border border-border bg-card/60 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Truck className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-foreground">Shipping</div>
-              <p className="truncate text-xs text-muted-foreground">
-                {[deal.carrier, deal.trackingNumber].filter(Boolean).join(" · ")}
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Shipping status — visible to both sides once the seller ships */}
+        <ShippingStatusCard deal={deal} />
+
+        {/* Delivery address — the buyer gives it when paying; the seller ships to it */}
+        <DeliveryCard
+          deal={deal}
+          onEdit={deal.myRole === "buyer" && deal.status === "escrow" ? openAddressDialog : undefined}
+        />
+        <Dialog open={addressDialogOpen} onOpenChange={setAddressDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="text-base">Change delivery address</DialogTitle>
+              <DialogDescription className="text-xs">The seller is notified right away. You can change it until the item ships.</DialogDescription>
+            </DialogHeader>
+            <DeliveryAddressForm value={delivery} onChange={setDelivery} />
+            {addressError ? <p className="text-xs text-destructive">{addressError}</p> : null}
+            <Button className="w-full rounded-xl bg-primary" disabled={savingAddress} onClick={handleSaveAddress}>
+              {savingAddress ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save address"}
+            </Button>
+          </DialogContent>
+        </Dialog>
 
         {/* Chat */}
         {thread ? (
@@ -438,27 +622,50 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
               </DialogTrigger>
               <DialogContent className="max-w-sm">
                 <DialogHeader className="space-y-1">
-                  <DialogTitle className="text-base">Add tracking info</DialogTitle>
+                  <DialogTitle className="text-base">Ship the item</DialogTitle>
                   <DialogDescription className="text-xs">
-                    Optional — the buyer will see this on the deal.
+                    Post it with any carrier and add the tracking number — the buyer can follow the parcel from the deal.
                   </DialogDescription>
                 </DialogHeader>
+                {deal.delivery ? (
+                  <div className="mt-2 rounded-xl border border-border bg-secondary/40 p-3 text-xs">
+                    <div className="mb-1 font-semibold text-foreground">Ship to</div>
+                    <div className="text-muted-foreground">
+                      {deal.delivery.name}, {deal.delivery.street}, {deal.delivery.postcode} {deal.delivery.city}, {deal.delivery.country}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleBookLabel}
+                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-ship/40 bg-ship/10 px-3 py-2 text-xs font-semibold text-ship hover:bg-ship/15"
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      Book a courier label with PayPack Shipments
+                    </button>
+                  </div>
+                ) : null}
                 <div className="mt-3 space-y-3">
-                  <input
-                    type="text"
+                  <select
                     value={carrier}
                     onChange={(e) => setCarrier(e.target.value)}
-                    placeholder="Carrier (e.g. DHL, UPS)"
-                    className="w-full rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
+                    aria-label="Carrier"
+                    className="w-full rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    <option value="">Carrier…</option>
+                    {DEAL_CARRIERS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="text"
                     value={trackingNumber}
                     onChange={(e) => setTrackingNumber(e.target.value)}
-                    placeholder="Tracking number"
+                    placeholder={carrier === "Other" ? "Tracking number (optional)" : "Tracking number"}
                     className="w-full rounded-xl border border-border bg-secondary px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </div>
+                {shipError || actionError ? <p className="text-xs text-destructive">{shipError ?? actionError}</p> : null}
                 <Button
                   className="mt-4 w-full rounded-xl bg-primary"
                   disabled={acting !== null}
@@ -472,19 +679,23 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
           </div>
         ) : primaryAction?.action === "accept" ? (
           <div className="mb-3 space-y-2">
-            <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+            <Dialog open={payDialogOpen} onOpenChange={openPayDialog}>
               <DialogTrigger asChild>
                 <Button className="w-full rounded-xl bg-primary py-5 text-sm font-semibold">
                   {primaryAction.label}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-sm">
+              <DialogContent className="max-h-[92vh] max-w-md overflow-y-auto">
                 <DialogHeader className="space-y-1">
                   <DialogTitle className="text-base">Pay into escrow</DialogTitle>
                   <DialogDescription className="text-xs">
                     {deal.price + deal.shippingPrice} {deal.currency} is held safely until you confirm the item arrived.
                   </DialogDescription>
                 </DialogHeader>
+                <div className="mt-2">
+                  <label className="mb-2 block text-xs font-medium text-muted-foreground">Where should the seller ship it?</label>
+                  <DeliveryAddressForm value={delivery} onChange={setDelivery} />
+                </div>
                 <div className="mt-2">
                   <label className="mb-2 block text-xs font-medium text-muted-foreground">How will you pay?</label>
                   <div className="grid grid-cols-3 gap-2">
@@ -529,13 +740,37 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
                       </div>
                     </div>
                   )}
-                  <p className="mt-3 text-[11px] text-muted-foreground">
-                    MVP: the amount is deducted from your PayPack wallet balance.
+                  <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2 text-xs">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Wallet className="h-3.5 w-3.5" />
+                      Wallet balance
+                    </span>
+                    <span className={cn("font-semibold", shortfall > 0 ? "text-destructive" : "text-foreground")}>
+                      {available !== null ? `${available.toFixed(2)} ${deal.currency}` : "…"}
+                    </span>
+                  </div>
+                  {shortfall > 0 ? (
+                    <button
+                      type="button"
+                      disabled={toppingUp}
+                      onClick={() => handleTopUpShortfall(shortfall)}
+                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/50 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5 disabled:opacity-60"
+                    >
+                      {toppingUp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Top up {shortfall.toFixed(2)} {deal.currency} (demo wallet)
+                    </button>
+                  ) : null}
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    No card is charged yet: the amount is held from your PayPack wallet until you confirm the item arrived.
                   </p>
                 </div>
                 {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
-                <Button className="mt-2 w-full rounded-xl bg-primary" disabled={acting !== null} onClick={handleConfirmPay}>
-                  {acting === "accept" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pay into escrow"}
+                <Button
+                  className="mt-2 w-full rounded-xl bg-primary"
+                  disabled={acting !== null || shortfall > 0}
+                  onClick={handleConfirmPay}
+                >
+                  {acting === "accept" ? <Loader2 className="h-4 w-4 animate-spin" /> : `Pay ${total} ${deal.currency} into escrow`}
                 </Button>
               </DialogContent>
             </Dialog>
@@ -557,7 +792,27 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
             {waitingMessage}
           </div>
         ) : null}
-        {actionError ? <p className="mb-3 text-center text-xs text-destructive">{actionError}</p> : null}
+        {actionError && !payDialogOpen && !shipDialogOpen ? (
+          <p className="mb-3 text-center text-xs text-destructive">{actionError}</p>
+        ) : null}
+
+        {deal.status === "shipped" && !deal.deliveredAt && deal.myRole === "seller" ? (
+          <Button
+            variant="outline"
+            className="mb-3 w-full rounded-xl border-ship/40 text-ship hover:bg-ship/10 hover:text-ship"
+            disabled={acting !== null}
+            onClick={() => runAction("delivered")}
+          >
+            {acting === "delivered" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <PackageCheck className="mr-1.5 h-4 w-4" />
+                The carrier shows it as delivered
+              </>
+            )}
+          </Button>
+        ) : null}
 
         {deal.status === "completed" && !deal.hasRated && deal.counterpartyUserId && (
           <div className="mb-3 space-y-3 rounded-2xl border border-border bg-secondary/40 p-4">
@@ -604,11 +859,39 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
           <Button
             variant="outline"
             disabled={!canCancel || acting !== null}
-            onClick={() => runAction("cancel")}
+            onClick={() => setCancelConfirmOpen(true)}
             className="border-border bg-card py-2 text-xs font-medium text-muted-foreground hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
           >
             {acting === "cancel" ? <Loader2 className="h-3 w-3 animate-spin" /> : "Cancel Deal"}
           </Button>
+          <Dialog open={cancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader className="space-y-1">
+                <DialogTitle className="text-base">Cancel this deal?</DialogTitle>
+                <DialogDescription className="text-xs">
+                  {deal.status === "escrow"
+                    ? `The ${total} ${deal.currency} held in escrow goes back to the buyer's wallet. This can't be undone.`
+                    : "The deal closes for both sides. This can't be undone."}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" className="rounded-xl" onClick={() => setCancelConfirmOpen(false)}>
+                  Keep deal
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="rounded-xl"
+                  disabled={acting !== null}
+                  onClick={async () => {
+                    const ok = await runAction("cancel")
+                    if (ok) setCancelConfirmOpen(false)
+                  }}
+                >
+                  {acting === "cancel" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel deal"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog
             open={disputeOpen}
             onOpenChange={(o) => {
@@ -736,6 +1019,8 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
             </DialogContent>
           </Dialog>
         </div>
+
+        <DealTimeline deal={deal} viewerId={viewerId} />
       </div>
 
       {celebration && (
@@ -764,7 +1049,7 @@ export function DealDetail({ showHeading = true }: { showHeading?: boolean } = {
               <CheckCircle2 className="h-8 w-8" />
             </div>
             <h3 className="text-xl font-bold text-foreground">Funds released! 🎉</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{celebration.name} has been paid.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{celebration.name} been paid.</p>
           </div>
         </div>
       )}

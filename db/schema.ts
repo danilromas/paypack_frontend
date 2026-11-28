@@ -93,6 +93,19 @@ export const deals = pgTable("deals", {
   boxLengthCm: numeric("box_length_cm", { precision: 8, scale: 2 }),
   boxWidthCm: numeric("box_width_cm", { precision: 8, scale: 2 }),
   boxHeightCm: numeric("box_height_cm", { precision: 8, scale: 2 }),
+  // Where the seller sends the item — filled in by the buyer when paying into escrow.
+  deliveryName: text("delivery_name"),
+  deliveryPhone: text("delivery_phone"),
+  deliveryStreet: text("delivery_street"),
+  deliveryCity: text("delivery_city"),
+  deliveryPostcode: text("delivery_postcode"),
+  deliveryCountry: text("delivery_country"),
+  deliveryNote: text("delivery_note"),
+  // Lifecycle milestones, so both sides see when each step happened.
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  shippedAt: timestamp("shipped_at", { withTimezone: true }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -103,6 +116,18 @@ export const deals = pgTable("deals", {
   check("deals_role_check", sql`${table.role} in ('buyer', 'seller')`),
   index("deals_created_at_idx").on(table.createdAt.desc()),
   index("deals_user_id_idx").on(table.userId),
+])
+
+/** Everything that happened on a deal, in order — drives the timeline both sides see. */
+export const dealEvents = pgTable("deal_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dealId: uuid("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  type: text("type").notNull(),
+  message: text("message").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("deal_events_deal_id_idx").on(table.dealId, table.createdAt),
 ])
 
 export const walletTransactions = pgTable("wallet_transactions", {

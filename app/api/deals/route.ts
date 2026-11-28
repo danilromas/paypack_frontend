@@ -4,6 +4,7 @@ import { deals } from "@/db/schema"
 import { validateDealCreatePayload, type DealCreatePayload } from "@/lib/deals"
 import { getCurrentUser, restrictionError } from "@/lib/auth/session"
 import { ensureCreatorParticipant, getDealForViewer, listDealsForViewer } from "@/lib/deals-access"
+import { logDealEvent } from "@/lib/deal-events"
 
 function normalizePayload(body: Record<string, unknown>): DealCreatePayload {
   return {
@@ -93,6 +94,12 @@ export async function POST(req: Request) {
 
       const deal = inserted[0]
       await ensureCreatorParticipant(tx, { id: deal.id, role: payload.role }, user.id)
+      await logDealEvent(tx, {
+        dealId: deal.id,
+        actorUserId: user.id,
+        type: "created",
+        message: `Created as the ${payload.role}`,
+      })
       return deal.id
     })
 

@@ -5,6 +5,7 @@ import { db } from "@/lib/db"
 import { dealParticipants, chatThreads, deals, users } from "@/db/schema"
 import { toDeal, type DealRowForViewer } from "@/lib/deals"
 import { notifyOtherParticipants } from "@/lib/notifications"
+import { logDealEvent } from "@/lib/deal-events"
 import type { Deal } from "@/types"
 
 export type DealRole = "buyer" | "seller"
@@ -85,6 +86,10 @@ const DEAL_FOR_VIEWER_SELECT = sql`
     d.payment_method AS "paymentMethod", d.payment_crypto_coin AS "paymentCryptoCoin",
     d.carrier, d.tracking_number AS "trackingNumber",
     d.box_length_cm AS "boxLengthCm", d.box_width_cm AS "boxWidthCm", d.box_height_cm AS "boxHeightCm",
+    d.delivery_name AS "deliveryName", d.delivery_phone AS "deliveryPhone", d.delivery_street AS "deliveryStreet",
+    d.delivery_city AS "deliveryCity", d.delivery_postcode AS "deliveryPostcode",
+    d.delivery_country AS "deliveryCountry", d.delivery_note AS "deliveryNote",
+    d.paid_at AS "paidAt", d.shipped_at AS "shippedAt", d.delivered_at AS "deliveredAt", d.completed_at AS "completedAt",
     d.created_at AS "createdAt", d.updated_at AS "updatedAt",
     dp.role AS "myRole",
     coalesce(other_user.name, other_dp.invited_email) AS "counterpartyName",
@@ -189,6 +194,13 @@ export async function joinDealByLink(
   } catch {
     return { ok: false, error: "This invite was already used" }
   }
+
+  await logDealEvent(tx, {
+    dealId,
+    actorUserId: joiningUserId,
+    type: "joined",
+    message: `Joined as the ${counterpartyRole}`,
+  })
 
   await notifyOtherParticipants(tx, dealId, joiningUserId, {
     type: "deal",

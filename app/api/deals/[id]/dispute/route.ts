@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/session"
 import { getParticipantRole, getDealForViewer } from "@/lib/deals-access"
 import { notifyOtherParticipants } from "@/lib/notifications"
 import { validateReason } from "@/lib/disputes"
+import { logDealEvent } from "@/lib/deal-events"
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -59,12 +60,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       })
 
       await tx.update(deals).set({ status: "disputed", updatedAt: new Date() }).where(eq(deals.id, deal.id))
+      await logDealEvent(tx, { dealId: deal.id, actorUserId: user.id, type: "disputed", message: reason })
 
       await notifyOtherParticipants(tx, deal.id, user.id, {
         type: "deal",
         title: `Dispute opened for "${deal.title}"`,
         description: reason,
-        relatedHref: "/dashboard/",
+        relatedHref: "/dashboard/support/",
       })
 
       return dispute

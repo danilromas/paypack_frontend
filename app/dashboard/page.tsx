@@ -15,12 +15,12 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/app-store";
 import { cn, formatDealRelativeTime } from "@/lib/utils";
 import type { Deal } from "@/types";
+import { nextStepFor } from "@/lib/deals";
 
+// Rating a finished deal is nice to have, not a blocker — "Your turn" counts only deals that wait on you.
 function isYourTurn(deal: Deal): boolean {
-  if (deal.status === "pending" && deal.myRole === "buyer") return true;
-  if (deal.status === "escrow" && deal.myRole === "seller") return true;
-  if (deal.status === "shipped" && deal.myRole === "buyer") return true;
-  return false;
+  const step = nextStepFor(deal);
+  return Boolean(step?.mine) && deal.status !== "completed";
 }
 
 const statusBadge: Record<string, string> = {

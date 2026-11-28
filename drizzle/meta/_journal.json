@@ -141,6 +141,13 @@
       "when": 1795847784014,
       "tag": "0019_sender_address_book",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795869287315,
+      "tag": "0020_deal_lifecycle",
+      "breakpoints": true
     }
   ]
 }

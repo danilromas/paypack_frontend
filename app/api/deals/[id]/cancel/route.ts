@@ -6,6 +6,7 @@ import { deals, dealParticipants, walletTransactions } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/session"
 import { getParticipantRole, getDealForViewer } from "@/lib/deals-access"
 import { notifyOtherParticipants } from "@/lib/notifications"
+import { logDealEvent } from "@/lib/deal-events"
 
 /** Either participant can cancel while nothing has shipped yet. Refunds the buyer if they'd already paid. */
 export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
@@ -61,11 +62,18 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
         }
       }
 
+      await logDealEvent(tx, {
+        dealId: deal.id,
+        actorUserId: user.id,
+        type: "cancelled",
+        message: wasInEscrow ? "Deal cancelled — escrow refunded to the buyer" : "Deal cancelled",
+      })
+
       await notifyOtherParticipants(tx, deal.id, user.id, {
         type: "deal",
         title: `"${deal.title}" was cancelled`,
         description: wasInEscrow ? "The held funds have been refunded to the buyer." : undefined,
-        relatedHref: "/dashboard/",
+        relatedHref: "/dashboard/deals/",
       })
 
       return deal

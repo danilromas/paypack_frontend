@@ -5,6 +5,7 @@ import { dealParticipants, deals, disputeEvents, disputes, walletTransactions } 
 import { getCurrentUser } from "@/lib/auth/session"
 import { isUuid } from "@/lib/ids"
 import { notifyOtherParticipants } from "@/lib/notifications"
+import { logDealEvent } from "@/lib/deal-events"
 
 /**
  * "needs-info" asks the parties for more evidence. The two outcomes close the dispute AND settle the
@@ -104,7 +105,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
       await tx
         .update(deals)
-        .set({ status: refund ? "cancelled" : "completed", updatedAt: new Date() })
+        .set({
+          status: refund ? "cancelled" : "completed",
+          ...(refund ? {} : { completedAt: new Date() }),
+          updatedAt: new Date(),
+        })
         .where(eq(deals.id, deal.id))
       await tx.update(disputes).set({ status: "resolved", resolvedAt: new Date() }).where(eq(disputes.id, dispute.id))
 
@@ -113,6 +118,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         ? `Dispute resolved in the buyer's favour — ${money} refunded to the buyer`
         : `Dispute resolved in the seller's favour — ${money} released to the seller`
       await tx.insert(disputeEvents).values({ disputeId: dispute.id, actorUserId: user.id, text: outcome })
+      await logDealEvent(tx, { dealId: deal.id, actorUserId: null, type: "dispute_resolved", message: outcome })
       await notifyOtherParticipants(tx, deal.id, user.id, {
         type: "deal",
         title: `Dispute resolved for "${deal.title}"`,

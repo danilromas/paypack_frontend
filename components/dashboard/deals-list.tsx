@@ -10,10 +10,12 @@ import {
   Clock,
   AlertTriangle,
   Ban,
+  Truck,
 } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import { cn, formatDealRelativeTime } from "@/lib/utils";
-import type { DealStatus } from "@/types";
+import type { Deal, DealStatus } from "@/types";
+import { nextStepFor } from "@/lib/deals";
 
 function getStatusConfig(status: DealStatus) {
   switch (status) {
@@ -31,7 +33,7 @@ function getStatusConfig(status: DealStatus) {
       };
     case "shipped":
       return {
-        icon: Clock,
+        icon: Truck,
         label: "Shipped",
         className: "bg-primary/10 text-primary border border-primary/20",
       };
@@ -63,21 +65,31 @@ function getEventIcon(status: DealStatus) {
       return { icon: Check, bg: "bg-success/10 text-success" };
     case "escrow":
       return { icon: Lock, bg: "bg-warning/10 text-warning" };
+    case "shipped":
+      return { icon: Truck, bg: "bg-ship/10 text-ship" };
     case "completed":
       return { icon: CheckCheck, bg: "bg-primary/10 text-primary" };
+    case "disputed":
+      return { icon: AlertTriangle, bg: "bg-destructive/10 text-destructive" };
     default:
       return { icon: Clock, bg: "bg-muted text-muted-foreground" };
   }
 }
 
-function getEventLabel(status: DealStatus) {
-  switch (status) {
+function getEventLabel(deal: Deal) {
+  switch (deal.status) {
     case "pending":
       return "Deal Created";
     case "escrow":
       return "Funds Locked";
+    case "shipped":
+      return deal.deliveredAt ? "Delivered" : "Shipped";
     case "completed":
       return "Deal Released";
+    case "disputed":
+      return "Dispute Opened";
+    case "cancelled":
+      return "Cancelled";
     default:
       return "Updated";
   }
@@ -156,6 +168,7 @@ export function DealsList({
             const eventConfig = getEventIcon(deal.status);
             const StatusIcon = statusConfig.icon;
             const EventIcon = eventConfig.icon;
+            const nextStep = nextStepFor(deal);
 
             return (
               <button
@@ -187,8 +200,20 @@ export function DealsList({
                       You're the {deal.myRole} · {deal.counterpartyName ?? deal.counterparty}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {getEventLabel(deal.status)} {formatDealRelativeTime(deal.createdAt)} · #{deal.id.slice(0, 8)}
+                      {getEventLabel(deal)} {formatDealRelativeTime(deal.status === "pending" ? deal.createdAt : deal.updatedAt)} · #
+                      {deal.id.slice(0, 8)}
                     </p>
+                    {nextStep ? (
+                      <p
+                        className={cn(
+                          "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                          nextStep.mine ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground",
+                        )}
+                      >
+                        {nextStep.mine ? "Your turn: " : ""}
+                        {nextStep.label}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
