@@ -11,6 +11,7 @@ import {
   validateQuoteAddress,
   postcodeError,
   toQuoteAddress,
+  normalizeSavedSenders,
 } from "../lib/shipments"
 
 const price = (gross: number) => ({ original: { currencyCode: "EUR", gross, net: gross / 1.24 } })
@@ -210,5 +211,40 @@ describe("postcodeError", () => {
 describe("ready for pickup", () => {
   it("maps locker and shop arrivals from both brokers", () => {
     expect(mapTrackingStatus("AvailableForPickup")).toBe("ready-for-pickup")
+  })
+})
+
+describe("normalizeSavedSenders", () => {
+  const address = {
+    name: "Mario Rossi",
+    country: "it",
+    zip: "10035",
+    city: "Mazzè",
+    street: "Via Roma 1",
+    phone: "+39 333 1234567",
+    email: "mario@example.com",
+  }
+
+  it("keeps at most five complete addresses with exactly one default", () => {
+    const result = normalizeSavedSenders([
+      { ...address, label: "Home" },
+      { ...address, street: "Via Po 2", isDefault: true },
+    ])
+    if ("error" in result) throw new Error(result.error)
+    expect(result.senders.map((s) => s.isDefault)).toEqual([false, true])
+    expect(result.senders[0].country).toBe("IT")
+    expect(result.senders[0].label).toBe("Home")
+    expect(result.senders[0].id).toMatch(/^[A-Za-z0-9-]+$/)
+
+    const noDefault = normalizeSavedSenders([address])
+    if ("error" in noDefault) throw new Error(noDefault.error)
+    expect(noDefault.senders[0].isDefault).toBe(true)
+  })
+
+  it("rejects a sixth address and incomplete ones", () => {
+    expect(normalizeSavedSenders(Array(6).fill(address))).toHaveProperty("error")
+    expect(normalizeSavedSenders([{ ...address, name: " " }])).toHaveProperty("error")
+    expect(normalizeSavedSenders([{ ...address, zip: "1003" }])).toHaveProperty("error")
+    expect(normalizeSavedSenders("nope")).toHaveProperty("error")
   })
 })

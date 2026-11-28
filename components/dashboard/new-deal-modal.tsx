@@ -195,7 +195,7 @@ export function NewDealModal({
         } else {
           setPreviewNotice(
             result.status === "no_extension"
-              ? "To fill in Facebook listings automatically, install the PayPack browser extension from the /extension page. For now, please fill in the details below."
+              ? "To fill in Facebook listings automatically, install the PayPack browser extension (version 1.2 or newer — reinstall it if you have an older one) from the /extension page. For now, please fill in the details below."
               : result.status === "login_required"
                 ? "Log in to Facebook in this browser so the PayPack extension can read the listing — or fill in the details below."
                 : "We couldn't read that Facebook listing — please fill in the details below.",
