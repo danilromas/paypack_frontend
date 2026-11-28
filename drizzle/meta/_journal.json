@@ -134,6 +134,13 @@
       "when": 1795766934309,
       "tag": "0018_enable_sergey_shipper",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795847784014,
+      "tag": "0019_sender_address_book",
+      "breakpoints": true
     }
   ]
 }

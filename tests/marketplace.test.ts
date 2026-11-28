@@ -18,8 +18,14 @@ describe("detectMarketplacePlatform", () => {
     ).toBe("facebook_marketplace")
   })
 
+  it("recognizes the short links the Facebook app's Share button copies", () => {
+    expect(detectMarketplacePlatform("https://www.facebook.com/share/1AbCdEfGh2/")).toBe("facebook_marketplace")
+    expect(detectMarketplacePlatform("https://m.facebook.com/share/1AbCdEfGh2")).toBe("facebook_marketplace")
+  })
+
   it("returns null for non-marketplace facebook links", () => {
     expect(detectMarketplacePlatform("https://www.facebook.com/someuser")).toBeNull()
+    expect(detectMarketplacePlatform("https://www.facebook.com/share/p/1AbCdEfGh2/")).toBeNull()
   })
 
   it("returns null for other hosts", () => {

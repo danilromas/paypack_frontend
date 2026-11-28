@@ -6,7 +6,9 @@
  */
 importScripts("storage.js");
 
+// The site lives on www (the bare domain redirects there); keep both so either tab can ask.
 const PP_FIXED_ALLOWED_ORIGINS = [
+  "https://www.paypack.uno",
   "https://paypack.uno",
   "https://paypack-nu.vercel.app",
   "http://localhost:3000",
@@ -20,7 +22,8 @@ function isFacebookListingUrl(raw) {
     return (
       u.protocol === "https:" &&
       /^(www\.|web\.|m\.)?facebook\.com$/i.test(u.hostname) &&
-      /\/marketplace\/item\/\d+/.test(u.pathname)
+      // A listing, or the short link the Facebook app's "Share" button copies (it redirects to one).
+      (/\/marketplace\/item\/\d+/.test(u.pathname) || /^\/share\/[A-Za-z0-9_-]+\/?$/.test(u.pathname))
     );
   } catch {
     return false;
@@ -60,6 +63,10 @@ async function scrapeListingInBackgroundTab(url) {
       const current = await chrome.tabs.get(tab.id).catch(() => null);
       if (current?.url && /facebook\.com\/(login|checkpoint)/.test(current.url)) {
         return { ok: false, error: "login_required" };
+      }
+      // A share link that resolved to something other than a listing (a post, a profile…).
+      if (current?.url && current.status === "complete" && !/facebook\.com\/(marketplace|share)\//.test(current.url)) {
+        return { ok: false, error: "not_found" };
       }
       let res;
       try {

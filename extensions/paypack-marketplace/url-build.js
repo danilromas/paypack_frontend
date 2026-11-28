@@ -3,7 +3,7 @@
  * Keep in sync with tests/extension-url-build.test.ts expectations.
  */
 var PayPackUrlBuild = {
-  DEFAULT_ORIGIN: "https://paypack.uno",
+  DEFAULT_ORIGIN: "https://www.paypack.uno",
 
   /**
    * @param {string} [paypackOrigin]

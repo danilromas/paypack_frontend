@@ -42,6 +42,16 @@ export interface SavedParty extends Omit<ShipmentAddress, "servicePoint"> {
   name: string
 }
 
+/** A sender address the user keeps for reuse; the default one pre-fills every new shipment. */
+export interface SavedSender extends SavedParty {
+  id: string
+  /** Optional nickname, e.g. "Warehouse" or "Home". */
+  label: string
+  isDefault: boolean
+}
+
+export const MAX_SAVED_SENDERS = 5
+
 /** Senders are always inside the EU. ISO 3166-1 alpha-2 codes. */
 export const EU_COUNTRIES: { code: string; name: string }[] = [
   { code: "AT", name: "Austria" },
@@ -304,6 +314,44 @@ export function validateShipmentAddress(address: unknown, label: "sender" | "rec
   if (!/^\S+@\S+\.\S+$/.test((a.email as string).trim())) return `Invalid ${label} email`
   if (!/^\+?[\d\s()-]{6,20}$/.test((a.phone as string).trim())) return `Invalid ${label} phone`
   return null
+}
+
+/**
+ * Checks and tidies the user's sender address book before it is stored: at most MAX_SAVED_SENDERS
+ * complete, bookable sender addresses, and exactly one default whenever the list isn't empty.
+ */
+export function normalizeSavedSenders(input: unknown): { senders: SavedSender[] } | { error: string } {
+  if (!Array.isArray(input)) return { error: "Invalid address list" }
+  if (input.length > MAX_SAVED_SENDERS) {
+    return { error: `You can keep up to ${MAX_SAVED_SENDERS} sender addresses` }
+  }
+  const clip = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "")
+  const senders: SavedSender[] = []
+  for (const [i, raw] of input.entries()) {
+    if (!raw || typeof raw !== "object") return { error: `Address ${i + 1} is invalid` }
+    const r = raw as Record<string, unknown>
+    const name = clip(r.name, 100)
+    if (!name) return { error: `Address ${i + 1}: enter the sender's name` }
+    const addressError = validateShipmentAddress(r, "sender")
+    if (addressError) return { error: `Address ${i + 1}: ${addressError}` }
+    const country = clip(r.country, 2).toUpperCase()
+    senders.push({
+      id: typeof r.id === "string" && /^[A-Za-z0-9-]{1,40}$/.test(r.id) ? r.id : crypto.randomUUID(),
+      label: clip(r.label, 40),
+      name,
+      country,
+      zip: clip(r.zip, 12),
+      city: clip(r.city, 100),
+      street: clip(r.street, 200),
+      phone: clip(r.phone, 20),
+      email: clip(r.email, 200),
+      state: needsState(country) ? clip(r.state, 2).toUpperCase() : null,
+      isDefault: r.isDefault === true,
+    })
+  }
+  const defaultIndex = Math.max(0, senders.findIndex((s) => s.isDefault))
+  senders.forEach((s, i) => (s.isDefault = i === defaultIndex))
+  return { senders }
 }
 
 /**

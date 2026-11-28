@@ -36,8 +36,8 @@ beforeAll(() => {
 })
 
 describe("PayPackUrlBuild (extension url-build.js)", () => {
-  it("uses paypack.uno as default origin constant", () => {
-    expect(PayPackUrlBuild.DEFAULT_ORIGIN).toBe("https://paypack.uno")
+  it("uses www.paypack.uno as default origin constant", () => {
+    expect(PayPackUrlBuild.DEFAULT_ORIGIN).toBe("https://www.paypack.uno")
   })
 
   it("falls back to default origin when paypackOrigin is empty", () => {
@@ -47,7 +47,7 @@ describe("PayPackUrlBuild (extension url-build.js)", () => {
       price: 42,
       desc: "",
     })
-    expect(u.startsWith("https://paypack.uno/dashboard/?")).toBe(true)
+    expect(u.startsWith("https://www.paypack.uno/dashboard/?")).toBe(true)
     expect(u).toContain("pp_import=1")
     expect(u).toContain("title=")
     expect(u).toContain("price=42")

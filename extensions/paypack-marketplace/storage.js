@@ -2,7 +2,7 @@
  * Shared settings + import history for popup and content script.
  */
 var PayPackStorage = (function () {
-  var DEFAULT_ORIGIN = "https://paypack.uno";
+  var DEFAULT_ORIGIN = "https://www.paypack.uno";
   var HISTORY_KEY = "importHistory";
   var LAST_IMPORT_KEY = "lastImport";
   var HISTORY_LIMIT = 80;

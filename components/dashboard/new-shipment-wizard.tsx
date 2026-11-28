@@ -18,6 +18,7 @@ import {
   MapPin,
   Package,
   ShieldCheck,
+  Star,
   Truck,
   X,
   Zap,
@@ -31,12 +32,14 @@ import {
   ORIGIN_COUNTRIES,
   formatShipmentAddress,
   needsCustoms,
+  MAX_SAVED_SENDERS,
   postcodeError,
   needsState,
   type DeliveryMode,
   type ExportReason,
   type ServicePointSummary,
   type SavedParty,
+  type SavedSender,
   type ShipmentAddress,
   type ShipmentCreatePayload,
 } from "@/lib/shipments"
@@ -49,6 +52,8 @@ import {
   writeShipmentDraft,
   type ShipmentDraft,
 } from "@/components/dashboard/shipment-draft"
+import { usePostcodeLookup } from "@/components/dashboard/use-postcode-lookup"
+import { canAutofillCity, cityMatchesPlaces, type PostcodeLookup } from "@/lib/postcode-places"
 
 /** Price first (postcodes + box), then the addresses and contents, then pickup and booking. */
 type WizardPhase = "price" | "details" | "review"
@@ -81,6 +86,25 @@ interface Party extends ShipmentAddress {
 }
 
 const EMPTY_PARTY: Party = { name: "", country: "", street: "", zip: "", city: "", phone: "", email: "" }
+
+function partyFromSaved(s: SavedParty): Party {
+  return {
+    ...EMPTY_PARTY,
+    name: s.name,
+    country: s.country,
+    zip: s.zip,
+    city: s.city,
+    street: s.street,
+    phone: s.phone,
+    email: s.email,
+    state: s.state ?? undefined,
+  }
+}
+
+/** Same person at the same address, however it was capitalised. */
+function partyKey(p: { name: string; country: string; zip: string; street: string; city: string }) {
+  return [p.name, p.country, p.zip, p.street, p.city].map((v) => v.trim().toLowerCase()).join("|")
+}
 
 interface Quote {
   tier: ServiceTier
@@ -155,6 +179,36 @@ function firstPickupDay(from: string, excluded: string[]) {
   return from
 }
 
+/** Under a postcode: the places it belongs to, or a warning when it doesn't exist there. */
+function PostcodeNote({ lookup, zip, countryName }: { lookup: PostcodeLookup | null; zip: string; countryName: string }) {
+  if (lookup?.status === "found") {
+    const names = lookup.places.map((p) => p.city)
+    const region = lookup.places[0]?.region
+    return (
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <MapPin className="h-3 w-3 shrink-0 text-success" />
+        <span className="truncate">
+          {names.slice(0, 3).join(" · ")}
+          {names.length > 3 ? ` +${names.length - 3}` : ""}
+          {region ? `, ${region}` : ""}
+        </span>
+      </p>
+    )
+  }
+  if (lookup?.status === "unknown") {
+    return (
+      <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-warning/15 px-2.5 py-1.5 text-xs text-warning-foreground">
+        <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+        <span>
+          We can&apos;t find postcode {zip.trim()} in {countryName}. Please double-check it — with a wrong postcode the
+          courier can&apos;t find the address and no lockers show up.
+        </span>
+      </p>
+    )
+  }
+  return null
+}
+
 /** HS codes people shipping bags reach for most; any 6–10 digit code is accepted. */
 const HS_CODE_HINTS = [
   { code: "420221", label: "Handbags, leather" },
@@ -162,6 +216,145 @@ const HS_CODE_HINTS = [
   { code: "420231", label: "Wallets & small leather goods" },
   { code: "420292", label: "Travel & sports bags, textile" },
 ]
+
+/** "My addresses" on the price step: one tap fills in the whole sender; the star marks the default. */
+function SavedSenderChips({
+  senders,
+  current,
+  busy,
+  onPick,
+  onRemove,
+}: {
+  senders: SavedSender[]
+  current: Party
+  busy: boolean
+  onPick: (s: SavedSender) => void
+  onRemove: (id: string) => void
+}) {
+  return (
+    <div className="mb-3">
+      <div className="mb-1.5 text-xs text-muted-foreground">My addresses</div>
+      <div className="flex flex-wrap gap-1.5">
+        {senders.map((s) => {
+          const picked = partyKey(s) === partyKey(current)
+          const name = s.label || `${s.street}, ${s.city}`
+          return (
+            <span
+              key={s.id}
+              className={cn(
+                "inline-flex max-w-full items-center rounded-lg border text-xs transition-colors",
+                picked ? "border-ship/50 bg-ship/10 text-ship" : "border-border bg-card text-foreground hover:bg-secondary",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => onPick(s)}
+                title={`${s.name} — ${s.street}, ${s.zip} ${s.city}`}
+                className="inline-flex min-w-0 items-center gap-1 py-1.5 pl-2.5 pr-1.5"
+              >
+                {s.isDefault && <Star className="h-3 w-3 shrink-0 fill-current text-ship" />}
+                <span className="truncate">{s.label || s.city || s.name}</span>
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (window.confirm(`Remove "${name}" from your addresses?`)) onRemove(s.id)
+                }}
+                aria-label={`Remove ${name} from my addresses`}
+                className="rounded-r-lg py-1.5 pl-0.5 pr-2 text-muted-foreground hover:text-destructive disabled:opacity-50"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Under the sender on the details step: keep this address for next time, or make it the default. */
+function SenderBookBar({
+  sender,
+  saved,
+  count,
+  busy,
+  error,
+  onSave,
+  onMakeDefault,
+}: {
+  sender: Party
+  saved: SavedSender | null
+  count: number
+  busy: boolean
+  error: string | null
+  onSave: (label: string, makeDefault: boolean) => void
+  onMakeDefault: (id: string) => void
+}) {
+  const [label, setLabel] = useState("")
+  const [makeDefault, setMakeDefault] = useState(false)
+  const complete = partyValid(sender)
+  return (
+    <div className="rounded-xl border border-dashed border-border px-3 py-2.5 text-xs">
+      {saved ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <Star className={cn("h-3.5 w-3.5", saved.isDefault ? "fill-current text-ship" : "text-muted-foreground")} />
+            {saved.isDefault ? "Your default sender address" : `Saved in your addresses${saved.label ? ` as "${saved.label}"` : ""}`}
+          </span>
+          {!saved.isDefault && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onMakeDefault(saved.id)}
+              className="font-medium text-ship hover:underline disabled:opacity-50"
+            >
+              Make default
+            </button>
+          )}
+        </div>
+      ) : count >= MAX_SAVED_SENDERS ? (
+        <p className="text-muted-foreground">
+          You already keep {MAX_SAVED_SENDERS} sender addresses — remove one on the Price step to save this one.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value.slice(0, 40))}
+              placeholder="Name it, e.g. Warehouse (optional)"
+              aria-label="Name for this sender address"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-secondary px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ship/40"
+            />
+            <button
+              type="button"
+              disabled={!complete || busy}
+              onClick={() => onSave(label.trim(), makeDefault)}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-ship px-3 py-2 font-semibold text-ship-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Star className="h-3 w-3" />}
+              Save address
+            </button>
+          </div>
+          {count > 0 && (
+            <label className="flex items-center gap-2 text-muted-foreground">
+              <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} />
+              Make it my default sender
+            </label>
+          )}
+          <p className="text-muted-foreground">
+            {complete
+              ? `Saved addresses fill in the sender in one tap (${count}/${MAX_SAVED_SENDERS} used).`
+              : "Fill in every field above to save this address for next time."}
+          </p>
+        </div>
+      )}
+      {error && <p className="mt-2 text-destructive">{error}</p>}
+    </div>
+  )
+}
 
 function PartyFields({
   title,
@@ -171,6 +364,7 @@ function PartyFields({
   onChange,
   countries,
   onChangeLocation,
+  footer,
 }: {
   title: string
   hint: string
@@ -180,10 +374,27 @@ function PartyFields({
   countries: { code: string; name: string }[]
   /** Country and postcode were set on the price step; changing them means re-pricing there. */
   onChangeLocation: () => void
+  footer?: React.ReactNode
 }) {
   const set = (field: keyof Party) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     onChange({ ...value, [field]: e.target.value })
   const done = partyValid(value)
+  const countryName = countries.find((c) => c.code === value.country)?.name ?? value.country
+  const lookup = usePostcodeLookup(value.country, value.zip)
+  const places = lookup?.status === "found" ? lookup.places : []
+  const cityMismatch = value.city.trim() !== "" && !cityMatchesPlaces(value.city, places)
+  const cityTyped = value.city.trim() !== ""
+  // Only a postcode with a single place says which city it is; Italian CAPs often cover dozens.
+  const onlyPlace = places.length === 1 && canAutofillCity(value.country) ? places[0].city : null
+  // Fill the city from the postcode once per postcode, and only into an empty field.
+  const filledFor = useRef<string | null>(null)
+  useEffect(() => {
+    const key = `${value.country}:${value.zip.trim()}`
+    if (places.length === 0 || filledFor.current === key) return
+    filledFor.current = key
+    if (value.city.trim() === "" && onlyPlace) onChange({ ...value, city: onlyPlace })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookup])
   return (
     <div className={cn("rounded-2xl border bg-card/60 p-4 transition-colors sm:p-5", done ? "border-ship/30" : "border-border")}>
       <div className="mb-4 flex items-center gap-3">
@@ -198,7 +409,8 @@ function PartyFields({
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border px-4 py-2.5 text-sm">
           <span className="min-w-0 truncate text-foreground">
-            {countries.find((c) => c.code === value.country)?.name ?? value.country} · {value.zip}
+            {countryName} · {value.zip}
+            {onlyPlace ? ` · ${onlyPlace}` : ""}
             {value.state ? ` · ${value.state.toUpperCase()}` : ""}
           </span>
           <button type="button" onClick={onChangeLocation} className="shrink-0 text-xs font-medium text-ship hover:underline">
@@ -207,11 +419,48 @@ function PartyFields({
         </div>
         <input value={value.name} onChange={set("name")} placeholder="Full name" autoComplete="name" className={inputClass} />
         <input value={value.street} onChange={set("street")} placeholder="Street and house number" autoComplete="street-address" className={inputClass} />
-        <input value={value.city} onChange={set("city")} placeholder="City" autoComplete="address-level2" className={inputClass} />
+        <input
+          value={value.city}
+          onChange={set("city")}
+          placeholder="City"
+          autoComplete="address-level2"
+          aria-invalid={cityMismatch ? true : undefined}
+          className={cn(inputClass, cityMismatch && "border-warning focus:ring-warning/40")}
+        />
+        {(cityMismatch || (!cityTyped && places.length > 1 && canAutofillCity(value.country))) && (
+          <div
+            className={cn(
+              "-mt-1 flex flex-wrap items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs",
+              cityMismatch ? "bg-warning/15 text-warning-foreground" : "bg-secondary text-muted-foreground",
+            )}
+          >
+            {cityMismatch && <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+            <span>
+              {cityMismatch
+                ? places.length === 1
+                  ? `Postcode ${value.zip.trim()} is in`
+                  : `That city isn't one of the ${places.length} places with postcode ${value.zip.trim()}, e.g.`
+                : `Postcode ${value.zip.trim()} covers ${places.length} places — pick yours:`}
+            </span>
+            {places.slice(0, 6).map((p) => (
+              <button
+                key={p.city}
+                type="button"
+                onClick={() => onChange({ ...value, city: p.city })}
+                className="rounded-md border border-border bg-card px-2 py-0.5 font-medium text-foreground hover:bg-secondary"
+              >
+                {p.city}
+              </button>
+            ))}
+            {places.length > 6 && <span>+{places.length - 6} more</span>}
+          </div>
+        )}
+        {lookup?.status === "unknown" && <PostcodeNote lookup={lookup} zip={value.zip} countryName={countryName} />}
         <div className="grid gap-3">
           <input value={value.phone} onChange={set("phone")} placeholder="Phone, e.g. +372 5555 1234" type="tel" autoComplete="tel" className={inputClass} />
           <input value={value.email} onChange={set("email")} placeholder="Email" type="email" autoComplete="email" className={inputClass} />
         </div>
+        {footer}
       </div>
     </div>
   )
@@ -225,6 +474,7 @@ function LocationFields({
   countries,
   countryPlaceholder,
   saved = [],
+  header,
 }: {
   title: string
   icon: LucideIcon
@@ -234,17 +484,20 @@ function LocationFields({
   countryPlaceholder: string
   /** Address book entries; picking one fills in the whole party, not just the location. */
   saved?: SavedParty[]
+  header?: React.ReactNode
 }) {
   const usable = saved.filter((p) => countries.some((c) => c.code === p.country))
   const set = (field: keyof Party) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     onChange({ ...value, [field]: e.target.value })
   const zipError = postcodeError(value.country, value.zip)
+  const lookup = usePostcodeLookup(value.country, value.zip)
   return (
     <div className="rounded-2xl border border-border bg-card/60 p-4 sm:p-5">
       <div className="mb-3 flex items-center gap-2 font-semibold text-foreground">
         <Icon className="h-4 w-4 text-ship" />
         {title}
       </div>
+      {header}
       {usable.length > 0 && (
         <select
           value=""
@@ -255,7 +508,7 @@ function LocationFields({
           aria-label={`${title}: saved addresses`}
           className={cn(inputClass, "mb-3 text-sm text-muted-foreground")}
         >
-          <option value="">Saved addresses…</option>
+          <option value="">Recent addresses…</option>
           {usable.map((p, i) => (
             <option key={i} value={i}>
               {p.name} — {p.street}, {p.zip} {p.city}
@@ -282,7 +535,15 @@ function LocationFields({
           className={cn(inputClass, zipError && "border-destructive/60 focus:ring-destructive/30")}
         />
       </div>
-      {zipError && <p className="mt-2 text-xs text-destructive">{zipError}</p>}
+      {zipError ? (
+        <p className="mt-2 text-xs text-destructive">{zipError}</p>
+      ) : (
+        <PostcodeNote
+          lookup={lookup}
+          zip={value.zip}
+          countryName={countries.find((c) => c.code === value.country)?.name ?? value.country}
+        />
+      )}
       {needsState(value.country) && (
         <input
           value={value.state ?? ""}
@@ -335,6 +596,47 @@ export function NewShipmentWizard({
     }
   }, [])
   const [sender, setSender] = useState<Party>(draft?.sender ?? EMPTY_PARTY)
+  // The user's own sender addresses (up to five). A fresh shipment starts from the default one.
+  const [savedSenders, setSavedSenders] = useState<SavedSender[]>([])
+  const [sendersBusy, setSendersBusy] = useState(false)
+  const [sendersError, setSendersError] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/shipments/senders/", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { senders?: SavedSender[] } | null) => {
+        if (cancelled || !data?.senders) return
+        setSavedSenders(data.senders)
+        const preferred = data.senders.find((s) => s.isDefault)
+        if (!draft && preferred) {
+          setSender((prev) => (prev.country === "" && prev.zip.trim() === "" ? partyFromSaved(preferred) : prev))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  async function storeSenders(next: SavedSender[]) {
+    setSendersBusy(true)
+    setSendersError(null)
+    try {
+      const res = await fetch("/api/shipments/senders/", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senders: next }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Couldn't save your addresses")
+      setSavedSenders(data.senders ?? [])
+    } catch (err) {
+      setSendersError(err instanceof Error ? err.message : "Couldn't save your addresses")
+    } finally {
+      setSendersBusy(false)
+    }
+  }
+  const currentSenderSaved = savedSenders.find((s) => partyKey(s) === partyKey(sender)) ?? null
   const [receiver, setReceiver] = useState<Party>(draft?.receiver ?? EMPTY_PARTY)
   const [weightKg, setWeightKg] = useState<number | "">(draft?.weightKg ?? "")
   const [lengthCm, setLengthCm] = useState<number | "">(draft?.lengthCm ?? "")
@@ -784,7 +1086,18 @@ export function NewShipmentWizard({
                 onChange={setSender}
                 countries={EU_COUNTRIES}
                 countryPlaceholder="Country (EU only)"
-                saved={savedParties.senders}
+                saved={savedParties.senders.filter((p) => !savedSenders.some((s) => partyKey(s) === partyKey(p)))}
+                header={
+                  savedSenders.length > 0 && (
+                    <SavedSenderChips
+                      senders={savedSenders}
+                      current={sender}
+                      busy={sendersBusy}
+                      onPick={(s) => setSender(partyFromSaved(s))}
+                      onRemove={(id) => void storeSenders(savedSenders.filter((x) => x.id !== id))}
+                    />
+                  )
+                }
               />
               <LocationFields
                 title="To"
@@ -959,6 +1272,28 @@ export function NewShipmentWizard({
                 onChange={setSender}
                 countries={EU_COUNTRIES}
                 onChangeLocation={() => setStep(1)}
+                footer={
+                  <SenderBookBar
+                    sender={sender}
+                    saved={currentSenderSaved}
+                    count={savedSenders.length}
+                    busy={sendersBusy}
+                    error={sendersError}
+                    onSave={(label, makeDefault) =>
+                      storeSenders([
+                        ...savedSenders.map((s) => ({ ...s, isDefault: makeDefault ? false : s.isDefault })),
+                        {
+                          ...toAddress(sender),
+                          name: sender.name.trim(),
+                          id: crypto.randomUUID(),
+                          label,
+                          isDefault: makeDefault || savedSenders.length === 0,
+                        },
+                      ])
+                    }
+                    onMakeDefault={(id) => storeSenders(savedSenders.map((s) => ({ ...s, isDefault: s.id === id })))}
+                  />
+                }
               />
               <PartyFields
                 title="To"

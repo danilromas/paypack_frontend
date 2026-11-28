@@ -7,7 +7,7 @@ let ppRuntimeSettings =
   typeof PayPackStorage !== "undefined"
     ? PayPackStorage.normalizeSettings(PayPackStorage.SYNC_DEFAULTS)
     : {
-        paypackOrigin: "https://paypack.uno",
+        paypackOrigin: "https://www.paypack.uno",
         showFab: true,
         showFeedButtons: true,
         buttonLabel: "BUY IN PAYPACK",

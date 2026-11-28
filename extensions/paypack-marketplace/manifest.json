@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PayPack Marketplace",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Import Facebook Marketplace listings into PayPack — history, settings, and one-click overlay.",
   "permissions": [
     "activeTab",
@@ -18,6 +18,7 @@
     "https://web.facebook.com/*",
     "https://m.facebook.com/*",
     "https://paypack.uno/*",
+    "https://www.paypack.uno/*",
     "https://*.vercel.app/*",
     "http://localhost:3000/*"
   ],
@@ -42,6 +43,7 @@
     {
       "matches": [
         "https://paypack.uno/*",
+        "https://www.paypack.uno/*",
         "https://*.vercel.app/*",
         "http://localhost:3000/*"
       ],

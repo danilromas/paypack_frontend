@@ -18,7 +18,10 @@ export function detectMarketplacePlatform(
     return null
   }
   if (!FACEBOOK_HOSTS.has(parsed.hostname.toLowerCase())) return null
-  if (!parsed.pathname.includes("/marketplace/")) return null
+  // The Facebook app's "Share" button copies a short /share/<token>/ link that redirects to the listing.
+  // Posts, videos and reels share as /share/p|v|r/…, so only the bare token form counts.
+  const isShareLink = /^\/share\/[A-Za-z0-9_-]+\/?$/.test(parsed.pathname)
+  if (!parsed.pathname.includes("/marketplace/") && !isShareLink) return null
   return "facebook_marketplace"
 }
 

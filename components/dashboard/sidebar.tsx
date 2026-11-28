@@ -14,10 +14,12 @@ import {
   Wallet,
   LogOut,
   Users,
+  BadgeCheck,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RatingStars } from "@/components/dashboard/rating-stars";
 import {
   SECTION_HOME,
@@ -27,6 +29,9 @@ import {
 } from "@/components/dashboard/section-switcher";
 
 interface RatingSummary {
+  avatarUrl: string | null;
+  kycStatus: string;
+  completedDealsCount: number;
   ratingAverage: number | null;
   ratingCount: number;
   memberSince: string;
@@ -116,34 +121,59 @@ export function DashboardSidebar() {
       </div>
 
       {/* Profile */}
-      <Link
-        href="/dashboard/profile"
-        className={cn(
-          "flex items-center gap-3 border-b border-sidebar-border px-6 py-4 transition-colors hover:bg-sidebar-accent/50",
-          pathname.startsWith("/dashboard/profile") && "bg-sidebar-accent",
-        )}
-      >
-        <Avatar className="h-10 w-10">
-          <AvatarFallback className="bg-sidebar-accent text-sm font-bold text-primary">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex min-w-0 flex-col text-left text-sm">
-          <span className="truncate font-semibold text-sidebar-foreground">
-            {user?.name ?? "..."}
-          </span>
-          {rating ? (
-            <>
-              <RatingStars score={rating.ratingAverage} count={rating.ratingCount} size="sm" />
-              <span className="truncate text-[10px] text-sidebar-muted">
-                On PayPack since {new Date(rating.memberSince).getFullYear()}
-              </span>
-            </>
-          ) : (
-            <span className="truncate text-xs text-sidebar-muted">{user?.email ?? ""}</span>
+      <div className="border-b border-sidebar-border px-4 py-3">
+        <Link
+          href="/dashboard/profile"
+          className={cn(
+            "group flex items-center gap-3 rounded-2xl border border-sidebar-border bg-sidebar-accent/40 p-3 transition-all hover:border-primary/30 hover:bg-sidebar-accent",
+            pathname.startsWith("/dashboard/profile") && "border-primary/40 bg-sidebar-accent",
           )}
-        </div>
-      </Link>
+        >
+          <div className="relative shrink-0">
+            <Avatar className="h-11 w-11 ring-2 ring-primary/25 ring-offset-2 ring-offset-sidebar">
+              {rating?.avatarUrl ? <AvatarImage src={rating.avatarUrl} alt="" className="object-cover" /> : null}
+              <AvatarFallback className="bg-gradient-to-br from-primary/25 to-primary/5 text-sm font-bold text-primary">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            {rating?.kycStatus === "approved" && (
+              <span
+                title="Identity verified"
+                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-sidebar"
+              >
+                <BadgeCheck className="h-4 w-4 fill-primary text-sidebar" />
+              </span>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+            <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">
+              {user?.name ?? "..."}
+            </span>
+            {rating ? (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <RatingStars score={rating.ratingAverage} size="sm" />
+                  <span className="text-[11px] font-medium text-sidebar-foreground">
+                    {rating.ratingAverage != null ? rating.ratingAverage.toFixed(1) : "New"}
+                  </span>
+                  {rating.ratingCount > 0 && (
+                    <span className="text-[10px] text-sidebar-muted">({rating.ratingCount})</span>
+                  )}
+                </span>
+                <span className="truncate text-[10px] text-sidebar-muted">
+                  {rating.completedDealsCount > 0
+                    ? `${rating.completedDealsCount} deal${rating.completedDealsCount === 1 ? "" : "s"} · `
+                    : ""}
+                  since {new Date(rating.memberSince).getFullYear()}
+                </span>
+              </>
+            ) : (
+              <span className="truncate text-xs text-sidebar-muted">{user?.email ?? ""}</span>
+            )}
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-sidebar-muted transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-3">

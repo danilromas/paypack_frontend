@@ -18,6 +18,6 @@ PayPack Marketplace — Chrome extension v1.1
 6) Open a Facebook Marketplace listing — use the teal overlay button
    "BUY IN PAYPACK" above the seller message box (not inside Facebook DOM).
 
-Default site URL: https://paypack.uno (change in Settings if needed).
+Default site URL: https://www.paypack.uno (change in Settings if needed).
 
 For updates: remove the old extension (or Reload), unzip the new zip, Load unpacked again.

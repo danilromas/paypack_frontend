@@ -33,6 +33,8 @@ export const users = pgTable("users", {
   // and every label is billed at carrier cost plus this markup.
   shippingCreditLimit: numeric("shipping_credit_limit", { precision: 10, scale: 2 }),
   shippingMarkupPct: numeric("shipping_markup_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  // Up to five sender addresses the user keeps for new shipments; the one marked default pre-fills the wizard.
+  senderAddressBook: jsonb("sender_address_book").$type<SavedSenderColumn[]>().notNull().default(sql`'[]'::jsonb`),
   // Admin sanctions: "restricted" can sign in but can't move money or open deals; "suspended" can't sign in.
   status: text("status").notNull().default("active"),
   statusReason: text("status_reason"),
@@ -277,6 +279,21 @@ export const notificationPreferences = pgTable("notification_preferences", {
   pushSecurityAlerts: boolean("push_security_alerts").notNull().default(true),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** One entry of users.sender_address_book (see SavedSender in lib/shipments). */
+export interface SavedSenderColumn {
+  id: string
+  label: string
+  name: string
+  country: string
+  zip: string
+  city: string
+  street: string
+  phone: string
+  email: string
+  state?: string | null
+  isDefault: boolean
+}
 
 /** Structured postal address + contact, needed to book a real carrier shipment. */
 export interface ShipmentAddressColumn {
