@@ -7,6 +7,7 @@ import { validateDealEditPayload, type DealEditPayload } from "@/lib/deals"
 import { getCurrentUser } from "@/lib/auth/session"
 import { getDealForViewer } from "@/lib/deals-access"
 import { notifyOtherParticipants } from "@/lib/notifications"
+import { logDealEvent } from "@/lib/deal-events"
 
 function normalizePayload(body: Record<string, unknown>): DealEditPayload {
   return {
@@ -104,6 +105,7 @@ export async function PUT(
       )
     }
 
+    await logDealEvent(db, { dealId: id, actorUserId: user.id, type: "edited", message: "Deal terms updated" })
     const updated = await getDealForViewer(id, user.id)
     return NextResponse.json(updated)
   } catch (error) {

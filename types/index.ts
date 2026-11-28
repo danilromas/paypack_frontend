@@ -28,6 +28,20 @@ export interface Deal {
   boxWidthCm?: number
   boxHeightCm?: number
   counterpartyUserId?: string
+  /** Where the seller ships to — set by the buyer when paying into escrow. */
+  delivery?: {
+    name: string
+    phone: string
+    street: string
+    city: string
+    postcode: string
+    country: string
+    note: string
+  }
+  paidAt?: string
+  shippedAt?: string
+  deliveredAt?: string
+  completedAt?: string
   hasRated?: boolean
   createdAt: string
   updatedAt: string

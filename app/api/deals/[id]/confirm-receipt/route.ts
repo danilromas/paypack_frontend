@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import { isUuid } from "@/lib/ids"
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { deals, walletTransactions } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/session"
 import { getParticipantRole, getOtherParticipantUserId, getDealForViewer } from "@/lib/deals-access"
 import { notifyUser } from "@/lib/notifications"
+import { logDealEvent } from "@/lib/deal-events"
 
 /** Buyer confirms receipt — the only action that releases the escrowed funds to the seller. */
 export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
@@ -30,7 +31,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
     const updated = await db.transaction(async (tx) => {
       const rows = await tx
         .update(deals)
-        .set({ status: "completed", updatedAt: new Date() })
+        .set({ status: "completed", completedAt: new Date(), deliveredAt: sql`coalesce(${deals.deliveredAt}, now())`, updatedAt: new Date() })
         .where(and(eq(deals.id, id), eq(deals.status, "shipped")))
         .returning()
       const deal = rows[0]
@@ -44,6 +45,13 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
         status: "completed",
         relatedDealId: deal.id,
         description: `Payout for completed deal — ${deal.title}`,
+      })
+
+      await logDealEvent(tx, {
+        dealId: deal.id,
+        actorUserId: user.id,
+        type: "completed",
+        message: `Receipt confirmed — ${amount.toFixed(2)} ${deal.currency} released to the seller`,
       })
 
       await notifyUser(tx, {

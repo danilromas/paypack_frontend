@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/session"
 import { getParticipantRole, getOtherParticipantUserId, getDealForViewer } from "@/lib/deals-access"
 import { validateRatingPayload } from "@/lib/ratings"
 import { notifyUser } from "@/lib/notifications"
+import { logDealEvent } from "@/lib/deal-events"
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
@@ -64,6 +65,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
           comment,
         })
         .returning()
+
+      await logDealEvent(tx, {
+        dealId: id,
+        actorUserId: user.id,
+        type: "rated",
+        message: `Left a ${body.score as number}-star rating`,
+      })
 
       await notifyUser(tx, {
         userId: ratedUserId,

@@ -8,6 +8,8 @@ import { getParticipantRole, getOtherParticipantUserId, getDealForViewer } from 
 import { getAvailableBalance, lockWallet } from "@/lib/wallet"
 import { notifyOtherParticipants } from "@/lib/notifications"
 import { CRYPTO_COINS, PAYMENT_METHODS } from "@/lib/payments"
+import { parseDeliveryAddress, validateDeliveryAddress } from "@/lib/deals"
+import { logDealEvent } from "@/lib/deal-events"
 
 /** Buyer accepts the deal and pays its price+shipping into escrow — a real, immediate ledger deduction. */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -28,6 +30,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       paymentMethod?: unknown
       paymentCryptoCoin?: unknown
       expectedAmount?: unknown
+      delivery?: unknown
+    }
+    // The seller needs to know where to ship, so the buyer gives the address as they pay.
+    const delivery = parseDeliveryAddress(body.delivery)
+    const deliveryError = validateDeliveryAddress(delivery)
+    if (deliveryError || !delivery) {
+      return NextResponse.json({ error: deliveryError ?? "Add a delivery address" }, { status: 400 })
     }
     const expectedAmount =
       typeof body.expectedAmount === "number" && Number.isFinite(body.expectedAmount) ? body.expectedAmount : null
@@ -79,7 +88,15 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         .update(deals)
         .set({
           status: "escrow",
+          paidAt: new Date(),
           updatedAt: new Date(),
+          deliveryName: delivery.name,
+          deliveryPhone: delivery.phone || null,
+          deliveryStreet: delivery.street,
+          deliveryCity: delivery.city,
+          deliveryPostcode: delivery.postcode,
+          deliveryCountry: delivery.country,
+          deliveryNote: delivery.note || null,
           ...(paymentMethod ? { paymentMethod, paymentCryptoCoin } : {}),
         })
         .where(
@@ -104,10 +121,17 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
         description: `Escrow hold for "${dealRow.title}"`,
       })
 
+      await logDealEvent(tx, {
+        dealId: dealRow.id,
+        actorUserId: user.id,
+        type: "paid",
+        message: `Paid ${amount.toFixed(2)} ${dealRow.currency} into escrow`,
+      })
+
       await notifyOtherParticipants(tx, dealRow.id, user.id, {
         type: "deal",
         title: `"${dealRow.title}" is now in escrow`,
-        description: "The buyer paid into escrow — ship when ready.",
+        description: `The buyer paid — ship to ${delivery.city}, ${delivery.country}.`,
         relatedHref: "/dashboard/deals",
       })
 
